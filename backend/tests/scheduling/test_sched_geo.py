@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from scheduling.catalog_index import CatalogIndex, build_index
-from scheduling.geo import haversine, nearby, resolve_place
+from scheduling.geo import haversine, names_own_area, nearby, resolve_place
 from scheduling.names import match_locations
 
 EVAL_DIR = Path(__file__).resolve().parents[3] / "eval"
@@ -178,3 +178,31 @@ def test_load_reads_geo_from_disk(tmp_path):
     (tmp_path / "aliases.json").write_text(json.dumps({"aliases": {}}), encoding="utf-8")
     ix = CatalogIndex.load(tmp_path / "catalog.json")
     assert resolve_place(ix, "Portland, Oregon").anchors[0].key == "metro:portland-or"
+
+
+@pytest.mark.parametrize("phrase,anchors", [
+    ("my zip code is 78751", ["zip:78751"]),
+    ("the postal code's 78741", ["zip:78741"]),
+    ("zip 78999", ["zip3:787"]),            # 789 has no clinic; 787 is the nearest area in region 78
+])
+def test_a_zip_inside_a_sentence_is_the_zip(nat, phrase, anchors):
+    m = resolve_place(nat, phrase)
+    assert (m.site_ids, _anchors(m)) == ((), anchors)
+
+
+def test_a_zip_anchor_is_said_as_the_callers_zip(nat):
+    assert [p.label for p in resolve_place(nat, "it's 78999").anchors] == ["78999"]
+
+
+def test_a_misheard_city_beats_clinics_named_after_it():
+    extra = _loc("loc_d3", "Dallas Uptown Clinic", "dallas-tx", "Uptown", "75204", 32.80, -96.80, "TX", "Dallas")
+    ix = build_index(national_raw(locations=LOCATIONS + [extra]), {"aliases": {}})
+    assert _anchors(resolve_place(ix, "Dalas")) == ["metro:dallas-tx"]
+    assert resolve_place(ix, "Dallas Uptown").site_ids == ("loc_d3",)
+
+
+def test_names_own_area(nat):
+    assert names_own_area(nat, "Cedar Park", "loc_a4")             # the clinic and the suburb it is in
+    assert names_own_area(nat, "I'm in Riverside", "loc_a1")
+    assert not names_own_area(nat, "Cedar Park Health Center", "loc_a4")
+    assert not names_own_area(nat, "Mueller", "loc_a3")            # Mueller Clinic is in Hyde Park

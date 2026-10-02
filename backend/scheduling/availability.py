@@ -125,15 +125,16 @@ class MockAvailability:
         return day.weekday() in self.clinic_days(row.provider, week_start).get(row.location.id, ())
 
     def _busy(self, provider_id: str, start: datetime, end: datetime, ignore: str | None = None) -> bool:
-        return any(h.slot.provider_id == provider_id and h.slot.id != ignore
+        return bool(self._holds) and any(h.slot.provider_id == provider_id and h.slot.id != ignore
                    and h.slot.start < end and start < h.slot.end for h in self._holds.values())
 
     def _day_slots(self, row: BookableRow, day: date) -> list[Slot]:
         dur = row.type.duration_min
         out = []
+        midnight, earliest = datetime.combine(day, datetime.min.time()), self.now + MIN_LEAD
         for minute in range(row.location.open_minute, row.location.close_minute - dur + 1, dur):
-            start = datetime.combine(day, datetime.min.time()) + timedelta(minutes=minute)
-            if start < self.now + MIN_LEAD:
+            start = midnight + timedelta(minutes=minute)
+            if start < earliest:
                 continue
             if _unit(self.seed, row.provider.id, row.location.id, day.isoformat(), minute, dur) >= self.open_rate:
                 continue

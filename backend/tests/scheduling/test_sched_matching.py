@@ -19,6 +19,7 @@ def _ids(cands):
     ("physical therapy", ["appt_070"]),
     ("flu shot", ["appt_011"]),
     ("eye exam", ["appt_045"]),
+    ("want my teeth cleaned", ["appt_074"]),             # "-ed" stems like "-ing"
 ])
 def test_lexicon_top1(index, phrase, top):
     assert _ids(match_types(index, phrase))[:1] == top

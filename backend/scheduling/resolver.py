@@ -20,7 +20,7 @@ import jellyfish
 from .availability import Availability, Slot as TimeSlot
 from .catalog_index import BookableRow, CatalogIndex
 from .decision import DECLINE, Verdict
-from .geo import RADIUS_MI, Place, PlaceMatch, haversine, nearby, resolve_place
+from .geo import RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, resolve_place
 from .lexicon import SHORTLIST_ABOVE, TypeCandidate, match_types, type_shortlist, types_named, unexplained_words
 from .names import clue_words, match_locations, match_providers
 from .policy import IssueKind, Rule, Violation, check, has_violation
@@ -31,6 +31,8 @@ TYPE_TIE_GAP = 0.1
 MAX_OPTIONS = 3
 HANDOFF_AFTER_MISSES = 3
 # An area search widens from the place's own radius to twice that, then to this, before refusing.
+# No ring goes past it: an anchor whose own radius is wider (a state with no catalog city in it)
+# refuses with none_nearby at once, naming the nearest city that has the visit.
 FINAL_RING_MI = 50.0
 MAX_SITE_CHOICES = 20
 _REFUSAL_PRIORITY = (Rule.NEW_PATIENT_TYPE, Rule.REFERRAL, Rule.NEW_PATIENT_PROVIDER)
@@ -296,7 +298,7 @@ class _Resolution:
 
         rows_pl = rows_p if location_ids is None else [r for r in rows_p if r.location.id in location_ids]
         if location_ids is not None and not rows_pl:
-            if self._newer("service", "location") or self._newer("provider", "location"):
+            if self._newer("service", "location") or self._newer("provider", "location") or self._area_too(location_ids):
                 self.preface += f"That's not available at {self._where(location_ids)}. "
                 self.notes.append("dropped location: does not fit the newer choice")
                 self.slots["location"] = Slot(turn=self.req.turn)
@@ -492,12 +494,15 @@ class _Resolution:
 
     def _ring(self, anchors: tuple[Place, ...], type_ids: list[str], provider_ids: list[str] | None,
               prov_rows: list[BookableRow] | None, has_service: bool):
-        """Widen around the area until some row there passes policy or needs only an answer."""
+        """Widen around the area until some row there passes policy or needs only an answer. A
+        named city's first ring is its own clinics: a neighboring city is "nothing closer"."""
         base = min(a.radius_mi for a in anchors)
-        radii = sorted({base, 2 * base, max(base, FINAL_RING_MI)})
+        radii = [r for r in sorted({base, 2 * base, FINAL_RING_MI}) if r <= FINAL_RING_MI]
         allowed = set(provider_ids) if provider_ids is not None else None
+        if not radii:
+            return self._none_nearby(anchors, base, type_ids, allowed, prov_rows, has_service)
         for radius in radii:
-            dist = self._distances(anchors, radius)
+            dist = self._distances(anchors, radius, own_metro_only=radius == radii[0])
             if allowed is None:
                 cand = self._rows_at(type_ids, dist)
             else:
@@ -517,7 +522,8 @@ class _Resolution:
         self.notes.append(f"area {'/'.join(a.key for a in anchors)} within {radius:g} mi: {len(order)} sites")
         if nearest and radius > radii[0]:
             lid = nearest.location.id
-            self.preface += T.ring_preface(self.ix, lid, dist[lid], anchors[0].label)
+            self.preface += T.ring_preface(self.ix, lid, dist[lid], anchors[0].label,
+                                           tuple(m for a in anchors for m in a.metro_ids))
         return _union(local, prov_rows), list(order)
 
     def _none_nearby(self, anchors: tuple[Place, ...], radius: float, type_ids: list[str],
@@ -616,12 +622,14 @@ class _Resolution:
         m = self.ix.metros[mid]
         return Place(f"metro:{mid}", "metro", m.name, m.lat, m.lon, (mid,), RADIUS_MI["metro"])
 
-    def _distances(self, anchors: tuple[Place, ...], radius: float) -> dict[str, float]:
-        """Miles to the nearest anchor for sites within `radius`; a city's own sites always count."""
+    def _distances(self, anchors: tuple[Place, ...], radius: float, own_metro_only: bool = False) -> dict[str, float]:
+        """Miles to the nearest anchor for sites within `radius`; a city's own sites always count,
+        and with `own_metro_only` they are all a city anchor reaches."""
         out: dict[str, float] = {}
         for a in anchors:
-            for lid, d in nearby(self.ix, a, radius):
-                out[lid] = min(d, out.get(lid, math.inf))
+            if not (own_metro_only and a.kind == "metro"):
+                for lid, d in nearby(self.ix, a, radius):
+                    out[lid] = min(d, out.get(lid, math.inf))
             if a.kind == "metro":
                 for mid in a.metro_ids:
                     for lid in self.ix.locs_by_metro.get(mid, ()):
@@ -636,6 +644,11 @@ class _Resolution:
 
     def _metro_rows(self, type_ids: list[str], metros: frozenset[str]) -> list[BookableRow]:
         return self._rows_at(type_ids, {l: 0.0 for m in sorted(metros) for l in self.ix.locs_by_metro.get(m, ())})
+
+    def _area_too(self, location_ids: list[str]) -> bool:
+        """"Lakewood" named a clinic that can't do this, and also the suburb it is in: search there."""
+        heard = self.slots["location"].heard
+        return self.geo and all(names_own_area(self.ix, heard, l) for l in location_ids)
 
     def _consult_site(self, sites: list[str], type_id: str) -> Verdict:
         s = self.slots["location"]
@@ -935,7 +948,8 @@ _PLACE_FILLER = frozenset({
     "please", "neighborhood", "region", "metro", "city", "town", "health", "center", "centre", "clinic",
     "clinics", "family", "specialty", "medical", "group", "community", "care", "office", "location", "on",
     "and", "my", "me", "that", "is", "there", "you", "your", "any", "some", "okay", "ok", "yes", "yeah", "like",
-    "want", "would", "prefer", "go", "get", "see", "can", "could", "for", "with", "us", "our", "place"})
+    "want", "would", "prefer", "go", "get", "see", "can", "could", "for", "with", "us", "our", "place", "zip",
+    "zipcode", "code", "postal"})
 
 
 def _time_fits(start: datetime, tp: TimePref) -> bool:

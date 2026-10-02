@@ -26,6 +26,7 @@ from pipecat.frames.frames import TTSSpeakFrame  # noqa: E402
 from agent_builder import AgentBuilder  # noqa: E402
 
 AGENT = BACKEND_DIR / "agents" / "clinic-scheduler.json"
+NATIONAL_AGENT = BACKEND_DIR / "agents" / "national-scheduler.json"
 
 # Each beat: ("caller", what they say) is narration; ("call", function, args) is the LLM's tool call.
 BEATS: dict[str, list[tuple]] = {
@@ -92,6 +93,24 @@ BEATS: dict[str, list[tuple]] = {
         ("caller", "Okay, that's all, bye."),
         ("call", "finish", {}),
     ],
+    "N1": [
+        ("caller", "Hi, I hurt my knee playing football. I'm in Austin, soonest you have please."),
+        ("llm", "start", {"summary": "Hurt knee playing football; in Austin; soonest."}),
+        ("llm", "update_request", {"service_phrase": "hurt my knee playing football", "location_phrase": "I'm in Austin",
+                                   "time_pref": {"soonest": True}}),
+        ("caller", "Sports injury. And I'm a new patient, no referral."),
+        ("llm", "update_request", {"service_phrase": "sports injury evaluation", "is_new": True, "has_referral": False}),
+        ("caller", "The first one."),
+        ("llm", "update_request", {"pick_offer": 1}),
+        ("caller", "Yes, book it."),
+        ("llm", "hold_slot", {}),
+        ("llm", "book_offer", {}),
+    ],
+    "N2": [
+        ("caller", "I need a dental cleaning, I live in Maine."),
+        ("llm", "start", {"summary": "Dental cleaning; lives in Maine."}),
+        ("llm", "update_request", {"service_phrase": "dental cleaning", "location_phrase": "I live in Maine"}),
+    ],
 }
 
 
@@ -142,7 +161,7 @@ async def run_beat(key: str) -> None:
     async def on_event(event: dict) -> None:
         events.append(event)
 
-    builder = AgentBuilder.from_json(AGENT, on_event=on_event)
+    builder = AgentBuilder.from_json(NATIONAL_AGENT if key.startswith("N") else AGENT, on_event=on_event)
     fm = SimFlowManager()
     await builder.start(fm)
     for step in BEATS[key]:

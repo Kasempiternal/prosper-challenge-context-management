@@ -11,12 +11,12 @@ from __future__ import annotations
 import math
 import re
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Callable, Iterable, Mapping
 
 import jellyfish
 
-from .names import NameCandidate, match_locations
+from .names import NameCandidate, _location_words, match_locations
 from .text import normalize, phonetic_keys, tokens
 
 if TYPE_CHECKING:
@@ -59,7 +59,8 @@ _NEAR_PREFIXES = (("close", "to"), ("closest", "to"), ("nearest", "to"), ("next"
                   ("near",), ("nearby",), ("around",), ("by",))
 _LEAD_FILLER = {"i", "m", "am", "im", "we", "re", "live", "living", "work", "stay", "staying", "located",
                 "based", "in", "at", "from", "um", "uh", "so", "well", "the", "over", "out", "here",
-                "somewhere", "anywhere", "just", "a", "s", "it", "one", "of"}
+                "somewhere", "anywhere", "just", "a", "s", "it", "one", "of", "my", "is", "zip", "zipcode",
+                "code", "postal"}
 _TRAILING_FILLER = {"area", "please", "neighborhood", "region", "metro", "city"}
 _ZIP = re.compile(r"^\d{5}$")
 
@@ -198,6 +199,15 @@ def resolve_place(ix: CatalogIndex, phrase: str | None) -> PlaceMatch:
     return found if found.sites or found.anchors else PlaceMatch(anchors=region)
 
 
+def names_own_area(ix: CatalogIndex, phrase: str | None, location_id: str) -> bool:
+    """The phrase is just the name of the neighborhood or suburb the clinic is in ("Lakewood" for
+    Lakewood Family Clinic, in Lakewood): the caller may mean the clinic or the place."""
+    loc = ix.locations[location_id]
+    _, words = _strip_lead(ix.gazetteer, tokens((phrase or "").partition(",")[0]))
+    own = {f"nbhd:{loc.metro_id}:{normalize(n)}" for n in (loc.neighborhood, loc.city) if n}
+    return any(p.key in own for p in ix.gazetteer.areas.get(" ".join(words), ()))
+
+
 def nearby(ix: CatalogIndex, place: Place, radius_mi: float | None = None,
            within: Iterable[str] | None = None) -> tuple[tuple[str, float], ...]:
     """(location id, miles) for sites within `radius_mi` (default: the place's own radius) of the
@@ -275,8 +285,10 @@ def _resolve_head(ix: CatalogIndex, words: list[str], near: bool, within: frozen
         return within is None or bool(within & set(p.metro_ids))
 
     if _ZIP.match(text):
-        place = gz.zips.get(text) or gz.zip3s.get(text[:3])
-        return PlaceMatch(anchors=(place,)) if place and keep(place) else PlaceMatch()
+        place = gz.zips.get(text) or gz.zip3s.get(text[:3]) or _nearest_zip3(gz, text)
+        if place is None or not keep(place):
+            return PlaceMatch()
+        return PlaceMatch(anchors=(replace(place, label=text),))  # say the caller's ZIP, not "370"
 
     exact = [p for p in gz.areas.get(text, ()) if keep(p)]
     if text in _WORD_ABBREVS:
@@ -286,6 +298,11 @@ def _resolve_head(ix: CatalogIndex, words: list[str], near: bool, within: frozen
         return PlaceMatch(anchors=_prefer_metros(regions))
 
     sites = _sites(ix, text, within)
+    if not any(set(words) & _location_words(ix.locations[c.id]) for c in sites):
+        # "Philedelphia": a misheard city name is the city, not the clinics with the city in their name.
+        misheard = _fuzzy_areas(gz, text, keep)
+        if misheard and all(p.kind in ("metro", "state") for p in misheard):
+            return PlaceMatch(anchors=_prefer_metros(misheard))
     if sites and sites[0].via == "exact" and sites[0].score >= STRONG_SITE_SCORE:
         return _site_anchors(gz, sites) if near else PlaceMatch(sites=sites)
     neighborhoods = [p for p in exact if p.kind == "neighborhood"]
@@ -297,6 +314,16 @@ def _resolve_head(ix: CatalogIndex, words: list[str], near: bool, within: frozen
     if sites:
         return _site_anchors(gz, sites) if near else PlaceMatch(sites=sites)
     return PlaceMatch()
+
+
+def _nearest_zip3(gz: Gazetteer, zip_code: str) -> Place | None:
+    """A ZIP whose 3-digit area has no clinic: ZIP areas are numbered geographically within their
+    2-digit region (370-385 is Tennessee), so the numerically nearest catalog area in the same
+    region stands in. Another region is never guessed."""
+    region = [z for z in gz.zip3s if z[:2] == zip_code[:2]]
+    if not region:
+        return None
+    return gz.zip3s[min(region, key=lambda z: (abs(int(z) - int(zip_code[:3])), z))]
 
 
 def _sites(ix: CatalogIndex, text: str, within: frozenset[str] | None) -> tuple[NameCandidate, ...]:

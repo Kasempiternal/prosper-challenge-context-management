@@ -84,11 +84,15 @@ def miles(d: float) -> str:
     return "1 mile" if n == 1 else f"{n} miles"
 
 
-def ring_preface(index: CatalogIndex, location_id: str, distance_mi: float, near: str) -> str:
-    """Said before offers when nothing was close: "The closest one is 18 miles away, in Round Rock." """
+def ring_preface(index: CatalogIndex, location_id: str, distance_mi: float, near: str,
+                 near_metros: tuple[str, ...] = ()) -> str:
+    """Said before offers when nothing was close: "The closest one is 18 miles away, in Round Rock."
+    A clinic in another of our cities is named by that city."""
     loc = index.locations[location_id]
     metro = index.metros.get(loc.metro_id)
-    if loc.city and normalize(loc.city) not in (normalize(near), normalize(metro.name) if metro else ""):
+    if metro and metro.name and near_metros and loc.metro_id not in near_metros:
+        where = metro.name
+    elif loc.city and normalize(loc.city) not in (normalize(near), normalize(metro.name) if metro else ""):
         where = loc.city
     else:
         where = loc.neighborhood or loc.short_name

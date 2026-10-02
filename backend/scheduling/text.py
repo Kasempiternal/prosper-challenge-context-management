@@ -30,7 +30,7 @@ def tokens(text: str) -> list[str]:
 
 def stem(token: str) -> str:
     """Crude stem so 'vaccine'/'vaccination', 'test'/'testing' share a key."""
-    for suffix in ("ations", "ation", "ings", "ing", "ies", "es", "s", "e"):
+    for suffix in ("ations", "ation", "ings", "ing", "ies", "ed", "es", "s", "e"):
         if len(token) > len(suffix) + 3 and token.endswith(suffix):
             return token[: -len(suffix)]
     return token

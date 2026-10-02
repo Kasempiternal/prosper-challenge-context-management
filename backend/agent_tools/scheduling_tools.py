@@ -74,7 +74,7 @@ def _update_request_properties(ctx: ToolContext) -> dict:
                            "description": "Specialty, only if the caller named or clearly implied one."},
         "provider_phrase": {"type": "string",
                             "description": "The doctor as the caller said it (e.g. 'Dr. Chen', 'the heart doctor Chen')."},
-        "location_phrase": {"type": "string", "description": "The clinic location as the caller said it."},
+        "location_phrase": {"type": "string", "description": "Where the caller wants to be seen, in their own words: clinic name, neighborhood, city, state or ZIP (e.g. \"I'm in Austin\", \"near Hyde Park\", \"78704\"). Never guess a place the caller did not say."},
         "is_new": {"type": "boolean", "description": "True if the caller is a new patient, false if established."},
         "has_referral": {"type": "boolean", "description": "Whether the caller has a referral."},
         "time_pref": {

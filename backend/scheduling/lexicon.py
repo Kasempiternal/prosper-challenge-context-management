@@ -18,6 +18,8 @@ _OFF_HINT_PENALTY = 0.6
 _NON_NAME_WHEN_NAMED = 0.85
 _STRONG = 0.7
 _SPECIALTY_DEFAULT_SCORE = 0.75
+# Words a type name carries that say nothing about it: "MRI - Brain", "Vaccination / Immunization".
+_NAME_STOP = {"of", "a", "an", "the", "and", "with", "for"}
 # A model choosing among every offered type is fine at SF's 74; at national scale (~300) the
 # request is cut to the types the phrase plausibly reaches.
 SHORTLIST_ABOVE = 80
@@ -60,13 +62,17 @@ class _Vocab:
     types_by_name_word: dict[str, tuple[str, ...]]
     name_words: dict[str, tuple[str, ...]]        # type id -> non-generic name words
     by_name: dict[str, tuple[str, ...]]           # normalized type name -> type ids
+    name_parts: dict[str, tuple[tuple[str, ...], ...]]  # type id -> each "/" alternative's words
     lay_term_words: int                           # words in the longest lay term
 
     @classmethod
     def build(cls, index: CatalogIndex) -> "_Vocab":
         name_words = {t.id: tuple(w for w in tokens(t.name) if w not in _GENERIC) for t in index.types.values()}
         alias_words = tuple(frozenset(a.phrase.split()) for a in index.aliases)
-        words = {w for ws in name_words.values() for w in ws} | {w for ws in alias_words for w in ws}
+        name_parts = {t.id: tuple(p for p in (tuple(w for w in tokens(part) if w not in _NAME_STOP)
+                                              for part in t.name.split("/")) if p)
+                      for t in index.types.values()}
+        words = {w for ps in name_parts.values() for p in ps for w in p} | {w for ws in alias_words for w in ws}
         by_stem: dict[str, list[str]] = defaultdict(list)
         by_len: dict[int, list[str]] = defaultdict(list)
         for w in sorted(words):
@@ -87,7 +93,7 @@ class _Vocab:
         def freeze(d: dict) -> dict:
             return {k: tuple(v) for k, v in d.items()}
         return cls(freeze(by_stem), freeze(by_len), freeze(aliases_by_word), alias_words,
-                   freeze(types_by_name_word), name_words, freeze(by_name),
+                   freeze(types_by_name_word), name_words, freeze(by_name), name_parts,
                    max((len(t.split()) for t in index.lay_terms), default=0))
 
     def matched(self, heard: list[str]) -> set[str]:
@@ -130,14 +136,15 @@ def match_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | N
 
 def _score_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | None) -> dict[str, TypeCandidate]:
     best: dict[str, TypeCandidate] = {}
+    alias_support: dict[str, set[int]] = defaultdict(set)
 
     def offer(tid: str, score: float, via: str) -> None:
         if tid not in best or score > best[tid].score:
             best[tid] = TypeCandidate(tid, round(score, 3), via)
 
     words = tokens(phrase or "")
+    vocab = _vocab(index)
     if words:
-        vocab = _vocab(index)
         for tid in vocab.by_name.get(" ".join(words), ()):
             offer(tid, 1.0, "name")
 
@@ -157,6 +164,7 @@ def _score_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | 
             coverage = (end - start) / len(words)
             for tid, w in alias.weights:
                 offer(tid, w * (0.6 + 0.4 * coverage), "alias")
+                alias_support[tid].update(range(start, end))
 
         content = [w for w in words if w not in _GENERIC]
         if content:
@@ -171,6 +179,8 @@ def _score_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | 
                 precision = hits / len(content)
                 offer(tid, 0.85 * (0.6 * recall + 0.4 * precision), "words")
 
+    named = _drop_dominated(index, vocab, words, best, alias_support)
+
     if any(c.via == "name" for c in best.values()):
         for tid, c in list(best.items()):
             if c.via != "name":
@@ -182,17 +192,51 @@ def _score_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | 
                 best[tid] = TypeCandidate(tid, round(c.score * _OFF_HINT_PENALTY, 3), c.via)
 
     strong = [c for c in best.values() if c.score >= _STRONG]
-    if not strong:
-        specialty = specialty_hint or _lay_specialty(index, words)
+    if not strong and not named:
+        lay = _lay_specialties(index, words)
+        # Lay terms of two specialties ("throat" and "stomach") are no single default's evidence.
+        specialty = specialty_hint or (lay[0] if len(lay) == 1 else None)
         default = index.specialty_default.get(specialty) if specialty else None
         if default:
             offer(default, _SPECIALTY_DEFAULT_SCORE, "specialty")
     return best
 
 
-def _lay_specialty(index: CatalogIndex, words: list[str]) -> str | None:
-    found = _lay_specialties(index, words)
-    return found[0] if found else None
+def _drop_dominated(index: CatalogIndex, vocab: _Vocab, words: list[str], best: dict[str, TypeCandidate],
+                    alias_support: dict[str, set[int]]) -> bool:
+    """A type whose full name the caller said, in order ("I need to get a colonoscopy", "knee
+    x-ray please"), drops every candidate whose evidence lies inside that name: Colonoscopy
+    Consultation, X-Ray, Therapy Session inside "physical therapy evaluation". This is the
+    exact-name rule for a name said inside a longer phrase; a name inside a longer said name
+    ("x-ray" in "knee x-ray") goes too. Returns whether some candidate at or above MIN_SCORE has
+    every distinctive name word heard (in any order)."""
+    kept = [i for i, w in enumerate(words) if w not in _NAME_STOP]
+    hits = [_word_hits(vocab, w) for w in words]
+    heard_anywhere = set().union(*(hits[i] for i in kept)) if kept else set()
+    spans: dict[str, frozenset[int]] = {}
+    named = False
+    for tid, cand in best.items():
+        for part in vocab.name_parts[tid]:
+            heard = [nw in heard_anywhere for nw in part]
+            distinctive = [h for h, nw in zip(heard, part) if nw not in _GENERIC]
+            named = named or (cand.score >= MIN_SCORE and bool(distinctive) and all(distinctive))
+            at = _find_span([words[i] for i in kept], list(part)) if all(heard) else -1
+            if at >= 0:
+                spans[tid] = spans.get(tid, frozenset()) | frozenset(kept[at:at + len(part)])
+    if not spans:
+        return named
+
+    def support(tid: str) -> set[int]:
+        out = set(alias_support.get(tid, ()))
+        for part in vocab.name_parts[tid]:
+            out.update(i for i, h in enumerate(hits) if not h.isdisjoint(part))
+        return out
+
+    dominated = {b for b in best for a, span in spans.items()
+                 if a != b and spans.get(b) != span and support(b) <= span}
+    for tid in dominated:
+        del best[tid]
+    return True
 
 
 def _lay_specialties(index: CatalogIndex, words: list[str]) -> list[str]:
@@ -210,20 +254,22 @@ def _lay_specialties(index: CatalogIndex, words: list[str]) -> list[str]:
 
 def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
                    metros: frozenset[str] | None = None) -> list[str]:
-    """At most SHORTLIST_SIZE offered types (offered in `metros`, when given) for a model to
-    choose among: lexical candidates at any score, then the types of the specialties the hint or
-    a lay term names, then every specialty's default. Sorted by id, like the full request."""
+    """Offered types (offered in `metros`, when given) for a model to choose among: at most
+    SHORTLIST_SIZE lexical candidates at any score and types of the specialties the hint or a lay
+    term names, plus every specialty's default, so a symptom no word of ours reaches ("swollen
+    stiff fingers") can still land in any specialty. Sorted by id, like the full request."""
     def offered(tid: str) -> bool:
-        return tid not in index.unoffered_types and (metros is None or bool(index.metros_by_type[tid] & metros))
+        return tid in index.types and tid not in index.unoffered_types and (
+            metros is None or bool(index.metros_by_type[tid] & metros))
 
     scored = sorted(_score_types(index, phrase, hint).values(), key=lambda c: (-c.score, c.type_id))
     ranked = [c.type_id for c in scored]
     for spec in ([hint] if hint else []) + _lay_specialties(index, tokens(phrase or "")):
         default = index.specialty_default.get(spec)
         ranked += ([default] if default else []) + sorted(t.id for t in index.types.values() if t.specialty == spec)
-    ranked += [index.specialty_default[s] for s in sorted(index.specialty_default)]
-    out = [tid for tid in dict.fromkeys(ranked) if tid in index.types and offered(tid)]
-    return sorted(out[:SHORTLIST_SIZE])
+    evidence = [tid for tid in dict.fromkeys(ranked) if offered(tid)][:SHORTLIST_SIZE]
+    defaults = [index.specialty_default[s] for s in sorted(index.specialty_default)]
+    return sorted(set(evidence) | {tid for tid in defaults if offered(tid)})
 
 
 # Filler that carries no meaning about which visit is wanted (contractions arrive split: "i m").

@@ -1,0 +1,79 @@
+Resolver eval (o200k_base tokenizer); JEV off
+
+=== national2: JEV off ===
+------------------------------------------------------------------------------------------------------
+cases / evaluated turns                     48 / 54
+WRONG-COMMIT rate per commit (headline)     1/24 = 4.2%  (over 54 resolve turns)
+top-1 (turn fully correct)                  37/54 = 68.5%
+ask precision (field-level)                 7/22 = 31.8%
+ask recall (field-level)                    7/7 = 100.0%
+mean questions per booking                  0.54 over 39 bookings
+refusal correctness                         7/8 = 87.5%
+resolver latency p50 / p95 (no network)     1.24 ms / 6.73 ms  (n=1080)
+Plan.say tokens  mean / p95 / max           28 / 56 / 72
+Plan.summary tokens mean / p95 / max        63 / 94 / 101
+tool result tokens mean / p95 / max         97 / 144 / 154
+  ... speak-direct (no say) mean/p95/max    66 / 91 / 100
+JEV requests; turns where a JEV hook fired  0; 17 of 54 turns
+------------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       4/5
+  dup_name_metro         5/6
+  geo                    11/18
+  new_patient            4/5
+  no_location            2/3
+  ring                   1/1
+  symptom                2/8
+  unoffered              2/2
+MISSES (17):
+  nat2-geo-05 turn 1: status ask != offer
+      said: That's not available at Bellaire. There's nothing closer to Bellaire; the nearest is 6 miles away, in Downtown. What's the visit for?
+      type disambiguator: open (no call)
+  nat2-geo-06 turn 1: status ask != offer
+      said: Is that a dental exam or a dental cleaning?
+      type disambiguator: open (no call)
+  nat2-geo-09 turn 1: status ask != offer
+      said: Is that Miami or St. Louis?
+  nat2-geo-10 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: open (no call)
+  nat2-geo-12 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: open (no call)
+  nat2-geo-17 turn 1: status refuse != offer
+      said: We can't do a chest x-ray at South San Antonio. I can book Dr. Kristy Jaramillo at Downtown or Dr. Johnnie Shoemaker at New Braunfels. Would either of those work?
+  nat2-geo-18 turn 1: status ask != offer
+      said: Is that a blood draw or a lipid panel?
+      type disambiguator: open (no call)
+  nat2-sym-01 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: open (no call)
+  nat2-sym-04 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: open (no call)
+  nat2-sym-05 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: open (no call)
+  nat2-sym-06 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: open (no call)
+  nat2-sym-07 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: open (no call)
+  nat2-sym-08 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: open (no call)
+  nat2-dup-06 turn 1: status ask != offer
+      said: Is that an annual physical or an annual wellness visit?
+  nat2-cap-02 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: open (no call)
+  nat2-new-05 turn 1: status offer != refuse; refusal None != new_patient_type; WRONG COMMIT: offered when it should not
+      said: For an allergy consultation, Dr. Cynthia Spain has tomorrow at 8:40, Tuesday at 8, or Wednesday the 14th at 8:40 at Elk Grove. Which works best?
+  nat2-noloc-03 turn 2: status ask != offer
+      said: Is that a blood draw or a lipid panel?
+      type disambiguator: open (no call)
+
+=== HEADLINE: wrong commits per commit; top-1 per evaluated turn ===
+set                           JEV off                             
+HELD-OUT national2 (pinned)   1/24 = 4.2%; top-1 37/54            

@@ -214,6 +214,51 @@ def test_a_state_without_clinics_refuses_with_the_nearest(talk):
     assert plan.say.startswith("We don't offer a new patient visit in Montana. The nearest is Capitol Hill in Denver")
 
 
+def test_a_state_with_no_city_of_ours_refuses_instead_of_ringing_past_50_miles(talk):
+    plan = talk({**FOLLOW_UP, "location_phrase": "out near Cheyenne, Wyoming"})
+    assert plan.status == "refuse" and plan.refusal.code == "none_nearby"
+    assert plan.say == ("We don't offer a follow-up visit in Wyoming. The nearest is Capitol Hill in Denver, "
+                        "about 264 miles away. Want me to look there?")
+    assert [a[2] for a in plan.refusal.alternatives] == ["loc_v1"]
+    plan = talk({**FOLLOW_UP, "location_phrase": "out near Cheyenne, Wyoming"}, {"pick_offer": 1})
+    # Picking it searches there (the fixture's Dr. Ito has no open days at that site).
+    assert "adopted alternative 1" in plan.notes and plan.req.location.resolved_id == "loc_v1"
+
+
+def _with_plano() -> dict:
+    """A second city 18 miles from Dallas, inside Dallas's 25-mile radius."""
+    raw = national_raw()
+    raw["metros"] = METROS + [{"id": "plano-tx", "name": "Plano", "state": "TX", "aliases": [],
+                               "lat": 33.02, "lon": -96.70}]
+    raw["locations"] = LOCATIONS + [_loc("loc_x1", "Legacy Health Center", "plano-tx", "Legacy", 33.02, -96.70,
+                                         "TX", "Plano", ("dental",))]
+    for p in raw["providers"]:
+        if p["id"] in ("prov_2", "prov_4"):
+            p["location_ids"] = p["location_ids"] + ["loc_x1"]
+    return raw
+
+
+def test_a_named_city_offers_its_own_clinics_before_a_neighbor_city():
+    ix = build_index(_with_plano(), ALIASES)
+    req = merge(Request(), Update.from_args({**FOLLOW_UP, "location_phrase": "Dallas"}))
+    plan = resolve(ix, req, MockAvailability(ix))
+    assert plan.status == "offer" and _offered_sites(plan) == {"loc_d1"}
+    req = merge(Request(), Update.from_args({"service_phrase": "dental cleaning", "is_new": True,
+                                             "location_phrase": "Dallas"}))
+    plan = resolve(ix, req, MockAvailability(ix))
+    assert plan.status == "offer" and _offered_sites(plan) == {"loc_x1"}
+    assert plan.say.startswith("There's nothing closer to Dallas; the nearest is 18 miles away, in Plano. ")
+
+
+def test_a_clinic_named_after_its_suburb_searches_the_suburb_when_it_cannot_do_the_visit(talk):
+    knee = {"service_phrase": "knee MRI", "is_new": True, "has_referral": True}
+    plan = talk({**knee, "location_phrase": "Cedar Park"})
+    assert plan.status == "offer" and _offered_sites(plan) == {"loc_a1"}
+    assert plan.say.startswith("That's not available at Cedar Park. ")
+    plan = talk({**knee, "location_phrase": "Cedar Park Health Center"})
+    assert plan.status == "refuse" and plan.refusal.code == "location_type"
+
+
 def test_policy_beats_none_nearby_when_rows_exist(talk):
     plan = talk({"service_phrase": "follow up", "is_new": True, "location_phrase": "Austin"})
     assert plan.refusal.code == "new_patient_type"
@@ -317,6 +362,61 @@ def test_multi_word_lay_terms_win_over_their_words(nat):
     assert [c.type_id for c in match_types(nat, "I hurt my knee")] == ["appt_002"]
     assert [c.type_id for c in match_types(nat, "my knee")][0] == "appt_000"
     assert [c.type_id for c in match_types(nat, "my teeth")] == ["appt_003"]
+
+
+def test_every_specialty_stays_reachable_when_nothing_lexical_matched():
+    raw = national_raw()
+    extra = [{"id": f"appt_{100 + i}", "name": f"Specialty {i} Consultation", "specialty": f"Spec{i}",
+              "duration_min": 30, "requires_referral": False, "new_patients_allowed": True} for i in range(90)]
+    raw["appointment_types"] = TYPES + extra
+    raw["providers"][2] = {**raw["providers"][2], "appointment_type_ids": [t["id"] for t in TYPES + extra]}
+    defaults = {f"Spec{i}": f"appt_{100 + i}" for i in range(2 * SHORTLIST_SIZE)}
+    ix = build_index(raw, {**ALIASES, "specialty_default": {**ALIASES["specialty_default"], **defaults}})
+    assert set(defaults.values()) <= set(type_shortlist(ix, "my wrists ache when it rains", None))
+    assert len(type_shortlist(ix, "specialty 7", None)) <= SHORTLIST_SIZE + len(ix.specialty_default)
+
+
+# ---- lexicon: specificity -------------------------------------------------------------------
+
+SPECIFIC_TYPES = [
+    ("appt_010", "X-Ray", "Radiology"), ("appt_011", "Knee X-Ray", "Radiology"),
+    ("appt_012", "Colonoscopy", "Gastroenterology"), ("appt_013", "Colonoscopy Consultation", "Gastroenterology"),
+    ("appt_014", "Therapy Session", "Psychiatry"), ("appt_015", "Physical Therapy Evaluation", "Physical Therapy"),
+    ("appt_016", "Physical Therapy Session", "Physical Therapy"), ("appt_017", "Orthopedic Consultation", "Orthopedics"),
+    ("appt_018", "GI Consultation", "Gastroenterology"), ("appt_019", "ENT Consultation", "ENT"),
+]
+SPECIFIC_ALIASES = {
+    "aliases": {"x ray": {"appt_010": 1.0, "appt_011": 0.6}, "colonoscopy": {"appt_012": 1.0, "appt_013": 1.0},
+                "therapy": {"appt_014": 1.0}, "physical therapy": {"appt_015": 1.0, "appt_016": 0.9}},
+    "lay_terms": {"knee": "Orthopedics", "stomach": "Gastroenterology", "throat": "ENT"},
+    "specialty_default": {"Orthopedics": "appt_017", "Gastroenterology": "appt_018", "ENT": "appt_019"}}
+
+
+@pytest.fixture(scope="module")
+def specific():
+    raw = national_raw()
+    raw["appointment_types"] = TYPES + [{"id": i, "name": n, "specialty": s, "duration_min": 30,
+                                         "requires_referral": False, "new_patients_allowed": True}
+                                        for i, n, s in SPECIFIC_TYPES]
+    raw["providers"][2] = {**raw["providers"][2], "appointment_type_ids": [t["id"] for t in raw["appointment_types"]]}
+    return build_index(raw, SPECIFIC_ALIASES)
+
+
+@pytest.mark.parametrize("phrase,ids", [
+    ("the clinic says I'm due for a colonoscopy", ["appt_012"]),          # not the consultation
+    ("they want a knee x-ray done this week", ["appt_011"]),              # not the plain X-Ray
+    ("booking a physical therapy evaluation after surgery", ["appt_015"]),  # not Psychiatry's Therapy Session
+    ("just a therapy session", ["appt_014"]),
+])
+def test_a_type_named_in_full_drops_the_types_inside_its_name(specific, phrase, ids):
+    assert [c.type_id for c in match_types(specific, phrase)] == ids
+
+
+def test_lay_term_default_only_when_no_type_is_named_and_one_specialty_is_meant(specific):
+    knee = [c.type_id for c in match_types(specific, "an x-ray of the knee, it's been sore")]
+    assert "appt_017" not in knee and {"appt_010", "appt_011"} <= set(knee)
+    assert [c.type_id for c in match_types(specific, "my stomach keeps hurting")] == ["appt_018"]
+    assert match_types(specific, "my throat and my stomach both burn") == []
 
 
 # ---- request merge ----------------------------------------------------------------------------
