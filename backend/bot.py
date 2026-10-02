@@ -37,11 +37,13 @@ from pipecat.services.elevenlabs.stt import ElevenLabsRealtimeSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.turns.user_start import VADUserTurnStartStrategy
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
 from pipecat.flows import FlowManager
 
 from agent_builder import AgentBuilder, AgentConfig, validate_agent
-from agent_tools import warm_up_jev
+from agent_tools import stt_keyterms, warm_up_jev
 from agents_api import ID_RE, agents_dir_from_env, create_router
 
 # Load .env next to this file, so the bot runs the same from the repo root or backend/.
@@ -70,6 +72,30 @@ class SerialToolCallsLLMService(OpenAILLMService):
         return params
 
 
+# Watchdog that ends a user turn after this long with no VAD or transcript activity. Pipecat's 5 s
+# default turned one stray turn into 5 s of dead air; 2 s stays well above STT latency (~0.4 s p99).
+USER_TURN_STOP_TIMEOUT_S = 2.0
+
+
+def user_aggregator_params() -> LLMUserAggregatorParams:
+    """A user turn starts only on Silero VAD speech. Pipecat's default also starts one on any
+    transcript, so a transcript landing after the turn ended opened an empty turn, interrupted
+    the reply being generated, and waited out the stop timeout. Stop stays the default smart-turn
+    analyzer."""
+    return LLMUserAggregatorParams(
+        vad_analyzer=SileroVADAnalyzer(),
+        user_turn_strategies=UserTurnStrategies(start=[VADUserTurnStartStrategy()]),
+        user_turn_stop_timeout=USER_TURN_STOP_TIMEOUT_S,
+    )
+
+
+def make_stt(api_key: str, keyterms: list[str] | None) -> ElevenLabsRealtimeSTTService:
+    return ElevenLabsRealtimeSTTService(
+        api_key=api_key,
+        settings=ElevenLabsRealtimeSTTService.Settings(keyterms=keyterms),
+    )
+
+
 def load_agent_data(body: dict | None) -> dict:
     """Pick the session's agent: inline `agent`, stored `agent_id`, else the example."""
     body = body or {}
@@ -88,7 +114,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
     config = AgentConfig.from_dict(agent_data)
     logger.info(f"Starting '{config.name}' with {len(config.nodes)} nodes")
 
-    stt = ElevenLabsRealtimeSTTService(api_key=os.environ["ELEVENLABS_API_KEY"])
+    async def send_event(event: dict) -> None:
+        await worker.queue_frame(RTVIServerMessageFrame(data=event))
+
+    builder = AgentBuilder(config, on_event=send_event)
+    keyterms = stt_keyterms(builder.tool_context.index) if builder.tool_context else None
+
+    stt = make_stt(os.environ["ELEVENLABS_API_KEY"], keyterms)
     tts = ElevenLabsTTSService(
         api_key=os.environ["ELEVENLABS_API_KEY"],
         settings=ElevenLabsTTSService.Settings(voice=config.voice_id),
@@ -101,7 +133,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
     context = LLMContext()
     context_aggregator = LLMContextAggregatorPair(
         context,
-        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
+        user_params=user_aggregator_params(),
     )
 
     pipeline = Pipeline(
@@ -123,11 +155,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
         params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
-
-    async def send_event(event: dict) -> None:
-        await worker.queue_frame(RTVIServerMessageFrame(data=event))
-
-    builder = AgentBuilder(config, on_event=send_event)
 
     flow_manager = FlowManager(
         llm=llm,

@@ -1,13 +1,15 @@
 """Tool name -> factory(ToolContext) -> FlowsFunctionSchema. Agent JSON names tools from here;
 the handler owns the parameter schema. Edge guards are named the same way: an edge with
-"precondition": "<name>" is refused (a tool error, no transition) while the guard returns a reason."""
+"precondition": "<name>" is refused (a tool error, no transition) while the guard returns a reason.
+A tool handler may return Reenter as its next node: the builder enters the current node again,
+re-rendering its prompts from state."""
 
 from typing import Callable, Optional
 
 from pipecat.flows import FlowsFunctionSchema
 
 from .context import ToolContext
-from .scheduling_tools import book_offer_tool, lookup_tool, offer_confirmed, update_request_tool
+from .scheduling_tools import Reenter, book_offer_tool, lookup_tool, offer_confirmed, update_request_tool
 
 ToolFactory = Callable[[ToolContext], FlowsFunctionSchema]
 EdgeGuard = Callable[[dict], Optional[str]]  # flow state -> reason the edge is not allowed yet

@@ -26,7 +26,7 @@ from pipecat.flows import (
     NodeConfig,
 )
 
-from agent_tools import EDGE_GUARDS, ToolContext, build_tool, make_context
+from agent_tools import EDGE_GUARDS, Reenter, ToolContext, build_tool, make_context
 
 from .schema import AgentConfig, Edge, Node
 from .validation import AgentValidationError, validate_agent
@@ -103,7 +103,7 @@ class AgentBuilder:
             "name": node.name,
             "role_message": node.role_message or self.config.persona,
             "task_messages": node.task_messages,
-            "functions": [build_tool(name, self.tool_context) for name in node.tools]
+            "functions": [self._make_tool(node, name) for name in node.tools]
             + [self._make_edge_function(node, edge) for edge in node.edges],
         }
         if node.context_strategy == "reset":
@@ -123,6 +123,20 @@ class AgentBuilder:
         if post_actions:
             node_config["post_actions"] = post_actions
         return node_config
+
+    def _make_tool(self, node: Node, name: str) -> FlowsFunctionSchema:
+        tool = build_tool(name, self.tool_context)
+        inner = tool.handler
+
+        async def handler(args: dict, flow_manager: FlowManager):
+            result, next_node = await inner(args, flow_manager)
+            if isinstance(next_node, Reenter):
+                next_node = {**self._make_node(node), "respond_immediately": next_node.respond}
+                await self._emit({"type": "node_entered", "node": node.name, "state": dict(flow_manager.state)})
+            return result, next_node
+
+        tool.handler = handler
+        return tool
 
     async def _on_call_ended(self, action: dict, flow_manager: FlowManager) -> None:
         await self._emit({"type": "call_ended", "reason": "end_node"})

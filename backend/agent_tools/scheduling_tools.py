@@ -1,8 +1,8 @@
 """Scheduling tools: the LLM's only way to touch the catalog.
 
 Handlers are the only writers of flow_manager.state["req"] (a Request dict),
-state["status"] (the last plan status, or "booked") and state["summary"] (the recap rendered
-into {{ summary }} after a context reset). They never raise: bad arguments come back as
+state["status"] (the last plan status, or "booked"), state["bookings"] (one record per booking)
+and state["summary"] (the recap rendered into {{ summary }} after a context reset). They never raise: bad arguments come back as
 {"status": "error", ...} so the LLM can retry, and state is written only after the resolver
 succeeded.
 
@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
 
@@ -44,6 +45,14 @@ def _encoding():
 
 def count_tokens(result: dict) -> int:
     return len(_encoding().encode(json.dumps(result, separators=(",", ":"))))
+
+
+@dataclass(frozen=True)
+class Reenter:
+    """A handler's next_node meaning "enter the current node again", so its prompts are rendered
+    from the state the handler just wrote. respond: whether the LLM speaks on re-entry."""
+
+    respond: bool
 
 
 def _error(message: str) -> dict:
@@ -223,6 +232,11 @@ def lookup_tool(ctx: ToolContext) -> FlowsFunctionSchema:
 
 # ---- book_offer ----------------------------------------------------------------------------
 
+def spoken_ref(ref: str) -> str:
+    """'H-60A2F034' -> 'H, 6, 0, A, 2, F, 0, 3, 4': one character at a time, so TTS spells it."""
+    return ", ".join(c for c in ref if c.isalnum())
+
+
 def book_offer_tool(ctx: ToolContext) -> FlowsFunctionSchema:
     async def handler(args: dict, flow_manager: FlowManager):
         state = flow_manager.state
@@ -255,23 +269,34 @@ def book_offer_tool(ctx: ToolContext) -> FlowsFunctionSchema:
             "location": ctx.index.locations[offer.location_id].short_name,
             "when": spoken_when(slot.start, ctx.availability.now),
         }
-        state.setdefault("bookings", {})[slot.id] = hold.ref
+        # Read by the UI and the post-call grader through node_entered.state.
+        state.setdefault("bookings", []).append({k: result[k] for k in ("ref", "visit", "provider", "location", "when")})
         logger.info(f"book_offer {slot.id} -> {hold.ref}")
         # A further appointment starts from scratch; only who the caller is carries over.
         state["req"] = Request(patient=req.patient).to_dict()
+        speak = ctx.speak_direct
+        if speak:
+            result["spoken"] = (f"You're all booked. Your confirmation is {spoken_ref(hold.ref)}. "
+                                "Is there anything else I can help with?")
         state["status"] = "booked"
         state["last_booking"] = result
         state["summary"] = (
             f"Booked: {result['visit']} with {result['provider']}, {result['when']} at "
-            f"{result['location']}, confirmation {hold.ref}. The caller may want another appointment; ask what for.")
-        return result, None
+            f"{result['location']}, confirmation {hold.ref}."
+            + (" The caller has heard the confirmation reference." if speak else "")
+            + " The caller may want another appointment; ask what for.")
+        # Re-entering renders the node's prompt from the "Booked:" summary, so the LLM is no longer
+        # told to book.
+        if speak:
+            await flow_manager.worker.queue_frame(TTSSpeakFrame(text=result["spoken"]))
+        return result, Reenter(respond=not speak)
 
     return FlowsFunctionSchema(
         name="book_offer",
         description=(
             "Book the appointment update_request read back, once the caller said yes to it. Takes no "
             "arguments: it books exactly the read-back time. Re-checks booking rules and availability, and "
-            "returns a confirmation reference to read to the caller. Safe to call again."
+            "returns a confirmation reference. Safe to call again."
         ),
         properties={},
         required=[],

@@ -5,6 +5,8 @@ from pathlib import Path
 import pytest
 from pipecat.flows import ContextStrategy, FlowManager
 
+from agent_tools.context import shared_availability
+
 from agent_builder import AgentBuilder, validate_agent
 
 
@@ -81,7 +83,7 @@ def test_builds_and_every_tool_resolves(clinic):
     assert schedule["context_strategy"].strategy is ContextStrategy.RESET
     confirm = builder._make_node(builder._nodes_by_name["confirm"])
     assert [f.name for f in confirm["functions"]] == [
-        "book_offer", "update_request", "finish", "book_another", "transfer_to_staff"]
+        "book_offer", "update_request", "lookup", "finish", "book_another", "transfer_to_staff"]
     assert builder.tool_context.jev_client is None
     assert builder.tool_context.speak_direct is True
 
@@ -146,3 +148,57 @@ def test_hold_slot_after_a_read_back_enters_confirm(clinic):
     result, next_node = asyncio.run(hold_slot.handler({}, StateFlowManager({"status": "confirm"})))
     assert result == {"status": "success"}
     assert next_node["name"] == "confirm"
+
+
+class BookingFlowManager:
+    def __init__(self):
+        self.state = {"summary": ""}
+        self.worker = self
+        self.spoken = []
+
+    async def queue_frame(self, frame):
+        self.spoken.append(frame.text)
+
+
+def _function(node, name):
+    return next(f for f in node["functions"] if f.name == name)
+
+
+@pytest.fixture
+def fresh_bookings():
+    shared_availability.cache_clear()
+    yield
+    shared_availability.cache_clear()
+
+
+def test_booking_reenters_confirm_with_a_prompt_that_no_longer_says_book(clinic, fresh_bookings):
+    events = []
+
+    async def on_event(event):
+        events.append(event)
+
+    builder = AgentBuilder.from_dict(clinic, on_event=on_event)
+    fm = BookingFlowManager()
+    schedule = builder._make_node(builder._nodes_by_name["schedule"])
+    update = _function(schedule, "update_request")
+    asyncio.run(update.handler({"service_phrase": "cardiology consultation", "specialty_hint": "Cardiology",
+                                "provider_phrase": "Dr. Chen", "is_new": True, "has_referral": True,
+                                "time_pref": {"soonest": True}}, fm))
+    asyncio.run(update.handler({"pick_offer": 1}, fm))
+    _, confirm = asyncio.run(_function(schedule, "hold_slot").handler({}, fm))
+    before = FlowManager._render_node(fm, "confirm", confirm)["task_messages"][0]["content"]
+    assert not before.startswith("The appointment: Booked:")
+
+    result, reentered = asyncio.run(_function(confirm, "book_offer").handler({}, fm))
+    assert result["status"] == "booked"
+    assert reentered["name"] == "confirm"
+    assert reentered["respond_immediately"] is False
+    assert reentered["context_strategy"].strategy is ContextStrategy.RESET
+    after = FlowManager._render_node(fm, "confirm", reentered)["task_messages"][0]["content"]
+    assert after.startswith(
+        f"The appointment: Booked: cardiology consultation with Dr. Emily Chen, tomorrow at 8 at Downtown, "
+        f"confirmation {result['ref']}. The caller has heard the confirmation reference.")
+    assert fm.spoken[-1] == result["spoken"]
+    assert events[-1]["type"] == "node_entered" and events[-1]["node"] == "confirm"
+    assert events[-1]["state"]["bookings"] == [
+        {k: result[k] for k in ("ref", "visit", "provider", "location", "when")}]

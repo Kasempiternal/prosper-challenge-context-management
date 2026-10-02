@@ -179,7 +179,7 @@ class MockAvailability:
             return self._holds[slot.id]
         if not self.is_open(slot):
             return Hold(ok=False, slot=slot)
-        hold = Hold(ok=True, slot=slot, ref="H-" + hashlib.blake2b(slot.id.encode(), digest_size=4).hexdigest().upper())
+        hold = Hold(ok=True, slot=slot, ref=f"H-{int.from_bytes(hashlib.blake2b(slot.id.encode(), digest_size=4).digest(), 'big') % 10000:04d}")
         self._holds[slot.id] = hold
         return hold
 

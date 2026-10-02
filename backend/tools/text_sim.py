@@ -76,6 +76,22 @@ BEATS: dict[str, list[tuple]] = {
         ("call", "book_another", {}),
         ("call", "update_request", {"service_phrase": "dermatology appointment", "specialty_hint": "Dermatology"}),
     ],
+    "5": [
+        ("caller", "New patient with a referral, cardiology consultation with Dr. Chen, soonest."),
+        ("call", "start", {"summary": "New patient with a referral; cardiology consultation with Dr. Chen, soonest."}),
+        ("call", "update_request", {"service_phrase": "cardiology consultation", "specialty_hint": "Cardiology",
+                                    "provider_phrase": "Dr. Chen", "is_new": True, "has_referral": True,
+                                    "time_pref": {"soonest": True}}),
+        ("caller", "The first one."),
+        ("call", "update_request", {"pick_offer": 1}),
+        ("caller", "Yes."),
+        ("call", "hold_slot", {}),
+        ("call", "book_offer", {}),
+        ("caller", "And do you do eye exams?"),
+        ("call", "lookup", {"kind": "do_you_offer", "phrase": "eye exams"}),
+        ("caller", "Okay, that's all, bye."),
+        ("call", "finish", {}),
+    ],
 }
 
 
@@ -103,7 +119,8 @@ class SimFlowManager:
     def enter(self, node: dict) -> None:
         self.node = FlowManager._render_node(self, node["name"], node)
         strategy = node.get("context_strategy")
-        print(f"\n  == node {node['name']} (context {strategy.strategy.value if strategy else 'append'}) ==")
+        waits = ", LLM waits for the caller" if node.get("respond_immediately") is False else ""
+        print(f"\n  == node {node['name']} (context {strategy.strategy.value if strategy else 'append'}{waits}) ==")
         for message in self.node["task_messages"]:
             print("  prompt: " + message["content"].replace("\n\n", "\n          ").splitlines()[0][:220])
 

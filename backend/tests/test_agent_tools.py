@@ -5,8 +5,9 @@ import pytest
 from pipecat.flows import NO_RESPONSE
 from pipecat.frames.frames import TTSSpeakFrame
 
-from agent_tools import build_tool, make_context
+from agent_tools import Reenter, build_tool, make_context, stt_keyterms
 from agent_tools.context import RecordingDisambiguator, shared_availability
+from agent_tools.scheduling_tools import spoken_ref
 from scheduling.decision import DECLINE
 from scheduling.resolver import NoDisambiguator
 
@@ -168,13 +169,45 @@ def test_book_offer_is_idempotent(make_ctx):
     confirm_pick(ctx, fm)
 
     first, next_node = call(ctx, fm, "book_offer", {})
-    again, _ = call(ctx, fm, "book_offer", {})
-    assert next_node is None
+    again, again_next = call(ctx, fm, "book_offer", {})
+    assert next_node == Reenter(respond=False)
+    assert again_next is None
     assert first == again
     assert first == {"status": "booked", "ref": first["ref"], "visit": "cardiology consultation",
-                     "provider": "Dr. Emily Chen", "location": "Downtown", "when": "tomorrow at 8"}
+                     "provider": "Dr. Emily Chen", "location": "Downtown", "when": "tomorrow at 8",
+                     "spoken": f"You're all booked. Your confirmation is {spoken_ref(first['ref'])}. "
+                               "Is there anything else I can help with?"}
     assert first["ref"].startswith("H-")
-    assert list(fm.state["bookings"].values()) == [first["ref"]]
+    assert fm.state["bookings"] == [{"ref": first["ref"], "visit": "cardiology consultation",
+                                     "provider": "Dr. Emily Chen", "location": "Downtown", "when": "tomorrow at 8"}]
+    assert [f.text for f in fm.worker.frames if isinstance(f, TTSSpeakFrame)][-1] == first["spoken"]
+
+
+def test_spoken_ref_spells_one_character_at_a_time():
+    assert spoken_ref("H-60A2F034") == "H, 6, 0, A, 2, F, 0, 3, 4"
+
+
+def test_booking_without_speak_direct_lets_the_llm_tell_the_caller(make_ctx):
+    ctx, fm = make_ctx(speak_direct=False), FakeFlowManager()
+    confirm_pick(ctx, fm)
+    spoken_before = len(fm.worker.frames)
+    result, next_node = call(ctx, fm, "book_offer", {})
+    assert next_node == Reenter(respond=True)
+    assert "spoken" not in result
+    assert len(fm.worker.frames) == spoken_before
+    assert fm.state["summary"] == (
+        f"Booked: cardiology consultation with Dr. Emily Chen, tomorrow at 8 at Downtown, confirmation "
+        f"{result['ref']}. The caller may want another appointment; ask what for.")
+
+
+def test_stt_keyterms_are_capped_deduped_and_proper_nouns_first(make_ctx):
+    terms = stt_keyterms(make_ctx().index)
+    assert len(terms) == 50
+    assert len({t.casefold() for t in terms}) == 50
+    assert all(len(t) <= 20 for t in terms)
+    assert terms[:3] == ["Chen", "Garcia", "Ramirez"]
+    assert {"Downtown", "Mission Bay", "Eye Exam", "Ophthalmology", "Cardiology"} <= set(terms)
+    assert "Comprehensive Eye Exam" not in terms  # 22 characters: over the realtime limit
 
 
 def test_confirm_summary_names_only_the_held_offer(make_ctx):
@@ -208,7 +241,8 @@ def test_booking_resets_the_request_but_keeps_the_patient(make_ctx):
     assert fm.state["status"] == "booked"
     assert fm.state["summary"] == (
         f"Booked: cardiology consultation with Dr. Emily Chen, tomorrow at 8 at Downtown, confirmation "
-        f"{booked['ref']}. The caller may want another appointment; ask what for.")
+        f"{booked['ref']}. The caller has heard the confirmation reference. The caller may want another "
+        "appointment; ask what for.")
 
     result, _ = call(ctx, fm, "update_request", {"service_phrase": "dermatology appointment",
                                                  "specialty_hint": "Dermatology"})
@@ -216,6 +250,10 @@ def test_booking_resets_the_request_but_keeps_the_patient(make_ctx):
     assert result["known"] == {"new_patient": "yes", "referral": "yes", "visit": "Dermatology Consultation"}
     assert len({" ".join(o.split()[1:4]) for o in result["offers"]}) == 3  # "Thu Oct 8": one offer per day
     assert fm.state["req"]["provider"]["heard"] is None
+
+    confirm_pick(ctx, fm, pick=2)
+    second, _ = call(ctx, fm, "book_offer", {})
+    assert [b["ref"] for b in fm.state["bookings"]] == [booked["ref"], second["ref"]]
 
 
 def test_book_offer_rechecks_policy(make_ctx):
