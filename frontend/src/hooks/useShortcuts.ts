@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { deleteSelection, saveCurrent } from '../lib/actions'
+import { useDevView } from '../store/devView'
 import { useEditor } from '../store/editor'
 
 export const SHORTCUTS: ReadonlyArray<{ keys: string[]; label: string }> = [
@@ -9,6 +10,7 @@ export const SHORTCUTS: ReadonlyArray<{ keys: string[]; label: string }> = [
   { keys: ['Del'], label: 'Delete selection' },
   { keys: ['Esc'], label: 'Clear selection' },
   { keys: ['Double-click'], label: 'Add node on canvas' },
+  { keys: ['D'], label: 'Toggle dev view' },
   { keys: ['?'], label: 'Show shortcuts' },
 ]
 
@@ -41,6 +43,8 @@ export function useShortcuts(onHelp: () => void) {
         deleteSelection()
       } else if (key === 'escape') {
         editor.select(null)
+      } else if (key === 'd' && !mod && !e.altKey) {
+        useDevView.getState().toggle()
       } else if (e.key === '?') {
         onHelp()
       }

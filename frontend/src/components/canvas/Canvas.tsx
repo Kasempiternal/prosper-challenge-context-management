@@ -10,7 +10,7 @@ import {
   type NodeChange,
   type OnNodeDrag,
 } from '@xyflow/react'
-import { motion, useReducedMotion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { issuesForNode } from '../../lib/issues'
@@ -18,8 +18,10 @@ import { FIT_VIEW, NODE_WIDTH, PANEL_FIT_VIEW, PANEL_INSET, fitViewOptions } fro
 import { spring } from '../../lib/motion'
 import { addEdge, addNode, edgeId, keyByName, moveNodes, parseEdgeId } from '../../lib/ops'
 import { isCallActive, useCall } from '../../store/call'
+import { useDevView } from '../../store/devView'
 import { useTheme } from '../../store/theme'
 import { selectPanelOpen, useEditor } from '../../store/editor'
+import { PipelineStrip } from '../dev/PipelineStrip'
 import { AgentNodeCard } from './AgentNodeCard'
 import { FunctionEdge } from './FunctionEdge'
 import { NodeContextMenu, type MenuState } from './NodeContextMenu'
@@ -46,6 +48,7 @@ export function Canvas() {
   const inCall = useCall((s) => isCallActive(s.status))
   const panelOpen = useEditor(selectPanelOpen)
   const colorMode = useTheme((s) => s.resolved)
+  const devView = useDevView((s) => s.on)
   const reduceMotion = useReducedMotion()
   const [transient, setTransient] = useState<Record<string, Transient>>({})
   const [menu, setMenu] = useState<MenuState | null>(null)
@@ -326,6 +329,8 @@ export function Canvas() {
           Add node
         </motion.button>
       </motion.div>
+
+      <AnimatePresence>{devView && <PipelineStrip />}</AnimatePresence>
 
       <NodeContextMenu menu={menu} onClose={() => setMenu(null)} />
     </div>

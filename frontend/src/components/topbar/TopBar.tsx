@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, Keyboard, LayoutGrid, Loader2, Phone, Redo2, Save, Settings2, Undo2 } from 'lucide-react'
+import { Activity, Check, Keyboard, LayoutGrid, Loader2, Phone, Redo2, Save, Settings2, Undo2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAutoLayout } from '../../hooks/useAutoLayout'
 import { SHORTCUTS } from '../../hooks/useShortcuts'
@@ -7,6 +7,8 @@ import { saveCurrent } from '../../lib/actions'
 import { callBlockedHint } from '../../lib/issues'
 import { fade, spring } from '../../lib/motion'
 import { isCallActive, useCall } from '../../store/call'
+import { cn } from '../../lib/cn'
+import { useDevView } from '../../store/devView'
 import { useEditor } from '../../store/editor'
 import { Button, IconButton } from '../ui/Button'
 import { Kbd, Popover } from '../ui/Popover'
@@ -92,6 +94,7 @@ export function TopBar({ helpOpen, setHelpOpen }: { helpOpen: boolean; setHelpOp
           </ul>
         </Popover>
         <ThemeMenu />
+        <DevViewToggle />
       </div>
 
       <div className="mx-1 h-5 w-px bg-border" />
@@ -116,6 +119,25 @@ export function TopBar({ helpOpen, setHelpOpen }: { helpOpen: boolean; setHelpOp
         {callStatus === 'live' ? 'On call' : 'Test call'}
       </Button>
     </header>
+  )
+}
+
+function DevViewToggle() {
+  const on = useDevView((s) => s.on)
+  return (
+    <button
+      type="button"
+      onClick={useDevView.getState().toggle}
+      aria-pressed={on}
+      title="Dev view: live pipeline telemetry (D)"
+      className={cn(
+        'ml-1 flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors duration-200 ease-out-soft',
+        on ? 'border-accent/40 bg-accent-soft text-accent' : 'border-border text-ink-soft hover:border-border-strong hover:text-ink',
+      )}
+    >
+      <Activity className="size-3.5" aria-hidden />
+      Dev view
+    </button>
   )
 }
 

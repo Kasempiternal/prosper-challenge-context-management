@@ -4,6 +4,7 @@ import { memo } from 'react'
 import { cn } from '../../lib/cn'
 import { routeEdge, type Box } from '../../lib/edgeRoute'
 import { EASE_OUT } from '../../lib/motion'
+import { useDevView } from '../../store/devView'
 import { useEditor } from '../../store/editor'
 import { parseEdgeId } from '../../lib/ops'
 import type { FunctionFlowEdge } from './types'
@@ -21,6 +22,7 @@ function FunctionEdgeImpl({
   data,
 }: EdgeProps<FunctionFlowEdge>) {
   const reduce = useReducedMotion()
+  const devView = useDevView((s) => s.on)
   const sourceNode = useInternalNode(source)
   const targetNode = useInternalNode(target)
   const { path, labelX, labelY } = routeEdge(
@@ -47,6 +49,19 @@ function FunctionEdgeImpl({
       <path d={path} fill="none" stroke="transparent" strokeWidth={20} className="react-flow__edge-interaction" />
       {taken && (
         <g key={data?.takenNonce}>
+          {devView && !reduce && (
+            <motion.path
+              d={path}
+              fill="none"
+              stroke="var(--color-accent)"
+              strokeWidth={10}
+              strokeLinecap="round"
+              pointerEvents="none"
+              initial={{ opacity: 0.35 }}
+              animate={{ opacity: 0 }}
+              transition={{ duration: 1.8, ease: EASE_OUT }}
+            />
+          )}
           <path
             d={path}
             fill="none"

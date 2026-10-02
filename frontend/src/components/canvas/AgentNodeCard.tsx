@@ -5,6 +5,7 @@ import { memo } from 'react'
 import { cn } from '../../lib/cn'
 import { softSpring } from '../../lib/motion'
 import { NODE_WIDTH } from '../../lib/layout'
+import { ToolBubbles } from '../dev/ToolBubbles'
 import type { AgentFlowNode } from './types'
 
 function AgentNodeCardImpl({ data, selected }: NodeProps<AgentFlowNode>) {
@@ -36,6 +37,7 @@ function AgentNodeCardImpl({ data, selected }: NodeProps<AgentFlowNode>) {
         inCall && !live && call !== 'visited' && 'opacity-80',
       )}
     >
+      {live && <ToolBubbles node={node.name} />}
       <Handle type="target" position={Position.Left} />
 
       <div className="flex items-center gap-2 px-4 pt-3.5 pb-1.5">

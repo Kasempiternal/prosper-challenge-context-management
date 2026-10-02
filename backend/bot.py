@@ -29,7 +29,11 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.frameworks.rtvi import RTVIServerMessageFrame
+from pipecat.processors.frameworks.rtvi import (
+    RTVIFunctionCallReportLevel,
+    RTVIObserverParams,
+    RTVIServerMessageFrame,
+)
 from pipecat.runner.run import app
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
@@ -156,6 +160,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
         pipeline,
         params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
+        # Tool names reach the Dev view; arguments and results (patient details) do not.
+        rtvi_observer_params=RTVIObserverParams(
+            function_call_report_level={"*": RTVIFunctionCallReportLevel.NAME}
+        ),
     )
 
     flow_manager = FlowManager(

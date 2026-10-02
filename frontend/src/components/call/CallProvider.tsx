@@ -3,6 +3,7 @@ import { PipecatClientAudio, PipecatClientProvider, usePipecatClient, useRTVICli
 import { SmallWebRTCTransport } from '@pipecat-ai/small-webrtc-transport'
 import { useState, type ReactNode } from 'react'
 import { REJECTED, parseFlowEvent, useCall } from '../../store/call'
+import { TelemetryFeed } from '../dev/TelemetryFeed'
 
 /**
  * Mounted once at the app root so a live call (and its bot audio) survives the
@@ -16,6 +17,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     <PipecatClientProvider client={client}>
       {children}
       <CallEvents />
+      <TelemetryFeed />
       <PipecatClientAudio />
     </PipecatClientProvider>
   )

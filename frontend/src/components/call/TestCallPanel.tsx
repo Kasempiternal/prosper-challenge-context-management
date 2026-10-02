@@ -8,14 +8,20 @@ import { callBlockedHint } from '../../lib/issues'
 import { softSpring, spring } from '../../lib/motion'
 import { clock } from '../../lib/time'
 import { isCallActive, useCall, type CallError, type CallStatus } from '../../store/call'
+import { useDevView } from '../../store/devView'
 import { useEditor } from '../../store/editor'
 import { IconButton } from '../ui/Button'
 import { PanelHeader } from '../inspector/Panel'
 import { Tabs } from '../ui/Tabs'
+import { CostPanel } from '../dev/CostPanel'
+import { DevTranscript } from '../dev/DevTranscript'
+import { LatencyWaterfall } from '../dev/LatencyWaterfall'
 import { CallReview } from './CallReview'
 import { CollectedData } from './CollectedData'
 import { Decisions } from './Decisions'
 import { Transcript } from './Transcript'
+
+type PanelTab = 'transcript' | 'latency' | 'cost' | 'decisions'
 
 const STATUS_LABEL: Record<CallStatus, string> = {
   idle: 'Ready to test',
@@ -57,8 +63,15 @@ export function TestCallPanel() {
   const blocked = !isCallActive(status) && issueCount > 0
   const decisionCount = useCall((s) => s.decisions.length)
   const scheduling = useEditor((s) => typeof s.doc?.agent.catalog === 'string')
-  const [tab, setTab] = useState<'transcript' | 'decisions'>('transcript')
+  const devView = useDevView((s) => s.on)
+  const [picked, setTab] = useState<PanelTab>('transcript')
   const showDecisions = scheduling || decisionCount > 0
+  const tabs = [
+    { value: 'transcript' as const, label: 'Transcript' },
+    ...(devView ? [{ value: 'latency' as const, label: 'Latency' }, { value: 'cost' as const, label: 'Cost' }] : []),
+    ...(showDecisions ? [{ value: 'decisions' as const, label: 'Decisions', count: decisionCount }] : []),
+  ]
+  const tab = tabs.some((t) => t.value === picked) ? picked : 'transcript'
 
   const start = async () => {
     const agent = useEditor.getState().doc?.agent
@@ -135,19 +148,22 @@ export function TestCallPanel() {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col border-t border-border-subtle bg-surface/60">
-        {showDecisions && (
+        {tabs.length > 1 && (
           <div className="pt-3">
-            <Tabs
-              value={tab}
-              onChange={setTab}
-              tabs={[
-                { value: 'transcript', label: 'Transcript' },
-                { value: 'decisions', label: 'Decisions', count: decisionCount },
-              ]}
-            />
+            <Tabs value={tab} onChange={setTab} tabs={tabs} />
           </div>
         )}
-        {showDecisions && tab === 'decisions' ? <Decisions /> : <Transcript />}
+        {tab === 'decisions' ? (
+          <Decisions />
+        ) : tab === 'latency' ? (
+          <LatencyWaterfall />
+        ) : tab === 'cost' ? (
+          <CostPanel />
+        ) : devView ? (
+          <DevTranscript />
+        ) : (
+          <Transcript />
+        )}
         <CollectedData />
       </div>
     </>
