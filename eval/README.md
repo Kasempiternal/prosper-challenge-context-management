@@ -4,12 +4,38 @@ Every case in `cases.jsonl` is a sequence of **`update_request` tool-call argume
 would extract from the caller's speech (for example `{"service_phrase": "MRI of my knee",
 "provider_phrase": "Dr. Nwin"}`). It is not raw audio or a transcript. Speech-to-text noise is
 simulated by misspelled phrases ("Dr. Nwin", "Dr. Shen", "Dr. Garsha"). The LLM's extraction
-accuracy is not measured here. The paid dialog simulation covers that.
+accuracy is not measured here. The paid dialog simulation that would measure it is not built. Three
+live voice calls cover the LLM side qualitatively (see the main README).
 
 Expected values were derived by hand from `backend/data/catalog.json`, not from resolver output.
 The `heldout` cases were written after the rest of the system was built and were scored once, with
 no tuning afterwards. Every other category was written by the same author as `aliases.json`, so
 treat its numbers as an in-distribution upper bound.
+
+## Dev vs held-out
+
+A **dev** set is one whose failures we read and fixed against. Its after-fix numbers are reported,
+but always labelled as seen. A **held-out** set is authored before the tuning or fixes it would
+judge, frozen (sha256 or a commit), and scored once. Only held-out numbers are evidence that the
+resolver generalizes.
+
+| set | file | catalog | role |
+|---|---|---|---|
+| main | `cases.jsonl` (90 non-held-out) | SF | written alongside the rules; in-distribution upper bound |
+| tune | `cases_tune.jsonl` (26) | SF | JEV gate thresholds chosen on it; not evidence |
+| heldout | `cases.jsonl` (12 held-out) | SF | held-out |
+| heldout2 | `cases_heldout2.jsonl` (49) | SF | held-out, written before any JEV run |
+| national | `cases_national.jsonl` (48) | national | **dev**: first run recorded, then fixed against |
+| national2 | `cases_national2.jsonl` (48) | national | **held-out**: frozen before the national fixes were scored, run once |
+
+Headline numbers (wrong commits per commit; top-1 per turn), from the commands below:
+
+| set | JEV off | JEV on |
+|---|---|---|
+| SF heldout + heldout2 (held-out) | 4/22 (18.2%); 27/61 | 2/39 (5.1%); 49/61 |
+| national, first run (dev) | 6/27 (22%); 37/56 | 7/32 (22%); 41/56 |
+| national, after fixes (dev, seen) | 1/35 (2.9%); 51/56 | 0/39; 56/56 |
+| **national2 (held-out)** | **1/24 (4.2%); 37/54** | **1/37 (2.7%); 50/54** |
 
 ```
 backend/.venv/Scripts/python eval/run_resolver_eval.py [--verbose]   # metrics + misses
@@ -174,7 +200,7 @@ criteria set. `warm_up()` (15 s timeout) at call start, on the same keep-alive c
 cost off the first caller turn: after it, the next requests ran 488-922 ms across both batches.
 A multi-hour idle was not tested.
 
-## National scale
+## National dev set (`national`)
 
 `cases_national.jsonl` (48 cases) runs against `backend/data/national/catalog.json` (40 metros,
 299 sites, 5,000 providers, 314 types). Every case pins `catalog_sha256`. `--set national` refuses
@@ -185,6 +211,25 @@ backend/.venv/Scripts/python eval/run_resolver_eval.py --set national [--jev on]
 backend/.venv/Scripts/python eval/naive_baseline_tokens.py --catalog backend/data/national/catalog.json
 backend/.venv/Scripts/python eval/national/build_cases.py scenarios|phrase|merge     # how the cases were made
 ```
+
+### Results: first run, then fixes (dev)
+
+The first run was recorded before any national fix: `eval/results/national_v1_first_run.txt`.
+
+| national (dev, 56 turns) | JEV off | JEV on |
+|---|---|---|
+| first run: wrong commits per commit | 6/27 (22.2%) | 7/32 (21.9%) |
+| first run: top-1 | 37/56 (66.1%) | 41/56 (73.2%) |
+| first run: questions per booking | 0.54 | 0.41 |
+| first run: JEV requests | 0 | 12 (21% of turns), p50/p95 533/776 ms live |
+| after fixes: wrong commits per commit | 1/35 (2.9%) | 0/39 |
+| after fixes: top-1 | 51/56 | 56/56 |
+
+The fixes are general rules, each unit-tested with wording that is not in the set: a hard 50-mile
+cap with a `none_nearby` refusal, full type names beating the generic types they contain, ZIP and
+misspelled-city precedence, and suburb clinics searching their own suburb. The SF eval output did
+not change. Because these numbers were produced after reading the failures, they show that the fixes
+work on the cases they were written for. They do not show generalization. national2 does.
 
 ### How the cases were authored
 
@@ -242,3 +287,53 @@ naming, and swapping "Therapy Session" for "Botox Treatment" because "therapy se
 "Individual Therapy", which new patients may book). There was 1 failed call (cmdc exit 8, rerun) and
 2 smoke tests, so 8 calls in all at roughly $0.01. After repair, the automatic checks dropped
 0 cases.
+
+## National held-out set (`national2`)
+
+```
+backend/.venv/Scripts/python eval/run_resolver_eval.py --set national2 --jev off
+backend/.venv/Scripts/python eval/run_resolver_eval.py --set national2 --jev on      # offline, from the cache
+backend/.venv/Scripts/python eval/national/build_cases.py --set national2 scenarios|phrase|merge
+```
+
+### How it was kept independent
+
+- **Different draw.** Seed 20261117 (the dev set uses 20261002), over different services, symptoms
+  and types. The sampler excludes any scenario that shares a type and metro, a site, a provider, a
+  name or a place with the dev set.
+- **Authored blind.** The cases were written without access to the resolver code or to the dev-set
+  failures. Ground truth comes from catalog queries, as for the dev set. DeepSeek wrote the caller's
+  wording from scenario facts (raw prompts and responses in `eval/national2/deepseek_raw/`).
+- **Frozen first.** The set was committed before the national fixes were scored on it, then run once
+  after the fixes. Nothing was changed in response to its misses.
+
+Categories (48 cases, 54 turns): geo 18 (city 2, "I'm in" 2, ZIP 2, "near" neighborhood 2,
+neighborhood 2, either/or town 2, misspelled city 2, suburb 1, ZIP3 1, state only 1, far place 1),
+symptom 8, duplicate names across metros 6, capability by metro 5, new-patient rules 5, no location 3,
+unoffered 2, ring expansion 1. Every case pins the catalog's sha256.
+
+### Results
+
+| national2 (held-out) | JEV off | JEV on |
+|---|---|---|
+| wrong commits per commit | 1/24 (4.2%) | 1/37 (2.7%) |
+| top-1 | 37/54 (68.5%) | 50/54 (92.6%) |
+| questions per booking | 0.54 | 0.21 |
+| JEV requests | 0 | 17 (31% of turns) |
+| JEV latency p50/p95/max (live) | - | 550 / 720 / 790 ms |
+| JEV cost for the set | $0 | $0.0008 |
+
+The live run is recorded in `eval/results/national2_heldout_jev_off.txt` and
+`eval/results/national2_heldout_jev_on.txt`. In that run one of the 17 JEV requests failed and fell
+back to asking, so it scored 1/36 and 49/54 with 0.23 questions per booking. The cache now holds an
+answer for that request, and the current code replays to the numbers in the table.
+
+Misses with JEV on (4):
+
+- nat2-new-05 (**wrong commit**): a new patient asking for "allergy shots", a type new patients may
+  not book, was offered an Allergy Consultation instead of a refusal. A type choice, not a policy
+  violation: the offered type is one new patients may book.
+- nat2-geo-09: asked "Miami or St. Louis?" where the case expected an offer.
+- nat2-geo-17: refused a chest X-ray at the named site and offered two nearby alternatives, where the
+  case expected an offer.
+- nat2-dup-06: asked "annual physical or annual wellness visit?" where the case expected an offer.
