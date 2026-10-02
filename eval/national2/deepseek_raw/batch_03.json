@@ -1,0 +1,73 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat2-sym-07: Existing patient (has any referral needed) who has hair thinning and coming out in patches. They do not know which kind of doctor they need. They are in Cleveland. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Cleveland\n- id nat2-sym-08: Existing patient (has any referral needed) who has had bloating, cramps and on-and-off diarrhea and constipation for months. They do not know which kind of doctor they need. They are in Seattle. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Seattle\n- id nat2-dup-01: Existing patient who wants Vaccination / Immunization with Dr. Scott Miller. They do not say where at first; asked which city, they answer Washington, DC. Fields: service_phrase = the visit they want: Vaccination / Immunization (said naturally); provider_phrase = the doctor's full name: Dr. Scott Miller; followup_location_phrase = their answer to 'which city?': Washington, DC\n- id nat2-dup-02: Existing patient who wants Back Pain Evaluation with Dr. Vijay Joshi, their doctor in Washington, DC. Fields: service_phrase = the visit they want: Back Pain Evaluation (said naturally); provider_phrase = the doctor's full name: Dr. Vijay Joshi; location_phrase = the city: Washington, DC\n- id nat2-dup-03: Existing patient who wants Flu Shot with Dr. Laura Gomez, their doctor in San Diego. Fields: service_phrase = the visit they want: Flu Shot (said naturally); provider_phrase = the doctor's full name: Dr. Laura Gomez; location_phrase = the city: San Diego\n- id nat2-dup-04: Existing patient who wants Group Therapy with Dr. Arpi Galstyan, their doctor in Tampa. Fields: service_phrase = the visit they want: Group Therapy (said naturally); provider_phrase = the doctor's full name: Dr. Arpi Galstyan; location_phrase = the city: Tampa\n- id nat2-dup-05: Existing patient who wants Vaccination / Immunization with Dr. Priya Ganesan, their doctor in Nashville. Fields: service_phrase = the visit they want: Vaccination / Immunization (said naturally); provider_phrase = the doctor's full name: Dr. Priya Ganesan; location_phrase = the city: Nashville\n- id nat2-dup-06: Existing patient who wants Annual Physical with Dr. Priya Shenoy, their doctor in Houston. Fields: service_phrase = the visit they want: Annual Physical (said naturally); provider_phrase = the doctor's full name: Dr. Priya Shenoy; location_phrase = the city: Houston\n- id nat2-cap-01: Existing patient (with a referral) who needs Lipid Panel. They are in Baltimore. Fields: service_phrase = the service: Lipid Panel (said naturally); location_phrase = the city: Baltimore\n- id nat2-cap-02: Existing patient (with a referral) who needs MRI - Shoulder. They are in Cleveland. Fields: service_phrase = the service: MRI - Shoulder (said naturally); location_phrase = the city: Cleveland\n- id nat2-cap-03: Existing patient (with a referral) who needs Dental X-Rays. They are in New Orleans. Fields: service_phrase = the service: Dental X-Rays (said naturally); location_phrase = the city: New Orleans\n- id nat2-cap-04: Existing patient who needs a contact lens fitting. They are in New York. Fields: service_phrase = how the caller asks for a contact lens fitting; location_phrase = the city: New York",
+ "response": "```json\n[\n  {\"id\": \"nat2-sym-07\", \"service_phrase\": \"my hair's been thinning and coming out in patches\", \"location_phrase\": \"Cleveland\"},\n  {\"id\": \"nat2-sym-08\", \"service_phrase\": \"I've been real bloated and crampy, and it's back and forth - diarrhea, then constipated - for months now\", \"location_phrase\": \"Seattle\"},\n  {\"id\": \"nat2-dup-01\", \"service_phrase\": \"need a vaccination\", \"provider_phrase\": \"Dr. Scott Miller\", \"followup_location_phrase\": \"Washington, DC\"},\n  {\"id\": \"nat2-dup-02\", \"service_phrase\": \"I need to check my back pain\", \"provider_phrase\": \"Dr. Vijay Joshi\", \"location_phrase\": \"Washington, DC\"},\n  {\"id\": \"nat2-dup-03\", \"service_phrase\": \"want to get a flu shot\", \"provider_phrase\": \"Dr. Laura Gomez\", \"location_phrase\": \"San Diego\"},\n  {\"id\": \"nat2-dup-04\", \"service_phrase\": \"I'm calling about the group therapy\", \"provider_phrase\": \"Dr. Arpi Galstyan\", \"location_phrase\": \"Tampa\"},\n  {\"id\": \"nat2-dup-05\", \"service_phrase\": \"I'm in for my immunization\", \"provider_phrase\": \"Dr. Priya Ganesan\", \"location_phrase\": \"Nashville\"},\n  {\"id\": \"nat2-dup-06\", \"service_phrase\": \"I need my yearly physical\", \"provider_phrase\": \"Dr. Priya Shenoy\", \"location_phrase\": \"Houston\"},\n  {\"id\": \"nat2-cap-01\", \"service_phrase\": \"I need a lipid panel\", \"location_phrase\": \"Baltimore\"},\n  {\"id\": \"nat2-cap-02\", \"service_phrase\": \"I need an MRI on my shoulder\", \"location_phrase\": \"Cleveland\"},\n  {\"id\": \"nat2-cap-03\", \"service_phrase\": \"I need dental x-rays\", \"location_phrase\": \"New Orleans\"},\n  {\"id\": \"nat2-cap-04\", \"service_phrase\": \"I'd like to get fitted for contact lenses\", \"location_phrase\": \"New York\"}\n]\n```\n",
+ "parsed": [
+  {
+   "id": "nat2-sym-07",
+   "service_phrase": "my hair's been thinning and coming out in patches",
+   "location_phrase": "Cleveland"
+  },
+  {
+   "id": "nat2-sym-08",
+   "service_phrase": "I've been real bloated and crampy, and it's back and forth - diarrhea, then constipated - for months now",
+   "location_phrase": "Seattle"
+  },
+  {
+   "id": "nat2-dup-01",
+   "service_phrase": "need a vaccination",
+   "provider_phrase": "Dr. Scott Miller",
+   "followup_location_phrase": "Washington, DC"
+  },
+  {
+   "id": "nat2-dup-02",
+   "service_phrase": "I need to check my back pain",
+   "provider_phrase": "Dr. Vijay Joshi",
+   "location_phrase": "Washington, DC"
+  },
+  {
+   "id": "nat2-dup-03",
+   "service_phrase": "want to get a flu shot",
+   "provider_phrase": "Dr. Laura Gomez",
+   "location_phrase": "San Diego"
+  },
+  {
+   "id": "nat2-dup-04",
+   "service_phrase": "I'm calling about the group therapy",
+   "provider_phrase": "Dr. Arpi Galstyan",
+   "location_phrase": "Tampa"
+  },
+  {
+   "id": "nat2-dup-05",
+   "service_phrase": "I'm in for my immunization",
+   "provider_phrase": "Dr. Priya Ganesan",
+   "location_phrase": "Nashville"
+  },
+  {
+   "id": "nat2-dup-06",
+   "service_phrase": "I need my yearly physical",
+   "provider_phrase": "Dr. Priya Shenoy",
+   "location_phrase": "Houston"
+  },
+  {
+   "id": "nat2-cap-01",
+   "service_phrase": "I need a lipid panel",
+   "location_phrase": "Baltimore"
+  },
+  {
+   "id": "nat2-cap-02",
+   "service_phrase": "I need an MRI on my shoulder",
+   "location_phrase": "Cleveland"
+  },
+  {
+   "id": "nat2-cap-03",
+   "service_phrase": "I need dental x-rays",
+   "location_phrase": "New Orleans"
+  },
+  {
+   "id": "nat2-cap-04",
+   "service_phrase": "I'd like to get fitted for contact lenses",
+   "location_phrase": "New York"
+  }
+ ]
+}

@@ -1,0 +1,67 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat2-geo-01: Existing patient who needs a urine test their doctor ordered. They are in Las Vegas, Nevada. Fields: service_phrase = how the caller asks for a urine test their doctor ordered; location_phrase = where they are: the caller names the city only (Las Vegas)\n- id nat2-geo-02: Existing patient who needs a urine test their doctor ordered. They are in Atlanta, Georgia. Fields: service_phrase = how the caller asks for a urine test their doctor ordered; location_phrase = where they are: the caller names the city only (Atlanta)\n- id nat2-geo-03: Existing patient who needs their regular dental checkup. They are in St. Louis, Missouri. Fields: service_phrase = how the caller asks for their regular dental checkup; location_phrase = where they are: the caller says they are in / live in the city (St. Louis)\n- id nat2-geo-04: Existing patient who needs a chest X-ray their doctor ordered. They are in Raleigh, North Carolina. Fields: service_phrase = how the caller asks for a chest X-ray their doctor ordered; location_phrase = where they are: the caller says they are in / live in the city (Raleigh)\n- id nat2-geo-05: Existing patient who needs an MRI of their shoulder that their doctor ordered. They live in Bellaire, Texas (a suburb; do not mention the bigger nearby city). Fields: service_phrase = how the caller asks for an MRI of their shoulder that their doctor ordered; location_phrase = where they are: the town name Bellaire\n- id nat2-geo-06: Existing patient who needs their regular dental checkup. Their ZIP code is 78225. Fields: service_phrase = how the caller asks for their regular dental checkup; location_phrase = where they are: the caller gives the ZIP code 78225\n- id nat2-geo-07: Existing patient who needs a bone density scan their doctor ordered. Their ZIP code is 37201. Fields: service_phrase = how the caller asks for a bone density scan their doctor ordered; location_phrase = where they are: the caller gives the ZIP code 37201\n- id nat2-geo-08: Existing patient who needs their regular dental checkup. Their ZIP code is 19102. Fields: service_phrase = how the caller asks for their regular dental checkup; location_phrase = where they are: the caller gives the ZIP code 19102\n- id nat2-geo-09: Existing patient who needs a urine test their doctor ordered. They are near the The Hill neighborhood of St. Louis (any clinic close by is fine). Fields: service_phrase = how the caller asks for a urine test their doctor ordered; location_phrase = where they are: that they are near / around The Hill (do not name the city)\n- id nat2-geo-10: Existing patient who needs an MRI of their shoulder that their doctor ordered. They live in the Back Bay neighborhood of Boston. Fields: service_phrase = how the caller asks for an MRI of their shoulder that their doctor ordered; location_phrase = where they are: the neighborhood they are in: Back Bay (do not name the city)\n- id nat2-geo-11: Existing patient who needs a chest X-ray their doctor ordered. They live in the Dr. Phillips neighborhood of Orlando. Fields: service_phrase = how the caller asks for a chest X-ray their doctor ordered; location_phrase = where they are: the neighborhood they are in: Dr. Phillips (do not name the city)\n- id nat2-geo-12: Existing patient who needs an MRI of their shoulder that their doctor ordered. They are near the Washington Heights neighborhood of New York (any clinic close by is fine). Fields: service_phrase = how the caller asks for an MRI of their shoulder that their doctor ordered; location_phrase = where they are: that they are near / around Washington Heights (do not name the city)",
+ "response": "```json\n[\n  {\n    \"id\": \"nat2-geo-01\",\n    \"service_phrase\": \"doctor ordered a urine test for me\",\n    \"location_phrase\": \"Las Vegas\"\n  },\n  {\n    \"id\": \"nat2-geo-02\",\n    \"service_phrase\": \"I'm supposed to get a urine test, my doctor ordered it\",\n    \"location_phrase\": \"Atlanta\"\n  },\n  {\n    \"id\": \"nat2-geo-03\",\n    \"service_phrase\": \"I need my regular dental checkup\",\n    \"location_phrase\": \"I'm in St. Louis\"\n  },\n  {\n    \"id\": \"nat2-geo-04\",\n    \"service_phrase\": \"my doctor ordered a chest X-ray\",\n    \"location_phrase\": \"I live in Raleigh\"\n  },\n  {\n    \"id\": \"nat2-geo-05\",\n    \"service_phrase\": \"my doctor, he ordered MRI for my shoulder\",\n    \"location_phrase\": \"Bellaire\"\n  },\n  {\n    \"id\": \"nat2-geo-06\",\n    \"service_phrase\": \"I need to come in for my regular dental checkup, you know the cleaning\",\n    \"location_phrase\": \"78225\"\n  },\n  {\n    \"id\": \"nat2-geo-07\",\n    \"service_phrase\": \"my doctor ordered a bone density scan\",\n    \"location_phrase\": \"37201\"\n  },\n  {\n    \"id\": \"nat2-geo-08\",\n    \"service_phrase\": \"I need my regular dental checkup\",\n    \"location_phrase\": \"19102\"\n  },\n  {\n    \"id\": \"nat2-geo-09\",\n    \"service_phrase\": \"my doctor ordered a urine test\",\n    \"location_phrase\": \"I'm near The Hill\"\n  },\n  {\n    \"id\": \"nat2-geo-10\",\n    \"service_phrase\": \"doctor ordered an MRI of my shoulder\",\n    \"location_phrase\": \"I'm in Back Bay\"\n  },\n  {\n    \"id\": \"nat2-geo-11\",\n    \"service_phrase\": \"my doctor ordered a chest X-ray\",\n    \"location_phrase\": \"I live in Dr. Phillips\"\n  },\n  {\n    \"id\": \"nat2-geo-12\",\n    \"service_phrase\": \"I need an MRI of my shoulder, doctor ordered it\",\n    \"location_phrase\": \"I'm over by Washington Heights\"\n  }\n]\n```\n",
+ "parsed": [
+  {
+   "id": "nat2-geo-01",
+   "service_phrase": "doctor ordered a urine test for me",
+   "location_phrase": "Las Vegas"
+  },
+  {
+   "id": "nat2-geo-02",
+   "service_phrase": "I'm supposed to get a urine test, my doctor ordered it",
+   "location_phrase": "Atlanta"
+  },
+  {
+   "id": "nat2-geo-03",
+   "service_phrase": "I need my regular dental checkup",
+   "location_phrase": "I'm in St. Louis"
+  },
+  {
+   "id": "nat2-geo-04",
+   "service_phrase": "my doctor ordered a chest X-ray",
+   "location_phrase": "I live in Raleigh"
+  },
+  {
+   "id": "nat2-geo-05",
+   "service_phrase": "my doctor, he ordered MRI for my shoulder",
+   "location_phrase": "Bellaire"
+  },
+  {
+   "id": "nat2-geo-06",
+   "service_phrase": "I need to come in for my regular dental checkup, you know the cleaning",
+   "location_phrase": "78225"
+  },
+  {
+   "id": "nat2-geo-07",
+   "service_phrase": "my doctor ordered a bone density scan",
+   "location_phrase": "37201"
+  },
+  {
+   "id": "nat2-geo-08",
+   "service_phrase": "I need my regular dental checkup",
+   "location_phrase": "19102"
+  },
+  {
+   "id": "nat2-geo-09",
+   "service_phrase": "my doctor ordered a urine test",
+   "location_phrase": "I'm near The Hill"
+  },
+  {
+   "id": "nat2-geo-10",
+   "service_phrase": "doctor ordered an MRI of my shoulder",
+   "location_phrase": "I'm in Back Bay"
+  },
+  {
+   "id": "nat2-geo-11",
+   "service_phrase": "my doctor ordered a chest X-ray",
+   "location_phrase": "I live in Dr. Phillips"
+  },
+  {
+   "id": "nat2-geo-12",
+   "service_phrase": "I need an MRI of my shoulder, doctor ordered it",
+   "location_phrase": "I'm over by Washington Heights"
+  }
+ ]
+}

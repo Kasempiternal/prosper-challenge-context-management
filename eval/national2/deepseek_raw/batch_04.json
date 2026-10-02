@@ -1,0 +1,69 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat2-cap-05: Existing patient (with a referral) who needs Lipid Panel and insists on going to the clinic called Chula Vista Specialty Center in Chula Vista, which they always use. Fields: service_phrase = the service: Lipid Panel (said naturally); location_phrase = that specific clinic by name: Chula Vista Specialty Center (not 'near' it)\n- id nat2-new-01: A brand-new patient who has never been seen at these clinics needs Vasectomy Consultation. They are in Sacramento. Fields: service_phrase = the service: Vasectomy Consultation (said naturally); location_phrase = the city: Sacramento\n- id nat2-new-02: A brand-new patient who has never been seen at these clinics needs Prostate Screening (PSA). They are in Dallas. Fields: service_phrase = the service: Prostate Screening (PSA) (said naturally); location_phrase = the city: Dallas\n- id nat2-new-03: A brand-new patient wants Annual Well-Woman Exam with Dr. Gina Guerrieri in Dallas (a friend recommended this doctor). Fields: service_phrase = the service: Annual Well-Woman Exam (said naturally); provider_phrase = the doctor's full name: Dr. Gina Guerrieri; location_phrase = the city: Dallas\n- id nat2-new-04: A brand-new patient wants Anemia Evaluation with Dr. Rachel Lysenko in New York (a friend recommended this doctor). Fields: service_phrase = the service: Anemia Evaluation (said naturally); provider_phrase = the doctor's full name: Dr. Rachel Lysenko; location_phrase = the city: New York\n- id nat2-new-05: A brand-new patient who has never been seen here wants Allergy Shots (Immunotherapy). They are in Sacramento. Fields: service_phrase = the service: Allergy Shots (Immunotherapy) (said naturally); location_phrase = the city: Sacramento\n- id nat2-noloc-01: Existing patient who needs their regular dental checkup. They do not say where they are at first; asked which city, they answer Las Vegas. Fields: service_phrase = how the caller asks for their regular dental checkup; followup_location_phrase = their answer to 'which city?': Las Vegas\n- id nat2-noloc-02: Existing patient who needs a chest X-ray their doctor ordered. They do not say where they are at first; asked which city, they answer Austin. Fields: service_phrase = how the caller asks for a chest X-ray their doctor ordered; followup_location_phrase = their answer to 'which city?': Austin\n- id nat2-noloc-03: Existing patient who needs a cholesterol blood test their doctor ordered. They do not say where they are at first; asked which city, they answer Chicago. Fields: service_phrase = how the caller asks for a cholesterol blood test their doctor ordered; followup_location_phrase = their answer to 'which city?': Chicago\n- id nat2-unoff-01: Existing patient who wants chiropractic evaluation. They are in Portland. Fields: service_phrase = the service: chiropractic evaluation (said naturally); location_phrase = the city: Portland\n- id nat2-unoff-02: Existing patient who wants tattoo removal consultation. They are in Albuquerque. Fields: service_phrase = the service: tattoo removal consultation (said naturally); location_phrase = the city: Albuquerque\n- id nat2-ring-01: Existing patient who needs contact lens fitting (has any referral needed). They are in New Orleans. Fields: service_phrase = the service: contact lens fitting (said naturally); location_phrase = the city: New Orleans",
+ "response": "```json\n[\n  {\"id\": \"nat2-cap-05\", \"service_phrase\": \"I need a lipid panel done\", \"location_phrase\": \"at Chula Vista Specialty Center, that's the one I always use\"},\n  {\"id\": \"nat2-new-01\", \"service_phrase\": \"I want to make appointment for vasectomy consultation\", \"location_phrase\": \"I am in Sacramento\"},\n  {\"id\": \"nat2-new-02\", \"service_phrase\": \"prostate screening, the PSA one\", \"location_phrase\": \"I'm over in Dallas\"},\n  {\"id\": \"nat2-new-03\", \"service_phrase\": \"I'd like to get an annual well-woman exam, my friend told me about you\", \"provider_phrase\": \"Dr. Gina Guerrieri\", \"location_phrase\": \"I'm in Dallas\"},\n  {\"id\": \"nat2-new-04\", \"service_phrase\": \"anemia evaluation\", \"provider_phrase\": \"Dr. Rachel Lysenko\", \"location_phrase\": \"New York\"},\n  {\"id\": \"nat2-new-05\", \"service_phrase\": \"I need my allergy shots\", \"location_phrase\": \"I'm in Sacramento\"},\n  {\"id\": \"nat2-noloc-01\", \"service_phrase\": \"just my regular dental checkup\", \"followup_location_phrase\": \"Las Vegas\"},\n  {\"id\": \"nat2-noloc-02\", \"service_phrase\": \"a chest X-ray my doctor ordered\", \"followup_location_phrase\": \"Austin\"},\n  {\"id\": \"nat2-noloc-03\", \"service_phrase\": \"a cholesterol blood test, my doctor ordered it\", \"followup_location_phrase\": \"Chicago\"},\n  {\"id\": \"nat2-unoff-01\", \"service_phrase\": \"I want a chiropractic evaluation\", \"location_phrase\": \"I'm in Portland\"},\n  {\"id\": \"nat2-unoff-02\", \"service_phrase\": \"I need a tattoo removal consultation\", \"location_phrase\": \"I'm in Albuquerque\"},\n  {\"id\": \"nat2-ring-01\", \"service_phrase\": \"I need a contact lens fitting\", \"location_phrase\": \"I'm in New Orleans\"}\n]\n```\n",
+ "parsed": [
+  {
+   "id": "nat2-cap-05",
+   "service_phrase": "I need a lipid panel done",
+   "location_phrase": "at Chula Vista Specialty Center, that's the one I always use"
+  },
+  {
+   "id": "nat2-new-01",
+   "service_phrase": "I want to make appointment for vasectomy consultation",
+   "location_phrase": "I am in Sacramento"
+  },
+  {
+   "id": "nat2-new-02",
+   "service_phrase": "prostate screening, the PSA one",
+   "location_phrase": "I'm over in Dallas"
+  },
+  {
+   "id": "nat2-new-03",
+   "service_phrase": "I'd like to get an annual well-woman exam, my friend told me about you",
+   "provider_phrase": "Dr. Gina Guerrieri",
+   "location_phrase": "I'm in Dallas"
+  },
+  {
+   "id": "nat2-new-04",
+   "service_phrase": "anemia evaluation",
+   "provider_phrase": "Dr. Rachel Lysenko",
+   "location_phrase": "New York"
+  },
+  {
+   "id": "nat2-new-05",
+   "service_phrase": "I need my allergy shots",
+   "location_phrase": "I'm in Sacramento"
+  },
+  {
+   "id": "nat2-noloc-01",
+   "service_phrase": "just my regular dental checkup",
+   "followup_location_phrase": "Las Vegas"
+  },
+  {
+   "id": "nat2-noloc-02",
+   "service_phrase": "a chest X-ray my doctor ordered",
+   "followup_location_phrase": "Austin"
+  },
+  {
+   "id": "nat2-noloc-03",
+   "service_phrase": "a cholesterol blood test, my doctor ordered it",
+   "followup_location_phrase": "Chicago"
+  },
+  {
+   "id": "nat2-unoff-01",
+   "service_phrase": "I want a chiropractic evaluation",
+   "location_phrase": "I'm in Portland"
+  },
+  {
+   "id": "nat2-unoff-02",
+   "service_phrase": "I need a tattoo removal consultation",
+   "location_phrase": "I'm in Albuquerque"
+  },
+  {
+   "id": "nat2-ring-01",
+   "service_phrase": "I need a contact lens fitting",
+   "location_phrase": "I'm in New Orleans"
+  }
+ ]
+}

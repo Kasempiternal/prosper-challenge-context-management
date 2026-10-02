@@ -1,18 +1,21 @@
-"""Author eval/cases_national.jsonl from the national catalog, independently of the resolver.
+"""Author eval/cases_national*.jsonl from the national catalog, independently of the resolver.
 
 Ground truth comes only from catalog queries here (the 6 policies + haversine distance). Caller
 wording comes from DeepSeek, which sees scenario facts in plain language and nothing else.
 
-  python eval/national/build_cases.py scenarios   # seeded sampler -> eval/national/scenarios.json
-  python eval/national/build_cases.py phrase      # DeepSeek via cmdc -> eval/national/deepseek_raw/*.json
-  python eval/national/build_cases.py merge       # scenarios + phrasings -> eval/cases_national.jsonl
+  python eval/national/build_cases.py [--set national|national2] scenarios  # seeded sampler -> <dir>/scenarios.json
+  python eval/national/build_cases.py [--set ...] phrase      # DeepSeek via cmdc -> <dir>/deepseek_raw/*.json
+  python eval/national/build_cases.py [--set ...] merge       # scenarios + phrasings -> eval/cases_<set>.jsonl
 
+A set is a Profile: seed, id prefix, the service/symptom/type lists it samples from, and optionally
+another set whose scenarios it avoids (same type+metro, same site, provider, name or place).
 `phrase` skips batches whose raw file exists, so reruns cost nothing and reproduce the same file.
 """
 
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import math
 import random
@@ -21,16 +24,13 @@ import shutil
 import subprocess
 import sys
 from collections import Counter, defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 CATALOG = ROOT / "backend" / "data" / "national" / "catalog.json"
 META = ROOT / "backend" / "data" / "national" / "catalog.meta.json"
-SCENARIOS = HERE / "scenarios.json"
-RAW = HERE / "deepseek_raw"
-OUT = ROOT / "eval" / "cases_national.jsonl"
-SEED = 20261002
 MODEL = "deepseek/deepseek-v4.1-flash"
 BATCH = 12
 
@@ -89,6 +89,87 @@ GENERIC_TYPE_WORDS = ("follow-up", "session", "visit", "management", "consultati
 MISSPELLED = {"albuquerque-nm": "Albukerky", "sacramento-ca": "Sacremento", "minneapolis-mn": "Minneapolous",
               "philadelphia-pa": "Philedelphia", "indianapolis-in": "Indianopolis", "pittsburgh-pa": "Pitsburg",
               "cleveland-oh": "Cleaveland", "nashville-tn": "Nashvile", "san-antonio-tx": "San Antonyo"}
+
+# national2: a second, held-out draw over different services, symptoms and types.
+GEO_SERVICES2 = [
+    ("their regular dental checkup", ["appt_075", "appt_074"]),
+    ("a cholesterol blood test their doctor ordered", ["appt_231", "appt_072", "appt_073"]),
+    ("a chest X-ray their doctor ordered", ["appt_218", "appt_062"]),
+    ("a urine test their doctor ordered", ["appt_230", "appt_072"]),
+    ("an MRI of their shoulder that their doctor ordered", ["appt_205"]),
+    ("a bone density scan their doctor ordered", ["appt_069"]),
+]
+SYMPTOMS2 = [
+    ("has had a constant ringing and buzzing in both ears for weeks", ["appt_179", "appt_050", "appt_051"],
+     ["tinnitus", "otolaryng", "ent "]),
+    ("has a painful bony bump at the base of the big toe that rubs in every shoe", ["appt_290", "appt_285",
+     "appt_137", "appt_291"], ["podiatr", "bunion"]),
+    ("snores loudly and their partner says they stop breathing for a few seconds at night; always tired",
+     ["appt_177", "appt_252", "appt_078", "appt_050"], ["apnea", "sleep study", "pulmonolog"]),
+    ("has numbness and tingling in the thumb and fingers of one hand, worse at night",
+     ["appt_141", "appt_136", "appt_152", "appt_036", "appt_032"], ["carpal", "neurolog", "orthop"]),
+    ("gets sudden spinning dizziness when rolling over in bed or looking up",
+     ["appt_155", "appt_178", "appt_036", "appt_050"], ["vertigo", "neurolog"]),
+    ("has been wheezing and short of breath climbing stairs for a couple of months",
+     ["appt_078", "appt_079", "appt_250"], ["pulmonolog", "asthma", "copd"]),
+    ("has hair thinning and coming out in patches", ["appt_125", "appt_026"], ["dermatolog"]),
+    ("has had bloating, cramps and on-and-off diarrhea and constipation for months",
+     ["appt_186", "appt_053", "appt_188"], ["gastro", "ibs", "gi "]),
+]
+NEW_OK_TYPES2 = ["appt_098", "appt_245", "appt_290", "appt_018", "appt_243", "appt_094"]
+NO_NEW_TYPES2 = ["appt_289", "appt_255", "appt_236"]
+UNOFFERED2 = ["appt_311", "appt_310", "appt_130"]
+CAPABILITY_TYPES2 = ["appt_205", "appt_218", "appt_184", "appt_231", "appt_240", "appt_029"]
+
+
+@dataclass(frozen=True)
+class FarPlace:
+    """A real place with no metro nearby; the nearest metro must be the same from the town and its state."""
+    kind: str
+    city: str
+    state: str
+    point: tuple[float, float]
+    state_centroid: tuple[float, float]
+
+
+@dataclass(frozen=True)
+class Profile:
+    name: str
+    seed: int
+    prefix: str
+    dir: Path
+    geo_services: list
+    symptoms: list
+    new_ok: list[str]
+    no_new: list[str]
+    unoffered: list[str]
+    capability: list[str]
+    eye: tuple[str, list[str]]
+    far: FarPlace
+    exclude: str | None = None
+
+    @property
+    def scenarios(self) -> Path:
+        return self.dir / "scenarios.json"
+
+    @property
+    def raw(self) -> Path:
+        return self.dir / "deepseek_raw"
+
+    @property
+    def out(self) -> Path:
+        return ROOT / "eval" / f"cases_{self.name}.jsonl"
+
+
+PROFILES = {p.name: p for p in (
+    Profile("national", 20261002, "nat", HERE, GEO_SERVICES, SYMPTOMS, NEW_OK_TYPES, NO_NEW_TYPES, UNOFFERED,
+            CAPABILITY_TYPES, ("a routine eye exam", EYE_TYPES),
+            FarPlace("portland_maine", "Portland", "Maine", PORTLAND_ME, MAINE_CENTROID)),
+    Profile("national2", 20261117, "nat2", ROOT / "eval" / "national2", GEO_SERVICES2, SYMPTOMS2, NEW_OK_TYPES2,
+            NO_NEW_TYPES2, UNOFFERED2, CAPABILITY_TYPES2, ("a contact lens fitting", ["appt_048"]),
+            FarPlace("far_place", "Billings", "Montana", (45.7833, -108.5007), (46.9653, -109.5337)),
+            exclude="national"),
+)}
 
 
 def miles(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -154,6 +235,50 @@ class Catalog:
         return sorted(lid for lid in lids if miles(anchor, self.xy(lid)) <= radius)
 
 
+def facts(cat: Catalog, s: dict) -> dict[str, set]:
+    """The catalog facts a scenario is about, read from its expectation, truth and required words."""
+    t, e = s["truth"], s["expected"]
+    by_name = {m["name"]: mid for mid, m in cat.metros.items()} | {"Washington, DC": "washington-dc"}
+    places = {w for rule in s["checks"].values() for w in rule.get("must", ())} | set(s["fixed"].values())
+    sites = {t["site"]} if "site" in t else set()
+    providers = ({t["provider"]} if "provider" in t else set()) | set(e.get("provider_ids", ())) | {
+        pid for ids in t.get("namesakes", {}).values() for pid in ids}
+    metros = ({t[k] for k in ("metro", "chosen") if k in t} | {cat.metro_of(x) for x in sites}
+              | {cat.metro_of(x) for x in e.get("location_ids_subset", ())} | {by_name[w] for w in places if w in by_name})
+    if "provider" in t:
+        metros |= cat.prov_metros(cat.provs[t["provider"]])
+    types = set(e.get("types_any", ())) | ({t["type"]} if "type" in t else set())
+    return {"kinds": {s["kind"]}, "metros": metros, "types": types, "sites": sites, "providers": providers,
+            "names": {cat.provs[p]["name"] for p in providers}, "places": places,
+            "pairs": set(itertools.product(types, metros))}
+
+
+@dataclass
+class Avoid:
+    """Facts already used by another set. Empty for a set with no `exclude`, which leaves sampling unchanged."""
+    metros: set = field(default_factory=set)
+    types: set = field(default_factory=set)
+    sites: set = field(default_factory=set)
+    providers: set = field(default_factory=set)
+    names: set = field(default_factory=set)
+    places: set = field(default_factory=set)
+    pairs: set = field(default_factory=set)
+    kind_metros: set = field(default_factory=set)
+
+    @classmethod
+    def of(cls, cat: Catalog, scen: list[dict]) -> Avoid:
+        a = cls()
+        for s in scen:
+            f = facts(cat, s)
+            for k in ("metros", "types", "sites", "providers", "names", "places", "pairs"):
+                getattr(a, k).update(f[k])
+            a.kind_metros.update((s["kind"], m) for m in f["metros"])
+        return a
+
+    def fresh(self, types, m: str) -> bool:
+        return not any((t, m) in self.pairs for t in types)
+
+
 def scenario(sid, category, kind, patient, situation, fields, expected, expect_t1=None, fixed=None, checks=None,
              truth=None):
     """fields: {phrase_key: instruction for DeepSeek}. fixed: phrases set by hand (misspellings)."""
@@ -166,17 +291,21 @@ def offer(types, lids, **extra):
     return {"status": "offer", "types_any": sorted(types), "location_ids_subset": sorted(lids), **extra}
 
 
-def build(cat: Catalog) -> list[dict]:
-    rng = random.Random(SEED)
+def build(cat: Catalog, prof: Profile, avoid: Avoid) -> list[dict]:
+    rng = random.Random(prof.seed)
     out: list[dict] = []
     metro_ids = sorted(cat.metros)
     state_metros: dict[str, list[str]] = defaultdict(list)
     for mid in metro_ids:
         state_metros[cat.metros[mid]["state"]].append(mid)
-    used_metros: Counter = Counter()
+    used_metros: Counter = Counter(avoid.metros)
+    pre = prof.prefix
+    eye_desc, eye_types = prof.eye
+    unoffered = [t for t in prof.unoffered if t not in avoid.types]
 
-    def pick_metro(pred, avoid_used=True):
+    def pick_metro(pred, avoid_used=True, types=()):
         cands = [m for m in metro_ids if pred(m)]
+        cands = [m for m in cands if avoid.fresh(types, m)] or cands
         if not cands:
             return None
         fresh = [m for m in cands if not used_metros[m]] if avoid_used else cands
@@ -185,7 +314,7 @@ def build(cat: Catalog) -> list[dict]:
         return m
 
     def svc_order():
-        order = list(GEO_SERVICES)
+        order = list(prof.geo_services)
         rng.shuffle(order)
         return order
 
@@ -210,12 +339,12 @@ def build(cat: Catalog) -> list[dict]:
     def gid():
         nonlocal n
         n += 1
-        return f"nat-geo-{n:02d}"
+        return f"{pre}-geo-{n:02d}"
 
     for kind in ("city", "city", "im_in", "im_in"):
         for desc, types in svc_order():
             m = pick_metro(lambda m: len(metro_strict(m, types, EXISTING)) >= 1 and len(
-                [x for x in cat.locs.values() if x["metro_id"] == m]) >= 5)
+                [x for x in cat.locs.values() if x["metro_id"] == m]) >= 5, types=types)
             if m:
                 valid = metro_strict(m, types, EXISTING)
                 break
@@ -232,7 +361,8 @@ def build(cat: Catalog) -> list[dict]:
     suburbs = sorted({(x["city"], x["metro_id"]) for x in cat.locs.values()
                       if x["city"] != cat.metros[x["metro_id"]]["name"]})
     suburb_city_count = Counter(c for c, _ in suburbs)
-    suburbs = [s for s in suburbs if suburb_city_count[s[0]] == 1]
+    suburbs = [s for s in suburbs if suburb_city_count[s[0]] == 1
+               and s[0] not in avoid.places and ("suburb_city", s[1]) not in avoid.kind_metros]
     rng.shuffle(suburbs)
     for city, m in suburbs:
         pts = [cat.xy(lid) for lid, x in cat.locs.items() if x["city"] == city]
@@ -241,7 +371,7 @@ def build(cat: Catalog) -> list[dict]:
         for desc, types in svc_order():
             valid = cat.within(cat.valid_locs(types, EXISTING), anchor, 25)
             far = cat.in_metro(cat.valid_locs(types, EXISTING), m)
-            if valid and set(far) - set(valid):
+            if valid and set(far) - set(valid) and avoid.fresh(types, m):
                 hit = desc, types, valid
                 break
         if hit:
@@ -258,14 +388,14 @@ def build(cat: Catalog) -> list[dict]:
 
     # zip of a site that offers the service
     zips_used = 0
-    lids = sorted(cat.locs)
+    lids = sorted(lid for lid in cat.locs if lid not in avoid.sites and cat.locs[lid]["zip"] not in avoid.places)
     rng.shuffle(lids)
     for lid in lids:
         if zips_used == 2:
             break
         for desc, types in svc_order():
             valid_all = cat.valid_locs(types, EXISTING)
-            if lid not in valid_all:
+            if lid not in valid_all or not avoid.fresh(types, cat.metro_of(lid)):
                 continue
             valid = cat.within(valid_all, cat.xy(lid), 10)
             z = cat.locs[lid]["zip"]
@@ -282,14 +412,14 @@ def build(cat: Catalog) -> list[dict]:
     for x in cat.locs.values():
         zip3s[x["zip"][:3]].add(x["metro_id"])
     all_zips = {x["zip"] for x in cat.locs.values()}
-    cands = sorted(z for z, ms in zip3s.items() if len(ms) == 1)
+    cands = sorted(z for z, ms in zip3s.items() if len(ms) == 1 and ("zip3", next(iter(ms))) not in avoid.kind_metros)
     rng.shuffle(cands)
     for z3 in cands:
         m = next(iter(zip3s[z3]))
         done = False
         for desc, types in svc_order():
             valid = metro_strict(m, types, EXISTING)
-            if not valid:
+            if not valid or not avoid.fresh(types, m):
                 continue
             z = next(f"{z3}{i:02d}" for i in range(1, 100) if f"{z3}{i:02d}" not in all_zips)
             out.append(scenario(gid(), "geo", "zip3", EXISTING,
@@ -306,12 +436,15 @@ def build(cat: Catalog) -> list[dict]:
     nb_count = Counter(x["neighborhood"] for x in cat.locs.values())
     city_names = {x["city"] for x in cat.locs.values()} | {m["name"] for m in cat.metros.values()}
     nbs = sorted(lid for lid, x in cat.locs.items()
-                 if nb_count[x["neighborhood"]] == 1 and x["neighborhood"] not in city_names)
+                 if nb_count[x["neighborhood"]] == 1 and x["neighborhood"] not in city_names
+                 and lid not in avoid.sites and x["neighborhood"] not in avoid.places)
     rng.shuffle(nbs)
     made = Counter()
     for lid in nbs:
         x = cat.locs[lid]
         for desc, types in svc_order():
+            if not avoid.fresh(types, x["metro_id"]):
+                continue
             valid_all = cat.valid_locs(types, EXISTING)
             near5 = cat.within(valid_all, cat.xy(lid), 5)
             near10 = cat.within(valid_all, cat.xy(lid), 10)
@@ -336,9 +469,10 @@ def build(cat: Catalog) -> list[dict]:
             break
 
     # state only, state with several metros
-    multi_states = sorted(s for s, ms in state_metros.items() if len(ms) >= 2 and STATE_NAMES[s] not in city_names)
+    multi_states = sorted(s for s, ms in state_metros.items() if len(ms) >= 2 and STATE_NAMES[s] not in city_names
+                          and STATE_NAMES[s] not in avoid.places)
     st = rng.choice(multi_states)
-    desc, types = rng.choice(GEO_SERVICES)
+    desc, types = rng.choice(prof.geo_services)
     out.append(scenario(gid(), "geo", "state_only", EXISTING,
                         f"Existing patient who needs {desc}. They only say which state they live in: {STATE_NAMES[st]}.",
                         {**svc_field(desc), **loc_field(f"the state only: {STATE_NAMES[st]} (no city)")},
@@ -350,7 +484,7 @@ def build(cat: Catalog) -> list[dict]:
     # either/or: a town name that exists in two metros
     twins = sorted((c, sorted(ms)) for c, ms in
                    ((c, {mm for cc, mm in {(x["city"], x["metro_id"]) for x in cat.locs.values()} if cc == c})
-                    for c in {x["city"] for x in cat.locs.values()}) if len(ms) == 2)
+                    for c in {x["city"] for x in cat.locs.values()}) if len(ms) == 2 and c not in avoid.places)
     rng.shuffle(twins)
     for city, ms in twins[:2]:
         chosen = rng.choice(ms)
@@ -378,42 +512,45 @@ def build(cat: Catalog) -> list[dict]:
                                     "followup_location_phrase": {"must": [chosen_state]}},
                             truth={"metros": ms, "chosen": chosen}))
 
-    # Portland, Maine: no clinic in Maine; nearest metro must win from both Portland ME and the Maine centroid
+    # far place (Portland, Maine for `national`): no clinic in its state; the nearest metro must win from
+    # both the town and the state centroid
+    far = prof.far
     for desc, types in svc_order():
         valid = cat.valid_locs(types, EXISTING)
 
         def nearest_metro(pt):
             return cat.metro_of(min(valid, key=lambda lid: miles(pt, cat.xy(lid))))
-        if nearest_metro(PORTLAND_ME) == nearest_metro(MAINE_CENTROID):
-            m = nearest_metro(PORTLAND_ME)
+        if nearest_metro(far.point) == nearest_metro(far.state_centroid):
+            m = nearest_metro(far.point)
             near = cat.in_metro(valid, m)
-            d = min(miles(PORTLAND_ME, cat.xy(lid)) for lid in near)
-            out.append(scenario(gid(), "geo", "portland_maine", EXISTING,
-                                f"Existing patient who needs {desc}. They live in Portland, Maine.",
-                                {**svc_field(desc), **loc_field("where they are: Portland, Maine (say both words)")},
+            d = min(miles(far.point, cat.xy(lid)) for lid in near)
+            out.append(scenario(gid(), "geo", far.kind, EXISTING,
+                                f"Existing patient who needs {desc}. They live in {far.city}, {far.state}.",
+                                {**svc_field(desc),
+                                 **loc_field(f"where they are: {far.city}, {far.state} (say both words)")},
                                 {"status": "refuse", "refuse_reason": "none_nearby", "location_ids_subset": near},
-                                checks={"location_phrase": {"must": ["Portland", "Maine"]}},
+                                checks={"location_phrase": {"must": [far.city, far.state]}},
                                 truth={"nearest_metro": m, "nearest_miles": round(d)}))
             break
 
     # misspelled metro name (fixed by hand, not by DeepSeek)
-    miss = sorted(m for m in MISSPELLED if m in cat.metros)
+    miss = sorted(m for m in MISSPELLED if m in cat.metros and ("misspelled_city", m) not in avoid.kind_metros)
     for m in rng.sample(miss, 2):
-        for desc, types in svc_order():
-            valid = metro_strict(m, types, EXISTING)
-            if valid:
-                break
+        order = svc_order()
+        ok = [(d, t) for d, t in order if metro_strict(m, t, EXISTING)]
+        desc, types = next(((d, t) for d, t in ok if avoid.fresh(t, m)), None) or (ok or order[-1:])[0]
+        valid = metro_strict(m, types, EXISTING)
         out.append(scenario(gid(), "geo", "misspelled_city", EXISTING,
                             f"Existing patient who needs {desc}. They are in {label(m)}.",
                             svc_field(desc), offer(types, valid), fixed={"location_phrase": MISSPELLED[m]},
                             truth={"metro": m}))
 
     # ---------------- symptoms -> specialty ----------------
-    for i, (symptom, types, leak) in enumerate(SYMPTOMS, 1):
-        m = pick_metro(lambda m: bool(cat.in_metro(cat.valid_locs(types, EXISTING), m)))
+    for i, (symptom, types, leak) in enumerate(prof.symptoms, 1):
+        m = pick_metro(lambda m: bool(cat.in_metro(cat.valid_locs(types, EXISTING), m)), types=types)
         valid = cat.in_metro(cat.valid_locs(types, EXISTING), m)
         name = label(m)
-        out.append(scenario(f"nat-sym-{i:02d}", "symptom", "symptom", EXISTING,
+        out.append(scenario(f"{pre}-sym-{i:02d}", "symptom", "symptom", EXISTING,
                             f"Existing patient (has any referral needed) who {symptom}. They do not know which "
                             f"kind of doctor they need. They are in {name}.",
                             {"service_phrase": "the reason for the visit, described as the symptom in everyday words "
@@ -443,15 +580,16 @@ def build(cat: Catalog) -> list[dict]:
 
     shared_dup, other_dup = [], []
     for name, ps in sorted(cat.by_name.items()):
-        if len(ps) < 2 or any(len(cat.prov_metros(p)) != 1 for p in ps)                 or len(set().union(*(cat.prov_metros(p) for p in ps))) < 2:
+        if name in avoid.names or len(ps) < 2 or any(len(cat.prov_metros(p)) != 1 for p in ps)                 or len(set().union(*(cat.prov_metros(p) for p in ps))) < 2:
             continue
         shared = sorted(t for t in set.intersection(*(set(p["appointment_type_ids"]) for p in ps)) if distinctive(t))
         hit = next(((name, t, pm) for t in shared for pm in [namesakes_by_metro(ps, t)]
-                    if len(pm) in (2, 3) and all(len(v) == 1 for v in pm.values())), None)
+                    if len(pm) in (2, 3) and all(len(v) == 1 for v in pm.values())
+                    and all(avoid.fresh([t], mm) for mm in pm)), None)
         (shared_dup if hit else other_dup).append(hit or (name, None, None))
     rng.shuffle(shared_dup)
     rng.shuffle(other_dup)
-    for i, (name, tid, per_metro) in enumerate(shared_dup[:3] + other_dup[:3], 1):
+    for i, (name, tid, per_metro) in enumerate(shared_dup[:3] + other_dup[:6 - len(shared_dup[:3])], 1):
         ps = cat.by_name[name]
         no_city = tid is not None
         if no_city:
@@ -475,13 +613,13 @@ def build(cat: Catalog) -> list[dict]:
         checks = {"provider_phrase": {"must": [first, last.split()[-1]]}}
         exp = offer(types, valid, provider_ids=[p["id"]])
         if not no_city:
-            out.append(scenario(f"nat-dup-{i:02d}", "dup_name_metro", "with_city", EXISTING,
+            out.append(scenario(f"{pre}-dup-{i:02d}", "dup_name_metro", "with_city", EXISTING,
                                 f"Existing patient who wants {svc} with {name}, their doctor in {city}.",
                                 {**base, **loc_field(f"the city: {city}")}, exp,
                                 checks={**checks, "location_phrase": {"must": [city]}},
                                 truth={"namesakes": per_metro}))
         else:
-            out.append(scenario(f"nat-dup-{i:02d}", "dup_name_metro", "no_city", EXISTING,
+            out.append(scenario(f"{pre}-dup-{i:02d}", "dup_name_metro", "no_city", EXISTING,
                                 f"Existing patient who wants {svc} with {name}. They do not say where at first; "
                                 f"asked which city, they answer {city}.",
                                 {**base, "followup_location_phrase": f"their answer to 'which city?': {city}"}, exp,
@@ -490,7 +628,7 @@ def build(cat: Catalog) -> list[dict]:
                                 truth={"namesakes": per_metro}))
 
     # ---------------- capability gating by metro ----------------
-    cap_types = list(CAPABILITY_TYPES)
+    cap_types = list(prof.capability)
     rng.shuffle(cap_types)
     made_cap = 0
     for tid in cap_types:
@@ -503,23 +641,23 @@ def build(cat: Catalog) -> list[dict]:
             offering = {lid for p in cat.by_type[tid] for lid in p["location_ids"] if cat.metro_of(lid) == m}
             return bool(cat.in_metro(cat.valid_locs([tid], EXISTING), m)) and any(
                 cap not in cat.locs[lid]["capabilities"] for lid in offering)
-        m = pick_metro(gated)
+        m = pick_metro(gated, types=[tid])
         valid = cat.in_metro(cat.valid_locs([tid], EXISTING), m)
         city = label(m)
         made_cap += 1
-        out.append(scenario(f"nat-cap-{made_cap:02d}", "capability_metro", "gated_offer", EXISTING,
+        out.append(scenario(f"{pre}-cap-{made_cap:02d}", "capability_metro", "gated_offer", EXISTING,
                             f"Existing patient (with a referral) who needs {t['name']}. They are in {city}.",
                             {"service_phrase": f"the service: {t['name']} (said naturally)", **loc_field(f"the city: {city}")},
                             offer([tid], valid), checks={"location_phrase": {"must": [city]}},
                             truth={"metro": m, "capability": cap}))
-    eye_metros = sorted({cat.metro_of(lid) for lid in cat.valid_locs(EYE_TYPES, EXISTING)})
-    m = rng.choice(eye_metros)
-    valid = cat.in_metro(cat.valid_locs(EYE_TYPES, EXISTING), m)
+    eye_metros = sorted({cat.metro_of(lid) for lid in cat.valid_locs(eye_types, EXISTING)})
+    m = rng.choice([mm for mm in eye_metros if avoid.fresh(eye_types, mm)] or eye_metros)
+    valid = cat.in_metro(cat.valid_locs(eye_types, EXISTING), m)
     made_cap += 1
-    out.append(scenario(f"nat-cap-{made_cap:02d}", "capability_metro", "metro_only_service", EXISTING,
-                        f"Existing patient who needs a routine eye exam. They are in {label(m)}.",
-                        {**svc_field("a routine eye exam"), **loc_field(f"the city: {label(m)}")},
-                        offer(EYE_TYPES, valid), checks={"location_phrase": {"must": [cat.metros[m]["name"]]}},
+    out.append(scenario(f"{pre}-cap-{made_cap:02d}", "capability_metro", "metro_only_service", EXISTING,
+                        f"Existing patient who needs {eye_desc}. They are in {label(m)}.",
+                        {**svc_field(eye_desc), **loc_field(f"the city: {label(m)}")},
+                        offer(eye_types, valid), checks={"location_phrase": {"must": [cat.metros[m]["name"]]}},
                         truth={"metro": m, "eye_metros": eye_metros}))
     # a named site that lacks the capability while a provider offering the type practices there
     name_count = Counter(x["name"] for x in cat.locs.values())
@@ -527,7 +665,7 @@ def build(cat: Catalog) -> list[dict]:
         cap = cat.types[tid]["required_capability"]
         sites = sorted({lid for p in cat.by_type[tid] for lid in p["location_ids"]
                         if cap not in cat.locs[lid]["capabilities"] and name_count[cat.locs[lid]["name"]] == 1})
-        sites = [s for s in sites if cat.in_metro(cat.valid_locs([tid], EXISTING), cat.metro_of(s))]
+        sites = [s for s in sites if s not in avoid.sites and cat.in_metro(cat.valid_locs([tid], EXISTING), cat.metro_of(s))]
         if not sites:
             continue
         s = rng.choice(sites)
@@ -535,7 +673,7 @@ def build(cat: Catalog) -> list[dict]:
         site = cat.locs[s]
         key = site["name"].split(" ")[0]
         made_cap += 1
-        out.append(scenario(f"nat-cap-{made_cap:02d}", "capability_metro", "named_site_lacks_capability", EXISTING,
+        out.append(scenario(f"{pre}-cap-{made_cap:02d}", "capability_metro", "named_site_lacks_capability", EXISTING,
                             f"Existing patient (with a referral) who needs {cat.types[tid]['name']} and insists on going "
                             f"to the clinic called {site['name']} in {site['city']}, which they always use.",
                             {"service_phrase": f"the service: {cat.types[tid]['name']} (said naturally)",
@@ -547,7 +685,7 @@ def build(cat: Catalog) -> list[dict]:
         break
 
     # ---------------- new-patient rules ----------------
-    nt = list(NEW_OK_TYPES)
+    nt = list(prof.new_ok)
     rng.shuffle(nt)
     k = 0
     for tid in nt:
@@ -561,11 +699,11 @@ def build(cat: Catalog) -> list[dict]:
         cands = [m for m in metro_ids if mixed(m)]
         if not cands:
             continue
-        m = pick_metro(mixed)
+        m = pick_metro(mixed, types=[tid])
         rows = [(pid, lid) for _, pid, lid in cat.rows([tid], NEW) if cat.metro_of(lid) == m]
         k += 1
         svc = cat.types[tid]["name"]
-        out.append(scenario(f"nat-new-{k:02d}", "new_patient", "accepting_only", NEW,
+        out.append(scenario(f"{pre}-new-{k:02d}", "new_patient", "accepting_only", NEW,
                             f"A brand-new patient who has never been seen at these clinics needs {svc}. "
                             f"They are in {label(m)}.",
                             {"service_phrase": f"the service: {svc} (said naturally)",
@@ -574,7 +712,7 @@ def build(cat: Catalog) -> list[dict]:
                             checks={"location_phrase": {"must": [cat.metros[m]["name"]]}}, truth={"metro": m}))
     closed = []
     for p in sorted(cat.provs.values(), key=lambda p: p["id"]):
-        if p["accepting_new_patients"] or len(cat.by_name[p["name"]]) != 1 or len(cat.prov_metros(p)) != 1:
+        if p["id"] in avoid.providers or p["accepting_new_patients"] or len(cat.by_name[p["name"]]) != 1 or len(cat.prov_metros(p)) != 1:
             continue
         for tid in p["appointment_type_ids"]:
             t = cat.types[tid]
@@ -585,7 +723,7 @@ def build(cat: Catalog) -> list[dict]:
         k += 1
         m = next(iter(cat.prov_metros(p)))
         first, last = p["name"].replace("Dr. ", "").split(" ", 1)
-        out.append(scenario(f"nat-new-{k:02d}", "new_patient", "provider_not_accepting", NEW,
+        out.append(scenario(f"{pre}-new-{k:02d}", "new_patient", "provider_not_accepting", NEW,
                             f"A brand-new patient wants {cat.types[tid]['name']} with {p['name']} in "
                             f"{label(m)} (a friend recommended this doctor).",
                             {"service_phrase": f"the service: {cat.types[tid]['name']} (said naturally)",
@@ -595,10 +733,10 @@ def build(cat: Catalog) -> list[dict]:
                             checks={"provider_phrase": {"must": [first, last.split()[-1]]},
                                     "location_phrase": {"must": [cat.metros[m]["name"]]}},
                             truth={"provider": p["id"], "type": tid}))
-    tid = rng.choice(NO_NEW_TYPES)
-    m = pick_metro(lambda m: bool(cat.in_metro(cat.valid_locs([tid], EXISTING), m)))
+    tid = rng.choice(prof.no_new)
+    m = pick_metro(lambda m: bool(cat.in_metro(cat.valid_locs([tid], EXISTING), m)), types=[tid])
     k += 1
-    out.append(scenario(f"nat-new-{k:02d}", "new_patient", "type_not_for_new", NEW,
+    out.append(scenario(f"{pre}-new-{k:02d}", "new_patient", "type_not_for_new", NEW,
                         f"A brand-new patient who has never been seen here wants {cat.types[tid]['name']}. "
                         f"They are in {label(m)}.",
                         {"service_phrase": f"the service: {cat.types[tid]['name']} (said naturally)",
@@ -608,10 +746,10 @@ def build(cat: Catalog) -> list[dict]:
 
     # ---------------- no location given ----------------
     for i in range(1, 4):
-        desc, types = GEO_SERVICES[[0, 2, 1][i - 1]]
-        m = pick_metro(lambda m: bool(cat.in_metro(cat.valid_locs(types, EXISTING), m)))
+        desc, types = prof.geo_services[[0, 2, 1][i - 1]]
+        m = pick_metro(lambda m: bool(cat.in_metro(cat.valid_locs(types, EXISTING), m)), types=types)
         city = label(m)
-        out.append(scenario(f"nat-noloc-{i:02d}", "no_location", "no_location", EXISTING,
+        out.append(scenario(f"{pre}-noloc-{i:02d}", "no_location", "no_location", EXISTING,
                             f"Existing patient who needs {desc}. They do not say where they are at first; asked which "
                             f"city, they answer {city}.",
                             {**svc_field(desc), "followup_location_phrase": f"their answer to 'which city?': {city}"},
@@ -620,10 +758,10 @@ def build(cat: Catalog) -> list[dict]:
                             checks={"followup_location_phrase": {"must": [city]}}, truth={"metro": m}))
 
     # ---------------- unoffered ----------------
-    for i, tid in enumerate(rng.sample(UNOFFERED, 2), 1):
+    for i, tid in enumerate(rng.sample(unoffered, 2), 1):
         assert not cat.by_type.get(tid)
-        m = pick_metro(lambda m: True)
-        out.append(scenario(f"nat-unoff-{i:02d}", "unoffered", "unoffered", EXISTING,
+        m = pick_metro(lambda m: True, types=[tid])
+        out.append(scenario(f"{pre}-unoff-{i:02d}", "unoffered", "unoffered", EXISTING,
                             f"Existing patient who wants {cat.types[tid]['name'].lower()}. They are in "
                             f"{label(m)}.",
                             {"service_phrase": f"the service: {cat.types[tid]['name'].lower()} (said naturally)",
@@ -635,8 +773,10 @@ def build(cat: Catalog) -> list[dict]:
     small = sorted(metro_ids, key=lambda m: (sum(1 for x in cat.locs.values() if x["metro_id"] == m), m))
     ring = None
     for m in small:
+        if ("none_nearby", m) in avoid.kind_metros:
+            continue
         anchor = cat.metro_xy(m)
-        for types in ([EYE_TYPES] + [t for _, t in GEO_SERVICES] + [[tid] for tid in CAPABILITY_TYPES]):
+        for types in ([eye_types] + [t for _, t in prof.geo_services] + [[tid] for tid in prof.capability]):
             valid = cat.valid_locs(types, EXISTING)
             if not valid or cat.within(valid, anchor, 60):
                 continue
@@ -652,7 +792,7 @@ def build(cat: Catalog) -> list[dict]:
             break
     m, types, m1, d1 = ring
     svc_name = cat.types[types[0]]["name"]
-    out.append(scenario("nat-ring-01", "ring", "none_nearby", EXISTING,
+    out.append(scenario(f"{pre}-ring-01", "ring", "none_nearby", EXISTING,
                         f"Existing patient who needs {svc_name.lower()} (has any referral needed). They are in "
                         f"{label(m)}.",
                         {"service_phrase": f"the service: {svc_name.lower()} (said naturally)",
@@ -700,11 +840,11 @@ def parse_array(text: str) -> list[dict]:
     return json.loads(m.group(0)) if m else []
 
 
-def phrase(scen: list[dict], only: list[str] | None = None, tag: str = "batch") -> None:
-    RAW.mkdir(parents=True, exist_ok=True)
+def phrase(scen: list[dict], raw_dir: Path, only: list[str] | None = None, tag: str = "batch") -> None:
+    raw_dir.mkdir(parents=True, exist_ok=True)
     todo = [s for s in scen if s["fields"] and (only is None or s["id"] in only)]
     for i in range(0, len(todo), BATCH):
-        path = RAW / f"{tag}_{i // BATCH + 1:02d}.json"
+        path = raw_dir / f"{tag}_{i // BATCH + 1:02d}.json"
         if path.exists():
             print(f"skip {path.name} (exists)")
             continue
@@ -739,7 +879,7 @@ def violations(s: dict, got: dict, metro_names: list[str], state_names: list[str
     return errs
 
 
-def merge_cases(scen: list[dict]) -> None:
+def merge_cases(scen: list[dict], prof: Profile) -> None:
     sha = json.loads(META.read_text(encoding="utf-8"))["sha256"]
     actual = hashlib.sha256(CATALOG.read_bytes()).hexdigest()
     if sha != actual:
@@ -753,7 +893,7 @@ def merge_cases(scen: list[dict]) -> None:
     phrasings: dict[str, dict] = {}
     # A phrasing counts only if its file's prompt carried this scenario's current wording, so an edited
     # scenario can never inherit a stale phrasing. Later files (repairs) win when they pass the checks.
-    for path in sorted(RAW.glob("*.json")):
+    for path in sorted(prof.raw.glob("*.json")):
         raw = json.loads(path.read_text(encoding="utf-8"))
         for got in raw["parsed"]:
             s = by_id.get(got.get("id")) if isinstance(got, dict) else None
@@ -777,21 +917,49 @@ def merge_cases(scen: list[dict]) -> None:
         lines.append({"id": s["id"], "category": s["category"], "kind": s["kind"], "catalog_sha256": sha,
                       "patient": s["patient"], "turns": turns, "expected": s["expected"],
                       "phrasing_source": got.get("_file", "hand")})
-    OUT.write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in lines), encoding="utf-8")
-    print(f"wrote {OUT.relative_to(ROOT)}: {len(lines)} cases; dropped {len(drops)}")
+    out = prof.out
+    out.write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in lines), encoding="utf-8")
+    print(f"wrote {out.relative_to(ROOT)}: {len(lines)} cases; dropped {len(drops)}")
     for sid, errs, got in drops:
         print(f"  DROP {sid}: {'; '.join(errs)}  got={got}")
     print("per category:", dict(Counter(c["category"] for c in lines)))
-    print("sha256", hashlib.sha256(OUT.read_bytes()).hexdigest())
+    print("sha256", hashlib.sha256(out.read_bytes()).hexdigest())
+
+
+def load_scenarios(prof: Profile) -> list[dict]:
+    return json.loads(prof.scenarios.read_text(encoding="utf-8"))
+
+
+def overlap(cat: Catalog, scen: list[dict], other: list[dict]) -> list[tuple[str, list[str]]]:
+    """Scenarios that share a (type, metro) pair with a scenario of the other set."""
+    theirs: dict[tuple[str, str], list[str]] = defaultdict(list)
+    for o in other:
+        for pair in facts(cat, o)["pairs"]:
+            theirs[pair].append(o["id"])
+    hits = []
+    for s in scen:
+        ids = sorted({oid for pair in facts(cat, s)["pairs"] for oid in theirs.get(pair, ())})
+        if ids:
+            hits.append((s["id"], ids))
+    return hits
 
 
 def main() -> None:
-    step = sys.argv[1] if len(sys.argv) > 1 else "scenarios"
+    args = sys.argv[1:]
+    name = "national"
+    if args[:1] == ["--set"]:
+        name, args = args[1], args[2:]
+    if name not in PROFILES:
+        sys.exit(f"unknown set {name}; known: {sorted(PROFILES)}")
+    prof = PROFILES[name]
+    step = args[0] if args else "scenarios"
     if step == "scenarios":
         cat = Catalog(json.loads(CATALOG.read_text(encoding="utf-8")))
-        scen = build(cat)
-        SCENARIOS.write_text(json.dumps(scen, indent=1, ensure_ascii=False), encoding="utf-8")
-        print(f"wrote {SCENARIOS.relative_to(ROOT)}: {len(scen)} scenarios")
+        other = load_scenarios(PROFILES[prof.exclude]) if prof.exclude else []
+        scen = build(cat, prof, Avoid.of(cat, other))
+        prof.dir.mkdir(parents=True, exist_ok=True)
+        prof.scenarios.write_text(json.dumps(scen, indent=1, ensure_ascii=False), encoding="utf-8")
+        print(f"wrote {prof.scenarios.relative_to(ROOT)}: {len(scen)} scenarios")
         print("per category:", dict(Counter(s["category"] for s in scen)))
         print("per kind:", dict(Counter(s["kind"] for s in scen)))
         for s in scen:
@@ -799,14 +967,19 @@ def main() -> None:
             print(f"  {s['id']:<14} {s['kind']:<28} {e['status']:<7} "
                   f"{e.get('refuse_reason') or e.get('ask_field') or ','.join(e.get('types_any', []))}"
                   f"  locs={len(e.get('location_ids_subset', []))} {s['truth']}")
+        if other:
+            hits = overlap(cat, scen, other)
+            print(f"type+metro overlap with {prof.exclude}: {len(hits)}/{len(scen)} scenarios")
+            for sid, ids in hits:
+                print(f"  {sid} shares a type+metro with {', '.join(ids)}")
         return
-    scen = json.loads(SCENARIOS.read_text(encoding="utf-8"))
+    scen = load_scenarios(prof)
     if step == "phrase":
-        phrase(scen)
+        phrase(scen, prof.raw)
     elif step == "repair":
-        phrase(scen, only=sys.argv[2].split(","), tag=sys.argv[3] if len(sys.argv) > 3 else "repair")
+        phrase(scen, prof.raw, only=args[1].split(","), tag=args[2] if len(args) > 2 else "repair")
     elif step == "merge":
-        merge_cases(scen)
+        merge_cases(scen, prof)
     else:
         sys.exit(f"unknown step {step}")
 

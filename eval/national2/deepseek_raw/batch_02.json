@@ -1,0 +1,67 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat2-geo-13: Existing patient who needs a cholesterol blood test their doctor ordered. They only say which state they live in: Missouri. Fields: service_phrase = how the caller asks for a cholesterol blood test their doctor ordered; location_phrase = the state only: Missouri (no city)\n- id nat2-geo-14: Existing patient who needs their regular dental checkup. They live in Pasadena, Texas. In the first sentence they only say the town name; when asked which one, they say the state. Fields: service_phrase = how the caller asks for their regular dental checkup; location_phrase = the town name Pasadena only (no state, no bigger city); followup_location_phrase = their answer to 'which Pasadena?': the state Texas\n- id nat2-geo-15: Existing patient who needs their regular dental checkup. They live in Arlington, Texas. In the first sentence they only say the town name; when asked which one, they say the state. Fields: service_phrase = how the caller asks for their regular dental checkup; location_phrase = the town name Arlington only (no state, no bigger city); followup_location_phrase = their answer to 'which Arlington?': the state Texas\n- id nat2-geo-16: Existing patient who needs a cholesterol blood test their doctor ordered. They live in Billings, Montana. Fields: service_phrase = how the caller asks for a cholesterol blood test their doctor ordered; location_phrase = where they are: Billings, Montana (say both words)\n- id nat2-geo-17: Existing patient who needs a chest X-ray their doctor ordered. They are in San Antonio. Fields: service_phrase = how the caller asks for a chest X-ray their doctor ordered\n- id nat2-geo-18: Existing patient who needs a cholesterol blood test their doctor ordered. They are in Minneapolis. Fields: service_phrase = how the caller asks for a cholesterol blood test their doctor ordered\n- id nat2-sym-01: Existing patient (has any referral needed) who has had a constant ringing and buzzing in both ears for weeks. They do not know which kind of doctor they need. They are in Detroit. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Detroit\n- id nat2-sym-02: Existing patient (has any referral needed) who has a painful bony bump at the base of the big toe that rubs in every shoe. They do not know which kind of doctor they need. They are in San Diego. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: San Diego\n- id nat2-sym-03: Existing patient (has any referral needed) who snores loudly and their partner says they stop breathing for a few seconds at night; always tired. They do not know which kind of doctor they need. They are in New Orleans. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: New Orleans\n- id nat2-sym-04: Existing patient (has any referral needed) who has numbness and tingling in the thumb and fingers of one hand, worse at night. They do not know which kind of doctor they need. They are in San Francisco. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: San Francisco\n- id nat2-sym-05: Existing patient (has any referral needed) who gets sudden spinning dizziness when rolling over in bed or looking up. They do not know which kind of doctor they need. They are in Dallas. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Dallas\n- id nat2-sym-06: Existing patient (has any referral needed) who has been wheezing and short of breath climbing stairs for a couple of months. They do not know which kind of doctor they need. They are in Philadelphia. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Philadelphia",
+ "response": "[{\"id\": \"nat2-geo-13\", \"service_phrase\": \"need to get a cholesterol test, my doctor ordered it\", \"location_phrase\": \"I'm in Missouri\"},\n{\"id\": \"nat2-geo-14\", \"service_phrase\": \"need my regular dental checkup\", \"location_phrase\": \"Pasadena\", \"followup_location_phrase\": \"Texas\"},\n{\"id\": \"nat2-geo-15\", \"service_phrase\": \"just need my checkup for my teeth, the regular one\", \"location_phrase\": \"Arlington\", \"followup_location_phrase\": \"Texas\"},\n{\"id\": \"nat2-geo-16\", \"service_phrase\": \"my doctor, he send me for cholesterol blood test\", \"location_phrase\": \"Billings, Montana\"},\n{\"id\": \"nat2-geo-17\", \"service_phrase\": \"so my doctor told me I need an X-ray, a chest X-ray, he ordered it\"},\n{\"id\": \"nat2-geo-18\", \"service_phrase\": \"cholesterol blood test, doctor ordered it\"},\n{\"id\": \"nat2-sym-01\", \"service_phrase\": \"I've had this ringing and buzzing in both my ears for weeks now\", \"location_phrase\": \"Detroit\"},\n{\"id\": \"nat2-sym-02\", \"service_phrase\": \"got this painful bump at the base of my big toe, rubs in every shoe\", \"location_phrase\": \"San Diego\"},\n{\"id\": \"nat2-sym-03\", \"service_phrase\": \"my partner says I snore real loud and stop breathing for a few seconds at night, I'm always tired\", \"location_phrase\": \"New Orleans\"},\n{\"id\": \"nat2-sym-04\", \"service_phrase\": \"my thumb and fingers on one hand, they go numb and tingle, worse at night\", \"location_phrase\": \"San Francisco\"},\n{\"id\": \"nat2-sym-05\", \"service_phrase\": \"I get dizzy, spinning, when I roll over in bed or look up\", \"location_phrase\": \"Dallas\"},\n{\"id\": \"nat2-sym-06\", \"service_phrase\": \"been wheezing and short of breath going up stairs for a couple months\", \"location_phrase\": \"Philadelphia\"}]\n",
+ "parsed": [
+  {
+   "id": "nat2-geo-13",
+   "service_phrase": "need to get a cholesterol test, my doctor ordered it",
+   "location_phrase": "I'm in Missouri"
+  },
+  {
+   "id": "nat2-geo-14",
+   "service_phrase": "need my regular dental checkup",
+   "location_phrase": "Pasadena",
+   "followup_location_phrase": "Texas"
+  },
+  {
+   "id": "nat2-geo-15",
+   "service_phrase": "just need my checkup for my teeth, the regular one",
+   "location_phrase": "Arlington",
+   "followup_location_phrase": "Texas"
+  },
+  {
+   "id": "nat2-geo-16",
+   "service_phrase": "my doctor, he send me for cholesterol blood test",
+   "location_phrase": "Billings, Montana"
+  },
+  {
+   "id": "nat2-geo-17",
+   "service_phrase": "so my doctor told me I need an X-ray, a chest X-ray, he ordered it"
+  },
+  {
+   "id": "nat2-geo-18",
+   "service_phrase": "cholesterol blood test, doctor ordered it"
+  },
+  {
+   "id": "nat2-sym-01",
+   "service_phrase": "I've had this ringing and buzzing in both my ears for weeks now",
+   "location_phrase": "Detroit"
+  },
+  {
+   "id": "nat2-sym-02",
+   "service_phrase": "got this painful bump at the base of my big toe, rubs in every shoe",
+   "location_phrase": "San Diego"
+  },
+  {
+   "id": "nat2-sym-03",
+   "service_phrase": "my partner says I snore real loud and stop breathing for a few seconds at night, I'm always tired",
+   "location_phrase": "New Orleans"
+  },
+  {
+   "id": "nat2-sym-04",
+   "service_phrase": "my thumb and fingers on one hand, they go numb and tingle, worse at night",
+   "location_phrase": "San Francisco"
+  },
+  {
+   "id": "nat2-sym-05",
+   "service_phrase": "I get dizzy, spinning, when I roll over in bed or look up",
+   "location_phrase": "Dallas"
+  },
+  {
+   "id": "nat2-sym-06",
+   "service_phrase": "been wheezing and short of breath going up stairs for a couple months",
+   "location_phrase": "Philadelphia"
+  }
+ ]
+}
