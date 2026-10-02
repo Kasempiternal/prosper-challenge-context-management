@@ -7,8 +7,14 @@
 #
 
 import re
+from pathlib import Path
 from typing import Any
 
+from agent_tools import GUARD_NAMES, TOOL_NAMES
+
+from .schema import CONTEXT_STRATEGIES
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
 FUNCTION_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]{0,63}$")
 
 
@@ -39,6 +45,9 @@ def validate_agent(data: Any) -> list[dict]:
         if key in data and not isinstance(data[key], str):
             err(key, f"'{key}' must be a string.")
 
+    _validate_catalog(data.get("catalog"), err)
+    _validate_resolver(data.get("resolver"), err)
+
     nodes = data.get("nodes")
     if not isinstance(nodes, list) or not nodes:
         err("nodes", "Agent has no nodes.")
@@ -67,7 +76,45 @@ def validate_agent(data: Any) -> list[dict]:
         if isinstance(node, dict):
             _validate_node(node, f"nodes[{i}]", node_names, err)
 
+    uses_tools = any(isinstance(n, dict) and isinstance(n.get("tools"), list) and n["tools"] for n in nodes)
+    if uses_tools and data.get("catalog") is None:
+        err("catalog", "Nodes use scheduling tools, so the agent needs a catalog.")
+
     return errors
+
+
+def _validate_catalog(catalog: Any, err) -> None:
+    if catalog is None:
+        return
+    if not _is_nonempty_str(catalog):
+        err("catalog", "catalog must be a file path relative to backend/.")
+        return
+    path = (BACKEND_DIR / catalog).resolve()
+    if Path(catalog).is_absolute() or not path.is_relative_to(BACKEND_DIR):
+        err("catalog", "catalog must be a path inside backend/.")
+    elif not path.is_file():
+        err("catalog", f"Catalog file '{catalog}' not found.")
+
+
+def _validate_resolver(resolver: Any, err) -> None:
+    if resolver is None:
+        return
+    if not isinstance(resolver, dict):
+        err("resolver", "resolver must be an object.")
+        return
+    if "speak_direct" in resolver and not isinstance(resolver["speak_direct"], bool):
+        err("resolver.speak_direct", "speak_direct must be true or false.")
+    jev = resolver.get("jev")
+    if jev is None:
+        return
+    if not isinstance(jev, dict):
+        err("resolver.jev", "jev must be an object.")
+        return
+    if "enabled" in jev and not isinstance(jev["enabled"], bool):
+        err("resolver.jev.enabled", "enabled must be true or false.")
+    timeout = jev.get("timeout_ms", 2500)
+    if not isinstance(timeout, int) or isinstance(timeout, bool) or not 1 <= timeout <= 30000:
+        err("resolver.jev.timeout_ms", "timeout_ms must be an integer between 1 and 30000.")
 
 
 def _validate_node(node: dict, path: str, node_names: set[str], err) -> None:
@@ -84,6 +131,13 @@ def _validate_node(node: dict, path: str, node_names: set[str], err) -> None:
     for key in ("pre_actions", "post_actions"):
         if key in node and not isinstance(node[key], list):
             err(f"{path}.{key}", f"'{key}' must be a list.")
+
+    strategy = node.get("context_strategy", "append")
+    if strategy not in CONTEXT_STRATEGIES:
+        err(f"{path}.context_strategy", f"context_strategy must be one of: {', '.join(CONTEXT_STRATEGIES)}.")
+    respond = node.get("respond_immediately")
+    if respond is not None and not isinstance(respond, bool):
+        err(f"{path}.respond_immediately", "respond_immediately must be true or false.")
 
     task_messages = node.get("task_messages", [])
     if not isinstance(task_messages, list):
@@ -132,6 +186,11 @@ def _validate_node(node: dict, path: str, node_names: set[str], err) -> None:
         elif target not in node_names:
             err(f"{epath}.target", f"Edge targets unknown node '{target}'.")
 
+        precondition = edge.get("precondition")
+        if precondition is not None and precondition not in GUARD_NAMES:
+            err(f"{epath}.precondition",
+                f"Unknown precondition {precondition!r}. Available: {', '.join(sorted(GUARD_NAMES))}.")
+
         properties = edge.get("properties", {})
         if not isinstance(properties, dict):
             err(f"{epath}.properties", "properties must be an object.")
@@ -146,3 +205,19 @@ def _validate_node(node: dict, path: str, node_names: set[str], err) -> None:
                 f"{epath}.required",
                 f"Required fields not in properties: {', '.join(map(str, missing))}.",
             )
+
+    tools = node.get("tools", [])
+    if not isinstance(tools, list):
+        err(f"{path}.tools", "tools must be a list of tool names.")
+        tools = []
+    seen: set[str] = set()
+    for j, tool in enumerate(tools):
+        tpath = f"{path}.tools[{j}]"
+        if tool not in TOOL_NAMES:
+            err(tpath, f"Unknown tool {tool!r}. Available: {', '.join(sorted(TOOL_NAMES))}.")
+        elif tool in seen:
+            err(tpath, f"Duplicate tool '{tool}' in this node.")
+        elif tool in functions:
+            err(tpath, f"Tool '{tool}' has the same name as an edge function in this node.")
+        else:
+            seen.add(tool)

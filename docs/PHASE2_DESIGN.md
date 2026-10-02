@@ -36,6 +36,11 @@ It **does** earn its ~500 ms in one place: mapping a free-text reason to an appo
 
 Fallback without a JEV key: gpt-4.1-nano with logprobs over the option letters. Last resort: ask the caller between the top 2.
 
+Two more uses with no latency cost, because nobody is waiting on the line:
+
+- **Post-call grader.** After each test call, JEV scores the transcript with `noul` and `score` questions: booking correct, unnecessary questions asked, any fact not in the catalog. Scores show in the UI right after hang-up.
+- **Eval judge.** The paid dialog simulation uses JEV, not gpt-4o, to score simulated calls: cheaper, with probabilities instead of free text.
+
 The eval decides whether JEV stays. If it does not reduce wrong-commits or questions asked, it is cut, and the README says so.
 
 ## Data shape
@@ -62,7 +67,7 @@ The eval decides whether JEV stays. If it does not reduce wrong-commits or quest
 |---|---|---|
 | `update_request(service_phrase?, service_name?, specialty_hint?, provider_phrase?, location_phrase?, is_new?, has_referral?, time_pref?, pick_offer?, clear?)` | Merge what the caller just said | `{status, say, ask?, offers?, known}` |
 | `lookup(kind, phrase)` | Answer questions: hours, address, languages, "do you offer X" | ≤5 facts |
-| `confirm_booking` (edge, only available once a slot is held) | Book, re-check policy, idempotent | Confirmation ref |
+| `book_offer()` (confirm node; no arguments) | Books exactly the offer the caller said yes to after the read-back; re-checks policy; idempotent | Confirmation ref |
 
 - `specialty_hint` is a 21-value enum (M: 21 specialties).
 - `service_name` is an optional strict enum of the 82 type names. The eval compares it with free-text `service_phrase`; whichever wins top-1 at this scale stays.
@@ -73,11 +78,11 @@ The eval decides whether JEV stays. If it does not reduce wrong-commits or quest
 Five nodes, on purpose. Every transition costs a context reset and an LLM round trip, so the work lives in tools.
 
 ```
-greeting --start--> schedule (hub: update_request, lookup)
-schedule --hold_slot [offer exists]--> confirm
-schedule --handoff--> handoff (end)
-confirm  --confirm_booking--> done (end)
-confirm  --change--> schedule        ("actually Thursday" also works in place)
+greeting --start(summary)--> schedule      (hub; tools: update_request, lookup)
+schedule --hold_slot [precondition: offer_confirmed]--> confirm   (tools: book_offer, update_request)
+confirm  --finish--> done (end)
+confirm  --book_another--> schedule
+greeting | schedule | confirm --transfer_to_staff--> handoff (end)
 ```
 
 Transitions use `RESET` plus a `{{ summary }}` placeholder rendered from state. `RESET_WITH_SUMMARY` is deprecated in this Pipecat version (M: `types.py:142`) and costs an extra LLM call, so it is not used.
@@ -86,9 +91,9 @@ Transitions use `RESET` plus a `{{ summary }}` placeholder rendered from state. 
 
 - `Node.tools: [str]` names tools from a code registry. The handler owns the parameter schema; the UI shows it read-only.
 - `Node.context_strategy`, `Node.respond_immediately`.
-- `Edge.guard`: a state predicate; the edge is refused until it holds.
+- `Edge.precondition`: a state predicate (`offer_confirmed`); the edge returns a tool error until it holds.
 - `AgentConfig.catalog`: path to the catalog.
-- `AgentConfig.resolver`: `{act_p, ask_p, jev: {enabled, timeout_ms}}`, tunable in the UI.
+- `AgentConfig.resolver`: `{speak_direct, jev: {enabled, timeout_ms}}`, tunable in the UI. JEV gate thresholds are tuned offline (`eval/tune_jev_gate.py`).
 - Migrate the builder from standalone `pipecat_flows` to the bundled `pipecat.flows` (needed for placeholders and `NO_RESPONSE`).
 
 ## Mock availability
@@ -101,7 +106,7 @@ Transitions use `RESET` plus a `{{ summary }}` placeholder rendered from state. 
 - **Change of mind**: `update_request` overwrites and recomputes. Dependent choices are kept only if still valid; otherwise the agent says so.
 - **Nothing valid**: a specific reason plus the nearest valid alternative. Example (M): a new patient asking for a knee MRI is refused, because MRI - Knee is closed to new patients and needs a referral.
 - **Referral**: asked only when every remaining option requires one.
-- **JEV slow or down**: 900 ms timeout, then logprobs, then ask the top 2. **LLM down**: templated apology and handoff.
+- **JEV slow or down**: 1.2 s total budget per turn, no retry; on timeout the resolver behaves as without JEV (ask the caller). A spoken "One moment." covers waits over 300 ms. **LLM down**: templated apology and handoff.
 
 ## Eval (the evidence)
 

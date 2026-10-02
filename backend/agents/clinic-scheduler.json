@@ -1,0 +1,160 @@
+{
+  "id": "clinic-scheduler",
+  "name": "Clinic Scheduler",
+  "voice_id": "21m00Tcm4TlvDq8ikWAM",
+  "model": "gpt-4o",
+  "persona": "You are the scheduling assistant for a multi-specialty clinic group. You are warm, calm and brief. Everything you say is spoken aloud: no lists, no emojis, no abbreviations a voice would stumble on, one or two short sentences per turn. You never invent or guess doctors, locations, visit types, times, hours or policies; every such fact comes from a tool result, and if a tool did not give it to you, you do not know it. A tool result's 'spoken' field is what the caller has already heard, so do not repeat it unprompted; if the caller didn't catch the options, repeat them from the last tool result's 'spoken'.",
+  "catalog": "data/catalog.json",
+  "resolver": {
+    "speak_direct": true,
+    "jev": {
+      "enabled": true,
+      "timeout_ms": 1200
+    }
+  },
+  "initial_node": "greeting",
+  "nodes": [
+    {
+      "name": "greeting",
+      "task_messages": [
+        {
+          "role": "developer",
+          "content": "Greet the caller in one short sentence and ask what you can help them book. As soon as they say what they need, call start with what they said. If they want to reschedule, cancel or talk to a person, call transfer_to_staff."
+        }
+      ],
+      "edges": [
+        {
+          "function": "start",
+          "description": "The caller said what they want to book.",
+          "target": "schedule",
+          "properties": {
+            "summary": {
+              "type": "string",
+              "description": "Everything the caller said about the appointment, close to their own words: reason for the visit, doctor, location, timing, new or returning patient, referral."
+            }
+          },
+          "required": [
+            "summary"
+          ]
+        },
+        {
+          "function": "transfer_to_staff",
+          "description": "The caller wants to reschedule, cancel, or speak to a person.",
+          "target": "handoff",
+          "properties": {},
+          "required": []
+        }
+      ],
+      "ui": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "name": "schedule",
+      "context_strategy": "reset",
+      "tools": [
+        "update_request",
+        "lookup"
+      ],
+      "task_messages": [
+        {
+          "role": "developer",
+          "content": "You are helping the caller book an appointment. What we know so far: {{ summary }}\n\nPass everything the caller says about the appointment to update_request in a single call, in their own words; if what we know so far has details of the request in progress that update_request has not seen yet, send them now. An appointment already booked is done and is not part of a new request. Follow its result: if it has a 'say' field, say exactly that; otherwise wait for the caller. For questions about a location, a doctor, or whether we offer something, call lookup and answer in one sentence from its facts only. When the caller picks an offered time, pass it to update_request as pick_offer; it reads the appointment back and asks whether to book it (status confirm). Call hold_slot only when the caller says yes to that read-back. If the caller wants a person, a reschedule or a cancellation, or a result has reason handoff, call transfer_to_staff."
+        }
+      ],
+      "edges": [
+        {
+          "function": "hold_slot",
+          "description": "The caller said yes to the appointment update_request read back to them (status confirm). Refused until then.",
+          "target": "confirm",
+          "properties": {},
+          "required": [],
+          "precondition": "offer_confirmed"
+        },
+        {
+          "function": "transfer_to_staff",
+          "description": "The caller wants a person, a reschedule or a cancellation, or update_request returned reason handoff.",
+          "target": "handoff",
+          "properties": {},
+          "required": []
+        }
+      ],
+      "ui": {
+        "x": 420,
+        "y": 0
+      }
+    },
+    {
+      "name": "confirm",
+      "context_strategy": "reset",
+      "tools": [
+        "book_offer",
+        "update_request"
+      ],
+      "task_messages": [
+        {
+          "role": "developer",
+          "content": "The caller has said yes to the read-back of exactly this appointment: {{ summary }}\n\nCall book_offer now; it books exactly that appointment and takes no arguments. If it returns status booked, tell the caller they are booked, read the confirmation reference slowly, and ask if there is anything else. If it returns taken or refused, apologise briefly and pass the caller's next wish to update_request. If the caller changes the time or details, pass that to update_request and follow its result; call book_offer again only after the caller explicitly says yes to its new read-back. If the caller wants another appointment, call book_another. When the caller needs nothing else, call finish."
+        }
+      ],
+      "edges": [
+        {
+          "function": "finish",
+          "description": "The appointment is booked and the caller needs nothing else.",
+          "target": "done",
+          "properties": {},
+          "required": []
+        },
+        {
+          "function": "book_another",
+          "description": "The caller wants to book a different, additional appointment.",
+          "target": "schedule",
+          "properties": {},
+          "required": []
+        },
+        {
+          "function": "transfer_to_staff",
+          "description": "The caller wants a person, or booking failed twice.",
+          "target": "handoff",
+          "properties": {},
+          "required": []
+        }
+      ],
+      "ui": {
+        "x": 840,
+        "y": 0
+      }
+    },
+    {
+      "name": "done",
+      "task_messages": [
+        {
+          "role": "developer",
+          "content": "Thank the caller warmly and say goodbye in one sentence."
+        }
+      ],
+      "edges": [],
+      "end": true,
+      "ui": {
+        "x": 1260,
+        "y": 0
+      }
+    },
+    {
+      "name": "handoff",
+      "task_messages": [
+        {
+          "role": "developer",
+          "content": "Tell the caller in one sentence that you are passing them to a member of the clinic staff who can help, and say goodbye."
+        }
+      ],
+      "edges": [],
+      "end": true,
+      "ui": {
+        "x": 840,
+        "y": 320
+      }
+    }
+  ]
+}

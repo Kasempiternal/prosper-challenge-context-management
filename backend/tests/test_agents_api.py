@@ -67,6 +67,7 @@ def test_list_sorted_by_updated_desc(client, agents_dir):
 def test_put_round_trips_unknown_keys(client, agents_dir):
     agent = client.get("/api/agents/prosper-scheduler").json()
     agent["future_field"] = {"a": [1, 2]}
+    agent["catalog"] = "data/catalog.json"
     agent["nodes"][0]["tools"] = ["lookup"]
     agent["nodes"][0]["edges"][0]["guard"] = "state.intent != null"
     response = client.put("/api/agents/prosper-scheduler", json=agent)

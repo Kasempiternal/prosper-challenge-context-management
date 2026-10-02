@@ -13,6 +13,7 @@
 # Run:  python bot.py   then open http://localhost:7860/client
 #
 
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -37,9 +38,10 @@ from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.workers.runner import WorkerRunner
-from pipecat_flows import FlowManager
+from pipecat.flows import FlowManager
 
 from agent_builder import AgentBuilder, AgentConfig, validate_agent
+from agent_tools import warm_up_jev
 from agents_api import ID_RE, agents_dir_from_env, create_router
 
 # Load .env next to this file, so the bot runs the same from the repo root or backend/.
@@ -54,6 +56,18 @@ app.include_router(create_router())
 transport_params = {
     "webrtc": lambda: TransportParams(audio_in_enabled=True, audio_out_enabled=True),
 }
+
+
+class SerialToolCallsLLMService(OpenAILLMService):
+    """One tool call per LLM turn: a speak-direct handler returns NO_RESPONSE, which only
+    holds if no sibling call asks the LLM to run again. OpenAI rejects parallel_tool_calls
+    on a request without tools (end nodes), so it is set per request."""
+
+    def build_chat_completion_params(self, params_from_context) -> dict:
+        params = super().build_chat_completion_params(params_from_context)
+        if params.get("tools"):
+            params["parallel_tool_calls"] = False
+        return params
 
 
 def load_agent_data(body: dict | None) -> dict:
@@ -79,7 +93,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
         api_key=os.environ["ELEVENLABS_API_KEY"],
         settings=ElevenLabsTTSService.Settings(voice=config.voice_id),
     )
-    llm = OpenAILLMService(api_key=os.environ["OPENAI_API_KEY"], model=config.model)
+    llm = SerialToolCallsLLMService(
+        api_key=os.environ["OPENAI_API_KEY"],
+        settings=SerialToolCallsLLMService.Settings(model=config.model),
+    )
 
     context = LLMContext()
     context_aggregator = LLMContextAggregatorPair(
@@ -119,14 +136,24 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
         transport=transport,
     )
 
+    background: set[asyncio.Task] = set()
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Client connected — starting flow at initial node")
+        if builder.tool_context and builder.tool_context.jev_client:
+            task = asyncio.create_task(warm_up_jev(builder.tool_context))
+            background.add(task)
+            task.add_done_callback(background.discard)
         await builder.start(flow_manager)
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected")
+        for task in list(background):
+            task.cancel()
+        if builder.tool_context and builder.tool_context.jev_client:
+            builder.tool_context.jev_client.close()
         await worker.cancel()
 
     runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)

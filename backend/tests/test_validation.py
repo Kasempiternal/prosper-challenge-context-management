@@ -83,7 +83,7 @@ def test_extra_keys_are_tolerated(example_agent):
     example_agent["id"] = "prosper-scheduler"
     example_agent["future"] = {"x": 1}
     example_agent["nodes"][0]["ui"] = {"x": 0, "y": 0}
-    example_agent["nodes"][0]["context_strategy"] = "summary"
+    example_agent["nodes"][0]["context_strategy"] = "reset"
     example_agent["nodes"][0]["edges"][0]["guard"] = "always"
     assert validate_agent(example_agent) == []
     assert AgentBuilder.from_dict(example_agent).config.name == "Prosper Scheduler"

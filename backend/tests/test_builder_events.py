@@ -33,7 +33,7 @@ def test_live_call_events(example_agent):
 
     asyncio.run(scenario())
     assert events == [
-        {"type": "node_entered", "node": "greeting", "state": {}},
+        {"type": "node_entered", "node": "greeting", "state": {"summary": ""}},
         {
             "type": "edge_taken",
             "function": "choose_intent",
@@ -41,6 +41,10 @@ def test_live_call_events(example_agent):
             "to": "collect_details",
             "args": {"intent": "book"},
         },
-        {"type": "node_entered", "node": "collect_details", "state": {"intent": "book"}},
+        {
+            "type": "node_entered",
+            "node": "collect_details",
+            "state": {"summary": "", "intent": "book"},
+        },
         {"type": "call_ended", "reason": "end_node"},
     ]

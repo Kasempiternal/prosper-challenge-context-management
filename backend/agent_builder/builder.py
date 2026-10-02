@@ -18,7 +18,15 @@ from pathlib import Path
 from typing import Awaitable, Callable, Optional, Union
 
 from loguru import logger
-from pipecat_flows import FlowManager, FlowsFunctionSchema, NodeConfig
+from pipecat.flows import (
+    ContextStrategy,
+    ContextStrategyConfig,
+    FlowManager,
+    FlowsFunctionSchema,
+    NodeConfig,
+)
+
+from agent_tools import EDGE_GUARDS, ToolContext, build_tool, make_context
 
 from .schema import AgentConfig, Edge, Node
 from .validation import AgentValidationError, validate_agent
@@ -34,6 +42,15 @@ class AgentBuilder:
         self._on_event = on_event
         self._nodes_by_name = {n.name: n for n in config.nodes}
         self._validate()
+        self.tool_context: Optional[ToolContext] = None
+        if config.catalog:
+            self.tool_context = make_context(
+                config.catalog,
+                speak_direct=config.resolver.speak_direct,
+                jev_enabled=config.resolver.jev.enabled,
+                jev_timeout_ms=config.resolver.jev.timeout_ms,
+                on_event=self._emit,
+            )
 
     # ---- loading -----------------------------------------------------------
     @classmethod
@@ -61,6 +78,8 @@ class AgentBuilder:
     # ---- running -----------------------------------------------------------
     async def start(self, flow_manager: FlowManager) -> None:
         """Enter the initial node and report it."""
+        # Prompts may use {{ summary }}; Flows raises on a placeholder missing from state.
+        flow_manager.state.setdefault("summary", "")
         await flow_manager.initialize(self.build_initial_node())
         await self._emit(
             {
@@ -84,8 +103,13 @@ class AgentBuilder:
             "name": node.name,
             "role_message": node.role_message or self.config.persona,
             "task_messages": node.task_messages,
-            "functions": [self._make_edge_function(node, edge) for edge in node.edges],
+            "functions": [build_tool(name, self.tool_context) for name in node.tools]
+            + [self._make_edge_function(node, edge) for edge in node.edges],
         }
+        if node.context_strategy == "reset":
+            node_config["context_strategy"] = ContextStrategyConfig(strategy=ContextStrategy.RESET)
+        if node.respond_immediately is not None:
+            node_config["respond_immediately"] = node.respond_immediately
         if node.pre_actions:
             node_config["pre_actions"] = node.pre_actions
         # Explicit post_actions win; otherwise a terminal node ends the call.
@@ -104,7 +128,13 @@ class AgentBuilder:
         await self._emit({"type": "call_ended", "reason": "end_node"})
 
     def _make_edge_function(self, node: Node, edge: Edge) -> FlowsFunctionSchema:
+        guard = EDGE_GUARDS[edge.precondition] if edge.precondition else None
+
         async def handler(args: dict, flow_manager: FlowManager):
+            refusal = guard(flow_manager.state) if guard else None
+            if refusal:
+                logger.info(f"[{edge.function}] refused by precondition {edge.precondition}: {refusal}")
+                return {"status": "error", "error": refusal}, None
             # Persist what the caller gave us so later nodes can use it.
             flow_manager.state.update(args)
             logger.info(f"[{edge.function}] -> {edge.target} | collected: {args}")
