@@ -1,7 +1,7 @@
 {
   "label": "National (synthetic, 40 metros)",
   "sha256": "2146030501cec474e0af918487d4c27eecc17e35ca75287dca3637374c581c22",
-  "naive_tokens": 832891,
+  "naive_tokens": 664495,
   "counts": {
     "metros": 40,
     "locations": 299,

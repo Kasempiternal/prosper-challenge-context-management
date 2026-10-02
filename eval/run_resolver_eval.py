@@ -33,7 +33,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 from scheduling.availability import MockAvailability  # noqa: E402
 from scheduling.catalog_index import CatalogIndex  # noqa: E402
 from scheduling.decision import Gate  # noqa: E402
-from scheduling.jev import USD_PER_INPUT_TOKEN, JevClient, JevProviderChooser, JevTypeDisambiguator  # noqa: E402
+from scheduling.jev import USD_PER_INPUT_TOKEN, JevClient, JevProviderChooser, JevSiteChooser, JevTypeDisambiguator  # noqa: E402
 from scheduling.lookup import lookup  # noqa: E402
 from scheduling.request import Request, Update, merge  # noqa: E402
 from scheduling.resolver import Plan, plan_json, resolve  # noqa: E402
@@ -159,7 +159,8 @@ def pct(xs, p):
 def make_hooks(index, client: JevClient | None, gate: Gate = Gate()) -> dict:
     if client is None:
         return {}
-    return {"disambiguator": JevTypeDisambiguator(index, client, gate), "chooser": JevProviderChooser(index, client, gate)}
+    return {"disambiguator": JevTypeDisambiguator(index, client, gate), "chooser": JevProviderChooser(index, client, gate),
+            "site_chooser": JevSiteChooser(index, client, gate)}
 
 
 def evaluate(index, cases: list[dict], hooks: dict, client: JevClient | None, latency_repeats: int = LATENCY_REPEATS) -> dict:

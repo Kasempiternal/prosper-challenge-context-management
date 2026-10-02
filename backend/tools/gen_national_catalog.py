@@ -2020,7 +2020,9 @@ def meta_for(text: str, label: str, catalog: dict, rows: list, **extra) -> dict:
     counts = {k: len(catalog[k]) for k in ("metros", "locations", "providers", "appointment_types") if k in catalog}
     counts["bookable_rows"] = len(rows)
     return {"label": label, "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-            "naive_tokens": naive_tokens(text), "counts": counts, **extra}
+            # Compact JSON, the cheapest way to paste the catalog into a prompt (matches eval/naive_baseline_tokens.py).
+            "naive_tokens": naive_tokens(json.dumps(catalog, separators=(",", ":"), ensure_ascii=False)),
+            "counts": counts, **extra}
 
 
 def write(path: Path, text: str) -> None:

@@ -1,3 +1,5 @@
+import pytest
+
 from scheduling.request import Request, Update, merge
 from scheduling.resolver import resolve
 
@@ -216,3 +218,17 @@ def test_lookup_new_patients_follows_policy_not_the_type_flag(index):
     assert "established patients only" in fact
     [fact] = lookup(index, "do_you_offer", "Annual Physical")
     assert "new patients welcome" in fact
+
+
+class _NoSiteChooser:
+    def pick_site(self, phrase, type_id, candidate_ids):
+        raise AssertionError(f"site chooser consulted on SF for {phrase!r}")
+
+
+@pytest.mark.parametrize("phrase", ["the one on Geary", "near Mission Bay", "the big clinic downtown", "Narnia",
+                                    "I'm in San Francisco", "94103", "Mission"])
+def test_sf_has_no_areas_so_the_site_chooser_never_runs(index, availability, phrase):
+    req = merge(Request(), Update.from_args({**EXISTING_REF, "service_phrase": "annual physical",
+                                             "location_phrase": phrase}))
+    plan = resolve(index, req, availability, site_chooser=_NoSiteChooser())
+    assert plan.area is None and not any(n.startswith("site chooser") for n in plan.notes)

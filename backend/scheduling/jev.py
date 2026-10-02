@@ -226,3 +226,28 @@ class JevProviderChooser:
         ans = self.client.choice(said, "Which provider does the caller mean?",
                                  provider_criteria(self.ix, candidate_ids))
         return self.gate.decide(ans.probabilities) if ans else DECLINE
+
+
+def site_criteria(index: CatalogIndex, location_ids: list[str]) -> dict[str, str]:
+    out = {}
+    for lid in sorted(location_ids):
+        loc = index.locations[lid]
+        where = ", ".join(filter(None, [loc.neighborhood, loc.address, loc.city]))
+        caps = ", ".join(sorted(loc.capabilities)) or "general visits only"
+        out[lid] = f"{loc.name}; {where}; on site: {caps}"
+    return out
+
+
+class JevSiteChooser:
+    """Splits the clinics of an area search using the caller's description of the place."""
+
+    def __init__(self, index: CatalogIndex, client: JevClient, gate: Gate = Gate()):
+        self.ix, self.client, self.gate = index, client, gate
+
+    def pick_site(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
+        visit = self.ix.types[type_id].name if type_id else "an appointment"
+        said = (f"A patient calling a multi-specialty clinic to book {visit} described the clinic location "
+                f"they want: '{phrase}'")
+        ans = self.client.choice(said, "Which clinic location does the caller mean?",
+                                 site_criteria(self.ix, candidate_ids))
+        return self.gate.decide(ans.probabilities) if ans else DECLINE

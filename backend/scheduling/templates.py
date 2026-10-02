@@ -7,6 +7,10 @@ import re
 from datetime import datetime
 
 from .catalog_index import AppointmentType, CatalogIndex
+from .geo import US_STATES
+from .text import normalize
+
+_STATE_NAMES = {abbrev: name for abbrev, name, _, _ in US_STATES}
 
 _KEEP_CASE = re.compile(r"^[A-Z0-9/\-]{2,}$")
 # Letters whose spoken name starts with a vowel sound: "an MRI", "an EKG", "an X-ray".
@@ -44,6 +48,51 @@ def join_and(items: list[str]) -> str:
     if len(items) == 2:
         return f"{items[0]} and {items[1]}"
     return ", ".join(items[:-1]) + f", and {items[-1]}"
+
+
+def site_label(index: CatalogIndex, location_id: str) -> str:
+    """"Mueller in Hyde Park": the site plus its neighborhood when the name does not already say it.
+    A catalog without neighborhoods (SF) reads the short name alone."""
+    loc = index.locations[location_id]
+    if loc.neighborhood and normalize(loc.neighborhood) not in normalize(loc.short_name):
+        return f"{loc.short_name} in {loc.neighborhood}"
+    return loc.short_name
+
+
+def _distinct_site_labels(index: CatalogIndex, ids: list[str]) -> list[str]:
+    labels = [index.locations[i].short_name for i in ids]
+    if len(set(labels)) < len(labels):
+        labels = [site_label(index, i) for i in ids]
+    if len(set(labels)) < len(labels):
+        labels = [f"{lab} on {index.locations[i].address.split(' ', 1)[-1]}" for lab, i in zip(labels, ids)]
+    return labels
+
+
+def state_name(abbrev: str) -> str:
+    return _STATE_NAMES.get(abbrev, abbrev)
+
+
+def metro_labels(index: CatalogIndex, ids: list[str]) -> list[str]:
+    """"Austin", or "Portland, Oregon" when two metros share a name."""
+    names = [index.metros[m].name for m in ids]
+    return [f"{n}, {state_name(index.metros[m].state)}" if names.count(n) > 1 else n
+            for n, m in zip(names, ids)]
+
+
+def miles(d: float) -> str:
+    n = max(1, round(d))
+    return "1 mile" if n == 1 else f"{n} miles"
+
+
+def ring_preface(index: CatalogIndex, location_id: str, distance_mi: float, near: str) -> str:
+    """Said before offers when nothing was close: "The closest one is 18 miles away, in Round Rock." """
+    loc = index.locations[location_id]
+    metro = index.metros.get(loc.metro_id)
+    if loc.city and normalize(loc.city) not in (normalize(near), normalize(metro.name) if metro else ""):
+        where = loc.city
+    else:
+        where = loc.neighborhood or loc.short_name
+    return f"There's nothing closer to {near}; the nearest is {miles(distance_mi)} away, in {where}. "
 
 
 def _clock(dt: datetime) -> str:
@@ -89,9 +138,9 @@ def say_offers(index: CatalogIndex, type_id: str, offers: list[tuple[str, str, d
     parts = []
     for name, times in groups.items():
         if len({loc for loc, _ in times}) == 1:
-            when = f"{join_or([spoken_when(s, now) for _, s in times])} at {index.locations[times[0][0]].short_name}"
+            when = f"{join_or([spoken_when(s, now) for _, s in times])} at {site_label(index, times[0][0])}"
         else:
-            when = join_or([f"{spoken_when(s, now)} at {index.locations[loc].short_name}" for loc, s in times])
+            when = join_or([f"{spoken_when(s, now)} at {site_label(index, loc)}" for loc, s in times])
         parts.append(f"{name} has {when}")
     body = join_and(parts) + "."
     if len(offers) == 1:
@@ -103,7 +152,7 @@ def say_confirm(index: CatalogIndex, type_id: str, provider_id: str, location_id
                 now: datetime) -> str:
     return (f"Okay, {with_article(type_label(index.types[type_id]))} with "
             f"{index.providers[provider_id].name}, {spoken_when(start, now)} at "
-            f"{index.locations[location_id].short_name}. Shall I book it?")
+            f"{site_label(index, location_id)}. Shall I book it?")
 
 
 def say_ask(index: CatalogIndex, field: str, options: list[str], context: str | None = None) -> str:
@@ -120,11 +169,15 @@ def say_ask(index: CatalogIndex, field: str, options: list[str], context: str | 
     if field == "provider_spelling":
         return "Could you spell the doctor's last name for me?"
     if field == "location":
-        return f"Is that {join_or([index.locations[o].short_name for o in options])}?"
+        return f"Is that {join_or(_distinct_site_labels(index, options))}?"
     if field == "location_open":
         return "Which neighborhood is that location in?"
     if field == "location_retry":
         return "Sorry, which location was that?"
+    if field == "metro" and options:
+        return f"Is that {join_or(metro_labels(index, options))}?"
+    if field == "metro":
+        return f"Which city in {context} are you in?" if context else "Which city are you in?"
     if field == "is_new":
         return "Have you been seen at one of our clinics before?"
     if field == "has_referral":
@@ -148,11 +201,12 @@ def _distinct_provider_labels(index: CatalogIndex, ids: list[str]) -> list[str]:
 def say_refuse(index: CatalogIndex, code: str, *, type_id: str | None = None, who: str | None = None,
                provider_id: str | None = None, location_id: str | None = None, specialty: str | None = None,
                alternatives: tuple[tuple[str, str, str], ...] = (), alt_type_id: str | None = None,
-               needs_referral: bool = False) -> str:
+               needs_referral: bool = False, near: str | None = None, near_kind: str | None = None,
+               radius_mi: float | None = None, nearest_mi: float | None = None) -> str:
     what = with_article(type_label(index.types[type_id])) if type_id else "that"
     What = what[0].upper() + what[1:]
     loc = index.locations[location_id].short_name if location_id else None
-    alt = _alternatives_sentence(index, alternatives)
+    alt = _alternatives_sentence(index, alternatives) if code != "none_nearby" else ""
 
     if code == "not_offered":
         return f"Sorry, we don't offer {index.specialty_spoken.get(specialty, 'that')} at our clinics."
@@ -178,6 +232,20 @@ def say_refuse(index: CatalogIndex, code: str, *, type_id: str | None = None, wh
         return f"We can't do {what} at {loc}.{alt}"
     if code == "no_availability":
         return f"I don't see any openings for {what} in the next three weeks with those preferences. Want me to try other days?"
+    if code == "none_nearby":
+        where = f"in {near}" if near_kind == "state" else f"within {miles(radius_mi or 0)} of {near}"
+        if who:
+            s = f"{who[0].upper()}{who[1:]} isn't at any of our clinics {where}."
+        else:
+            s = f"We don't offer {what} {where}." if type_id else f"We don't have a clinic {where}."
+        if location_id:
+            loc = index.locations[location_id]
+            metro = index.metros.get(loc.metro_id)
+            city = metro.name if metro and metro.name else loc.city
+            s += f" The nearest is {site_label(index, location_id)} in {city}, about {miles(nearest_mi or 0)} away."
+            if alternatives:
+                s += " Want me to look there?"
+        return s
     if code == "handoff":
         return "I'm having trouble finding that. Let me have someone from our front desk call you back."
     raise ValueError(f"no template for refusal {code!r}")
@@ -186,6 +254,6 @@ def say_refuse(index: CatalogIndex, code: str, *, type_id: str | None = None, wh
 def _alternatives_sentence(index: CatalogIndex, alternatives: tuple[tuple[str, str, str], ...]) -> str:
     if not alternatives:
         return ""
-    parts = [f"{index.providers[p].name} at {index.locations[l].short_name}" for _, p, l in alternatives]
+    parts = [f"{index.providers[p].name} at {site_label(index, l)}" for _, p, l in alternatives]
     question = "Would that work?" if len(parts) == 1 else "Would either of those work?"
     return f" I can book {join_or(parts)}. {question}"

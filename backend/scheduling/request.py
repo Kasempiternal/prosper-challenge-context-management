@@ -27,6 +27,7 @@ class Slot:
     within: tuple[str, ...] = ()     # options of the question this phrase answered
     asks: int = 0                    # consecutive failed matches (drives spell -> handoff)
     turn: int = 0                    # turn on which heard/hint last changed
+    region: str | None = None        # location only: the answer to "which city?", narrowing heard
 
     @property
     def given(self) -> bool:
@@ -179,9 +180,13 @@ def _parse_time_pref(tp: Any) -> TimePref:
     return TimePref(days=days, part_of_day=part, not_before=not_before)
 
 
+# Asks whose answer arrives in another slot's phrase: "Which city?" is answered as a location.
+_ASK_SLOT = {"metro": "location"}
+
+
 def _answered(req: Request, slot_name: str) -> tuple[str, ...]:
     pa = req.pending_ask
-    return pa.options if pa and pa.field == slot_name else ()
+    return pa.options if pa and _ASK_SLOT.get(pa.field, pa.field) == slot_name else ()
 
 
 def merge(req: Request, update: Update) -> Request:
@@ -209,7 +214,12 @@ def merge(req: Request, update: Update) -> Request:
     for name, phrase in (("provider", update.provider_phrase), ("location", update.location_phrase)):
         if phrase:
             old: Slot = getattr(req, name)
-            changes[name] = Slot(heard=phrase, within=_answered(req, name), asks=old.asks, turn=turn)
+            if name == "location" and old.heard and req.pending_ask and _ASK_SLOT.get(req.pending_ask.field):
+                # "Downtown" -> "Which city?" -> "Austin": the city narrows the place, not replaces it.
+                changes[name] = Slot(heard=old.heard, region=phrase, within=_answered(req, name), asks=old.asks,
+                                     turn=turn)
+            else:
+                changes[name] = Slot(heard=phrase, within=_answered(req, name), asks=old.asks, turn=turn)
 
     if update.time_pref is not None:
         changes["time_pref"] = update.time_pref

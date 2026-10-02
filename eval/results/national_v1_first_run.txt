@@ -1,0 +1,154 @@
+Resolver eval (o200k_base tokenizer); JEV on (LIVE network)
+
+=== national: JEV off ===
+------------------------------------------------------------------------------------------------------
+cases / evaluated turns                     48 / 56
+WRONG-COMMIT rate per commit (headline)     6/27 = 22.2%  (over 56 resolve turns)
+top-1 (turn fully correct)                  37/56 = 66.1%
+ask precision (field-level)                 9/22 = 40.9%
+ask recall (field-level)                    9/9 = 100.0%
+mean questions per booking                  0.54 over 39 bookings
+refusal correctness                         7/8 = 87.5%
+resolver latency p50 / p95 (no network)     2.25 ms / 9.32 ms  (n=1120)
+Plan.say tokens  mean / p95 / max           28 / 52 / 63
+Plan.summary tokens mean / p95 / max        63 / 94 / 99
+tool result tokens mean / p95 / max         98 / 143 / 152
+  ... speak-direct (no say) mean/p95/max    67 / 92 / 96
+JEV requests; turns where a JEV hook fired  0; 12 of 56 turns
+------------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       3/5
+  dup_name_metro         4/6
+  geo                    9/18
+  new_patient            5/5
+  no_location            2/3
+  ring                   1/1
+  symptom                3/8
+  unoffered              2/2
+MISSES (19):
+  nat-geo-02 turn 1: status ask != offer
+      said: Is that an x-ray or a knee x-ray?
+      type disambiguator: open (no call)
+  nat-geo-03 turn 1: status ask != offer
+      said: Is that a physical therapy evaluation, a physical therapy session, or a therapy session?
+      type disambiguator: open (no call)
+  nat-geo-07 turn 1: status ask != offer
+      said: Sorry, which location was that?
+  nat-geo-08 turn 1: types ['appt_060'] not within ['appt_070']; locations ['loc_118'] not within ['loc_192', 'loc_195']
+      said: For a therapy session, Dr. Carlos Nelson has today at 12:20 at Katy, Dr. Jacklyn Crenshaw has tomorrow at 10:40 at Katy, and Dr. Andrea Bansal has Friday at 9:50 at Katy. Which works best?
+  nat-geo-09 turn 1: status ask != offer
+      said: Is that a physical therapy evaluation or a physical therapy session?
+      type disambiguator: open (no call)
+  nat-geo-14 turn 2: types ['appt_032'] not within ['appt_062', 'appt_219']; locations ['loc_084'] not within ['loc_078', 'loc_080']
+      said: For an orthopedic consultation, Dr. Scott Valenti has today at 11:30, Friday at 8:50, or Monday at 7:30 at Lakewood. Which works best?
+  nat-geo-15 turn 2: status ask != offer
+      said: Is that an orthopedic consultation, a knee x-ray, or an x-ray?
+  nat-geo-16 turn 1: status offer != refuse; refusal None != none_nearby; WRONG COMMIT: offered when it should not
+      said: There's nothing closer to Maine; the nearest is 230 miles away, in Downtown. For a dental cleaning, Dr. Kelvin Fawcett has today at 11:15 or Friday at 9 at Downtown and Dr. Demetrius Pruitt has tomorrow at 9 at Downtown. Which works best?
+  nat-geo-18 turn 1: types ['appt_060'] not within ['appt_070']; locations ['loc_260'] not within ['loc_259', 'loc_264']
+      said: For a therapy session, Dr. Ana Hayes has today at 12:10, tomorrow at 8, or Monday at 8 at South Philadelphia. Which works best?
+  nat-sym-02 turn 1: status ask != offer
+      said: Is that an orthopedic consultation or a back pain evaluation?
+  nat-sym-03 turn 1: status ask != offer
+      said: Is that a dermatology consultation or a rash evaluation?
+      type disambiguator: open (no call)
+  nat-sym-04 turn 1: types ['appt_050'] not within ['appt_053', 'appt_187']
+      said: For an ENT consultation, Dr. Marcella Waldron has today at 11 at Doral and Dr. Joshua Beebe has tomorrow at 7:30 or Friday at 7:30 at Kendall. Which works best?
+      type disambiguator: open (no call)
+  nat-sym-07 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: open (no call)
+  nat-sym-08 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: open (no call)
+  nat-dup-02 turn 2: status ask != offer
+      said: Is that an annual physical or an annual wellness visit?
+  nat-dup-03 turn 2: status ask != offer
+      said: Is that an annual physical or an annual wellness visit?
+  nat-cap-02 turn 1: status ask != offer
+      said: Is that a colonoscopy consultation or a colonoscopy?
+  nat-cap-03 turn 1: status ask != offer
+      said: What's the visit for?
+  nat-noloc-02 turn 2: types ['appt_075'] not within ['appt_074']
+      said: For a dental exam, Dr. Kelvin Fawcett has today at 11 or tomorrow at 9 at Downtown and Dr. Alysia Nowak has Friday at 9 at Downtown. Which works best?
+      type disambiguator: open (no call)
+
+=== national: JEV on ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   48 / 56
+WRONG-COMMIT rate per commit (headline)   7/32 = 21.9%  (over 56 resolve turns)
+top-1 (turn fully correct)                41/56 = 73.2%
+ask precision (field-level)               9/17 = 52.9%
+ask recall (field-level)                  9/9 = 100.0%
+mean questions per booking                0.41 over 39 bookings
+refusal correctness                       7/8 = 87.5%
+resolver latency p50 / p95 (no network)   2.93 ms / 10.12 ms  (n=1120)
+Plan.say tokens  mean / p95 / max         32 / 54 / 63
+Plan.summary tokens mean / p95 / max      67 / 94 / 99
+tool result tokens mean / p95 / max       104 / 144 / 152
+  ... speak-direct (no say) mean/p95/max  69 / 91 / 96
+JEV requests (rate per resolve turn)      12 (21.4%); live 11, disk cache 0, failed 1
+JEV latency p50 / p95 / max (live)        533 / 776 / 776 ms
+  ... over the 1.2 s live budget          0 of 11
+JEV input tokens total / per request      9922 / 902
+JEV cost if every request were live       $0.00040
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       3/5
+  dup_name_metro         4/6
+  geo                    11/18
+  new_patient            5/5
+  no_location            3/3
+  ring                   1/1
+  symptom                4/8
+  unoffered              2/2
+MISSES (15):
+  nat-geo-02 turn 1: status ask != offer
+      said: Is that an x-ray or a knee x-ray?
+      type disambiguator: open (no call)
+  nat-geo-07 turn 1: status ask != offer
+      said: Sorry, which location was that?
+  nat-geo-08 turn 1: types ['appt_060'] not within ['appt_070']; locations ['loc_118'] not within ['loc_192', 'loc_195']
+      said: For a therapy session, Dr. Carlos Nelson has today at 12:20 at Katy, Dr. Jacklyn Crenshaw has tomorrow at 10:40 at Katy, and Dr. Andrea Bansal has Friday at 9:50 at Katy. Which works best?
+  nat-geo-14 turn 2: types ['appt_032'] not within ['appt_062', 'appt_219']; locations ['loc_084'] not within ['loc_078', 'loc_080']
+      said: For an orthopedic consultation, Dr. Scott Valenti has today at 11:30, Friday at 8:50, or Monday at 7:30 at Lakewood. Which works best?
+  nat-geo-15 turn 2: status ask != offer
+      said: Is that an orthopedic consultation, a knee x-ray, or an x-ray?
+  nat-geo-16 turn 1: status offer != refuse; refusal None != none_nearby; WRONG COMMIT: offered when it should not
+      said: There's nothing closer to Maine; the nearest is 230 miles away, in Downtown. For a dental cleaning, Dr. Kelvin Fawcett has today at 11:15 or Friday at 9 at Downtown and Dr. Demetrius Pruitt has tomorrow at 9 at Downtown. Which works best?
+  nat-geo-18 turn 1: types ['appt_060'] not within ['appt_070']; locations ['loc_260'] not within ['loc_259', 'loc_264']
+      said: For a therapy session, Dr. Ana Hayes has today at 12:10, tomorrow at 8, or Monday at 8 at South Philadelphia. Which works best?
+  nat-sym-02 turn 1: status ask != offer
+      said: Is that an orthopedic consultation or a back pain evaluation?
+  nat-sym-04 turn 1: types ['appt_182'] not within ['appt_053', 'appt_187']
+      said: For a GI follow-up, Dr. Neha Kakkar has today at 11 at Downtown, Dr. Steven Mabry has tomorrow at 7 at Kendall, and Dr. Michael Parks has Friday at 7 at Kendall. Which works best?
+      type disambiguator: act appt_182 [appt_182=1.00 appt_004=0.00 appt_005=0.00]
+  nat-sym-06 turn 1: locations ['loc_003', 'loc_007'] not within ['loc_010', 'loc_012']
+      said: For a plantar fasciitis evaluation, Dr. Elena Yakovlev has today at 11 at Richmond in Richmond District, tomorrow at 8:30 at North Gate in Presidio Heights, or Friday at 8 at North Gate in Presidio Heights. Which works best?
+      type disambiguator: act appt_288 [appt_288=0.97 appt_285=0.03 appt_001=0.00]
+  nat-sym-08 turn 1: types ['appt_032'] not within ['appt_259', 'appt_261']
+      said: For an orthopedic consultation, Dr. Jian Shih has today at 11:20 at Sunnyvale, Dr. Ronald Kaneshiro has tomorrow at 7 at Evergreen, and Dr. Jonathan Ward has Friday at 7 at Evergreen. Which works best?
+      type disambiguator: act appt_032 [appt_032=0.86 appt_001=0.14 appt_002=0.00]
+  nat-dup-02 turn 2: status ask != offer
+      said: Is that an annual physical or an annual wellness visit?
+  nat-dup-03 turn 2: status ask != offer
+      said: Is that an annual physical or an annual wellness visit?
+  nat-cap-02 turn 1: status ask != offer
+      said: Is that a colonoscopy consultation or a colonoscopy?
+  nat-cap-03 turn 1: status ask != offer
+      said: What's the visit for?
+
+--- national: JEV off vs on ---
+metric                          off                       on                        
+wrong-commit (per commit)       6/27 = 22.2%              7/32 = 21.9%              
+top-1                           37/56 (66.1%)             41/56 (73.2%)             
+questions per booking           0.54                      0.41                      
+JEV requests (rate)             0 (0%)                    12 (21%)                  
+JEV latency p50/p95/max (live)  -                         533/776/776 ms            
+JEV $ (input tokens x $0.04/M)  $0.00000                  $0.00040                  
+
+LIVE this run: 12 requests, 10827 input tokens, $0.00043
+
+=== HEADLINE: wrong commits per commit; top-1 per evaluated turn ===
+set                           JEV off                             JEV on
+national (catalog-pinned)     6/27 = 22.2%; top-1 37/56           7/32 = 21.9%; top-1 41/56           

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
+from functools import lru_cache
 
 import jellyfish
 
@@ -16,6 +18,10 @@ _OFF_HINT_PENALTY = 0.6
 _NON_NAME_WHEN_NAMED = 0.85
 _STRONG = 0.7
 _SPECIALTY_DEFAULT_SCORE = 0.75
+# A model choosing among every offered type is fine at SF's 74; at national scale (~300) the
+# request is cut to the types the phrase plausibly reaches.
+SHORTLIST_ABOVE = 80
+SHORTLIST_SIZE = 20
 
 
 @dataclass(frozen=True)
@@ -41,9 +47,88 @@ def _find_span(hay: list[str], needle: list[str]) -> int:
     return -1
 
 
+# eq=False: identity hash, so _word_hits can cache per vocabulary.
+@dataclass(frozen=True, slots=True, eq=False)
+class _Vocab:
+    """Every word a type name or alias uses, bucketed so a phrase word is compared only with
+    words it could match: the same stem, or (fuzzy) a long word of similar length."""
+
+    by_stem: dict[str, tuple[str, ...]]
+    by_len: dict[int, tuple[str, ...]]
+    aliases_by_word: dict[str, tuple[int, ...]]   # word -> positions in index.aliases
+    alias_words: tuple[frozenset[str], ...]
+    types_by_name_word: dict[str, tuple[str, ...]]
+    name_words: dict[str, tuple[str, ...]]        # type id -> non-generic name words
+    by_name: dict[str, tuple[str, ...]]           # normalized type name -> type ids
+    lay_term_words: int                           # words in the longest lay term
+
+    @classmethod
+    def build(cls, index: CatalogIndex) -> "_Vocab":
+        name_words = {t.id: tuple(w for w in tokens(t.name) if w not in _GENERIC) for t in index.types.values()}
+        alias_words = tuple(frozenset(a.phrase.split()) for a in index.aliases)
+        words = {w for ws in name_words.values() for w in ws} | {w for ws in alias_words for w in ws}
+        by_stem: dict[str, list[str]] = defaultdict(list)
+        by_len: dict[int, list[str]] = defaultdict(list)
+        for w in sorted(words):
+            by_stem[stem(w)].append(w)
+            by_len[len(w)].append(w)
+        aliases_by_word: dict[str, list[int]] = defaultdict(list)
+        types_by_name_word: dict[str, list[str]] = defaultdict(list)
+        by_name: dict[str, list[str]] = defaultdict(list)
+        for i, ws in enumerate(alias_words):
+            for w in ws:
+                aliases_by_word[w].append(i)
+        for tid, ws in name_words.items():
+            for w in set(ws):
+                types_by_name_word[w].append(tid)
+        for t in index.types.values():
+            by_name[normalize(t.name)].append(t.id)
+
+        def freeze(d: dict) -> dict:
+            return {k: tuple(v) for k, v in d.items()}
+        return cls(freeze(by_stem), freeze(by_len), freeze(aliases_by_word), alias_words,
+                   freeze(types_by_name_word), name_words, freeze(by_name),
+                   max((len(t.split()) for t in index.lay_terms), default=0))
+
+    def matched(self, heard: list[str]) -> set[str]:
+        """Vocabulary words v with _token_match(h, v) for some heard word h."""
+        return set().union(*(_word_hits(self, h) for h in heard))
+
+
+@lru_cache(maxsize=8192)
+def _word_hits(vocab: _Vocab, h: str) -> frozenset[str]:
+    out = set(vocab.by_stem.get(stem(h), ()))
+    if len(h) > 4:
+        jw = jellyfish.jaro_winkler_similarity
+        for n in (len(h) - 1, len(h), len(h) + 1):
+            out.update(v for v in vocab.by_len.get(n, ()) if len(v) > 4 and jw(h, v) >= 0.92)
+    return frozenset(out)
+
+
+# Keyed by id(index); the entry holds the index, so its id cannot be reused while cached.
+_VOCABS: dict[int, tuple[CatalogIndex, _Vocab]] = {}
+
+
+def _vocab(index: CatalogIndex) -> _Vocab:
+    hit = _VOCABS.get(id(index))
+    if hit is None or hit[0] is not index:
+        hit = _VOCABS[id(index)] = (index, _Vocab.build(index))
+    return hit[1]
+
+
+def types_named(index: CatalogIndex, phrase: str) -> tuple[str, ...]:
+    """Types whose full name is exactly the phrase, in catalog order."""
+    return _vocab(index).by_name.get(normalize(phrase), ())
+
+
 def match_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | None = None) -> list[TypeCandidate]:
     """Score every appointment type against the phrase. Longest alias match wins over the
     shorter aliases it contains ("physical therapy" beats "physical")."""
+    return sorted((c for c in _score_types(index, phrase, specialty_hint).values() if c.score >= MIN_SCORE),
+                  key=lambda c: (-c.score, c.type_id))
+
+
+def _score_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | None) -> dict[str, TypeCandidate]:
     best: dict[str, TypeCandidate] = {}
 
     def offer(tid: str, score: float, via: str) -> None:
@@ -51,14 +136,17 @@ def match_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | N
             best[tid] = TypeCandidate(tid, round(score, 3), via)
 
     words = tokens(phrase or "")
-    norm = " ".join(words)
     if words:
-        for t in index.types.values():
-            if normalize(t.name) == norm:
-                offer(t.id, 1.0, "name")
+        vocab = _vocab(index)
+        for tid in vocab.by_name.get(" ".join(words), ()):
+            offer(tid, 1.0, "name")
 
+        hit = vocab.matched(words)
+        # An alias can span the phrase only if each of its words matched some phrase word.
+        maybe = sorted({i for w in hit for i in vocab.aliases_by_word.get(w, ()) if vocab.alias_words[i] <= hit})
         spans = []
-        for alias in index.aliases:
+        for i in maybe:
+            alias = index.aliases[i]
             a_words = alias.phrase.split()
             start = _find_span(words, a_words)
             if start >= 0:
@@ -72,15 +160,16 @@ def match_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | N
 
         content = [w for w in words if w not in _GENERIC]
         if content:
-            for t in index.types.values():
-                name_words = [w for w in tokens(t.name) if w not in _GENERIC]
-                if not name_words:
+            hit_content = vocab.matched(content)
+            reached = {tid for w in hit_content for tid in vocab.types_by_name_word.get(w, ())}
+            for tid in index.types:
+                if tid not in reached:
                     continue
-                hits = sum(1 for nw in name_words if any(_token_match(cw, nw) for cw in content))
-                if hits:
-                    recall = hits / len(name_words)
-                    precision = hits / len(content)
-                    offer(t.id, 0.85 * (0.6 * recall + 0.4 * precision), "words")
+                name_words = vocab.name_words[tid]
+                hits = sum(1 for nw in name_words if nw in hit_content)
+                recall = hits / len(name_words)
+                precision = hits / len(content)
+                offer(tid, 0.85 * (0.6 * recall + 0.4 * precision), "words")
 
     if any(c.via == "name" for c in best.values()):
         for tid, c in list(best.items()):
@@ -98,15 +187,43 @@ def match_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | N
         default = index.specialty_default.get(specialty) if specialty else None
         if default:
             offer(default, _SPECIALTY_DEFAULT_SCORE, "specialty")
-
-    return sorted((c for c in best.values() if c.score >= MIN_SCORE), key=lambda c: (-c.score, c.type_id))
+    return best
 
 
 def _lay_specialty(index: CatalogIndex, words: list[str]) -> str | None:
-    for w in words:
-        if w in index.lay_terms:
-            return index.lay_terms[w]
-    return None
+    found = _lay_specialties(index, words)
+    return found[0] if found else None
+
+
+def _lay_specialties(index: CatalogIndex, words: list[str]) -> list[str]:
+    """Specialties the phrase's lay terms point to: longer terms first ("hurt my knee" before
+    "knee"), then earlier in the phrase. With one-word terms only, that is phrase order."""
+    longest = _vocab(index).lay_term_words
+    hits = []
+    for n in range(min(longest, len(words)), 0, -1):
+        for i in range(len(words) - n + 1):
+            spec = index.lay_terms.get(" ".join(words[i:i + n]))
+            if spec:
+                hits.append(spec)
+    return list(dict.fromkeys(hits))
+
+
+def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
+                   metros: frozenset[str] | None = None) -> list[str]:
+    """At most SHORTLIST_SIZE offered types (offered in `metros`, when given) for a model to
+    choose among: lexical candidates at any score, then the types of the specialties the hint or
+    a lay term names, then every specialty's default. Sorted by id, like the full request."""
+    def offered(tid: str) -> bool:
+        return tid not in index.unoffered_types and (metros is None or bool(index.metros_by_type[tid] & metros))
+
+    scored = sorted(_score_types(index, phrase, hint).values(), key=lambda c: (-c.score, c.type_id))
+    ranked = [c.type_id for c in scored]
+    for spec in ([hint] if hint else []) + _lay_specialties(index, tokens(phrase or "")):
+        default = index.specialty_default.get(spec)
+        ranked += ([default] if default else []) + sorted(t.id for t in index.types.values() if t.specialty == spec)
+    ranked += [index.specialty_default[s] for s in sorted(index.specialty_default)]
+    out = [tid for tid in dict.fromkeys(ranked) if tid in index.types and offered(tid)]
+    return sorted(out[:SHORTLIST_SIZE])
 
 
 # Filler that carries no meaning about which visit is wanted (contractions arrive split: "i m").

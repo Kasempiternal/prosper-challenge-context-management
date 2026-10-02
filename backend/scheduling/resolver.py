@@ -8,24 +8,31 @@ offer (<=3 concrete times), ask (one question whose answer changes the valid set
 from __future__ import annotations
 
 import json
+import math
 from collections import Counter
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Protocol
 
 from . import templates as T
+import jellyfish
+
 from .availability import Availability, Slot as TimeSlot
 from .catalog_index import BookableRow, CatalogIndex
 from .decision import DECLINE, Verdict
-from .lexicon import TypeCandidate, match_types, unexplained_words
+from .geo import RADIUS_MI, Place, PlaceMatch, haversine, nearby, resolve_place
+from .lexicon import SHORTLIST_ABOVE, TypeCandidate, match_types, type_shortlist, types_named, unexplained_words
 from .names import clue_words, match_locations, match_providers
 from .policy import IssueKind, Rule, Violation, check, has_violation
 from .request import WEEKDAY_NAMES, AltRef, OfferRef, PendingAsk, Request, Slot, TimePref
-from .text import normalize
+from .text import phonetic_keys, tokens
 
 TYPE_TIE_GAP = 0.1
 MAX_OPTIONS = 3
 HANDOFF_AFTER_MISSES = 3
+# An area search widens from the place's own radius to twice that, then to this, before refusing.
+FINAL_RING_MI = 50.0
+MAX_SITE_CHOICES = 20
 _REFUSAL_PRIORITY = (Rule.NEW_PATIENT_TYPE, Rule.REFERRAL, Rule.NEW_PATIENT_PROVIDER)
 
 
@@ -45,12 +52,32 @@ class ProviderChooser(Protocol):
     def pick_provider(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict: ...
 
 
+class SiteChooser(Protocol):
+    """Picks among the clinics of an area search using the caller's descriptive words ("the one on
+    Lamar", "the big one by the river"). Consulted only when such words exist."""
+
+    def pick_site(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict: ...
+
+
 class NoDisambiguator:
     def pick_type(self, phrase: str, hint: str | None, candidate_ids: list[str]) -> Verdict:
         return DECLINE
 
     def pick_provider(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
         return DECLINE
+
+    def pick_site(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
+        return DECLINE
+
+
+@dataclass(frozen=True)
+class Area:
+    """Where an area phrase ("Hyde Park", "Austin", "78701") was searched: every site within
+    radius_mi of an anchor, plus a named city's own sites. Offers never leave it."""
+
+    anchors: tuple[Place, ...]
+    radius_mi: float
+    location_ids: tuple[str, ...]  # nearest first
 
 
 @dataclass(frozen=True)
@@ -96,6 +123,7 @@ class Plan:
     notes: tuple[str, ...] = ()
     valid_rows: int = 0
     result: dict | None = None
+    area: Area | None = None
 
     def tool_result(self, speak_direct: bool = False) -> dict:
         """With speak-direct the handler already sent `say` to TTS, so the LLM only needs the facts."""
@@ -104,18 +132,26 @@ class Plan:
 
 
 def resolve(index: CatalogIndex, req: Request, availability: Availability,
-            disambiguator: TypeDisambiguator | None = None, chooser: ProviderChooser | None = None) -> Plan:
+            disambiguator: TypeDisambiguator | None = None, chooser: ProviderChooser | None = None,
+            site_chooser: SiteChooser | None = None) -> Plan:
     return _Resolution(index, req, availability, disambiguator or NoDisambiguator(),
-                       chooser or NoDisambiguator()).run()
+                       chooser or NoDisambiguator(), site_chooser or NoDisambiguator()).run()
 
 
 class _Resolution:
-    def __init__(self, index, req, availability, disambiguator, chooser):
+    def __init__(self, index, req, availability, disambiguator, chooser, site_chooser):
         self.ix: CatalogIndex = index
         self.req: Request = req
         self.av: Availability = availability
         self.dis: TypeDisambiguator = disambiguator
         self.chooser: ProviderChooser = chooser
+        self.site_chooser: SiteChooser = site_chooser
+        # A catalog without metros or coordinates (SF) never takes a geographic branch.
+        self.geo = index.has_geo or index.multi_metro
+        self.area: Area | None = None
+        self.dist: dict[str, float] = {}   # location id -> miles from the caller's place
+        self.site_choice = False           # the place left several sites a description could split
+        self.place_memo: PlaceMatch | None = None
         self.type_consulted = False
         self.patient = req.patient
         self.slots: dict[str, Slot] = {"service": req.service, "provider": req.provider, "location": req.location}
@@ -187,7 +223,7 @@ class _Resolution:
                 return False
         for name, picked in (("provider", offer.provider_id), ("location", offer.location_id)):
             if name in changed:
-                ids = self._name_candidates(name)
+                ids = self._place_ids() if name == "location" and self.geo else self._name_candidates(name)
                 if ids is not None and picked not in ids:
                     return False
         if "time_pref" in changed and not _time_fits(datetime.fromisoformat(offer.start), self.req.time_pref):
@@ -228,11 +264,16 @@ class _Resolution:
         provider_ids = self._name_candidates("provider")
         if provider_ids == []:
             return self._miss("provider")
-        location_ids = self._name_candidates("location")
-        if location_ids == []:
-            return self._miss("location")
-
-        rows = [r for tid in type_ids for r in self.ix.rows_by_type[tid]]
+        if self.geo:
+            scope = self._geo_scope(type_ids, provider_ids, svc is not None)
+            if isinstance(scope, Plan):
+                return scope
+            rows, location_ids = scope
+        else:
+            location_ids = self._name_candidates("location")
+            if location_ids == []:
+                return self._miss("location")
+            rows = [r for tid in type_ids for r in self.ix.rows_by_type[tid]]
         rows_p = rows if provider_ids is None else [r for r in rows if r.provider.id in provider_ids]
         if provider_ids is not None and not rows_p:
             if self._newer("service", "provider"):
@@ -240,6 +281,14 @@ class _Resolution:
                 self.notes.append("dropped provider: does not offer the new service")
                 self.slots["provider"] = Slot(turn=self.req.turn)
                 provider_ids, rows_p = None, rows
+                if self.geo:
+                    # The dropped doctor may have been what chose the city: scope again without them.
+                    self.area, self.dist, self.site_choice = None, {}, False
+                    scope = self._geo_scope(type_ids, None, svc is not None)
+                    if isinstance(scope, Plan):
+                        return scope
+                    rows, location_ids = scope
+                    rows_p = rows
             else:
                 alts = self._alternatives(rows, location_ids)
                 return self._refuse("provider_type", type_id=self._best_type(rows), who=self._who(provider_ids),
@@ -251,9 +300,29 @@ class _Resolution:
                 self.preface += f"That's not available at {self._where(location_ids)}. "
                 self.notes.append("dropped location: does not fit the newer choice")
                 self.slots["location"] = Slot(turn=self.req.turn)
-                location_ids, rows_pl = None, rows_p
+                dropped, location_ids, rows_pl = location_ids, None, rows_p
+                anchors = tuple(self.ix.gazetteer.sites[l] for l in dropped if l in self.ix.gazetteer.sites)
+                if self.geo and anchors:
+                    # Search around the dropped clinic rather than the whole country.
+                    scope = self._ring(anchors, type_ids, provider_ids,
+                                       rows_p if provider_ids is not None else None, svc is not None)
+                    if isinstance(scope, Plan):
+                        return scope
+                    rows, location_ids = scope
+                    rows_p = rows if provider_ids is None else [r for r in rows if r.provider.id in provider_ids]
+                    rows_pl = [r for r in rows_p if r.location.id in location_ids]
             else:
                 return self._refuse_location(rows_p, provider_ids, location_ids)
+
+        if svc is None and self.geo:
+            # No visit named yet: two live types already mean "What's the visit for?", so a
+            # metro's thousands of rows are not all checked to find that out.
+            seen: set[str] = set()
+            for r in rows_pl:
+                if r.type.id not in seen and not has_violation(check(r, self.patient)):
+                    seen.add(r.type.id)
+                    if len(seen) > 1:
+                        return self._ask_type(sorted(seen), False)
 
         ok, pending, bad = [], [], []
         issues: dict[tuple, list[Violation]] = {}
@@ -305,7 +374,20 @@ class _Resolution:
                     return self._ask_needed(live, issues, type_id)
             self.slots["provider"] = replace(self.slots["provider"], resolved_id=provs[0])
 
-        if location_ids is not None:
+        if self.site_choice:
+            sites = sorted({r.location.id for r in live}, key=lambda l: (self.dist.get(l, 0.0), l))
+            if 2 <= len(sites) <= MAX_SITE_CHOICES:
+                verdict = self._consult_site(sites, type_id)
+                if verdict.pair:
+                    return self._ask("location", options=tuple(sorted(verdict.pair)))
+                if verdict.act in sites:
+                    ok = [r for r in ok if r.location.id == verdict.act]
+                    live = [r for r in live if r.location.id == verdict.act]
+                    self.slots["location"] = replace(self.slots["location"], resolved_id=verdict.act)
+                    if not ok:
+                        return self._ask_needed(live, issues, type_id)
+
+        if location_ids is not None and self.area is None:
             locs = sorted({r.location.id for r in live})
             if len(locs) > 1:
                 return self._ask("location", options=tuple(locs)) if len(locs) <= MAX_OPTIONS else self._ask("location_open")
@@ -314,6 +396,8 @@ class _Resolution:
         found = self.av.find(ok, self.req.time_pref, MAX_OPTIONS)
         if not found:
             return self._refuse("no_availability", type_id=type_id)
+        if self.dist:
+            found = self._nearer_ties(found, ok)
         names = [self.ix.providers[s.provider_id].name for s in found]
         order = list(dict.fromkeys(names))
         found = [s for _, s in sorted(zip(names, found), key=lambda ns: (order.index(ns[0]), ns[1].start))]
@@ -331,8 +415,7 @@ class _Resolution:
             return None
         cands: list[TypeCandidate] = []
         if s.exact and s.heard:
-            norm = normalize(s.heard)
-            cands = [TypeCandidate(t.id, 1.0, "name") for t in self.ix.types.values() if normalize(t.name) == norm]
+            cands = [TypeCandidate(tid, 1.0, "name") for tid in types_named(self.ix, s.heard)]
         if not cands:
             cands = match_types(self.ix, s.heard, s.hint)
         if s.within:
@@ -359,6 +442,279 @@ class _Resolution:
         ids = {r.type.id for r in rows}
         return min(ids, key=lambda t: (-self.scores.get(t, 0.0), t)) if ids else None
 
+    # ---- geography (catalogs with metros or coordinates only) ---------------------------------
+
+    def _geo_scope(self, type_ids: list[str], provider_ids: list[str] | None,
+                   has_service: bool) -> Plan | tuple[list[BookableRow], list[str] | None]:
+        """Rows to search and the locations they must be at (None: anywhere), from the place
+        phrase, the provider and the catalog's metros. Asks which city when that is open."""
+        ix = self.ix
+        tset = set(type_ids)
+        prov_rows = None
+        prov_metros: frozenset[str] = frozenset()
+        if provider_ids is not None:
+            prov_rows = sorted((r for p in provider_ids for r in ix.rows_by_provider[p] if r.type.id in tset),
+                               key=lambda r: r.key)
+            prov_metros = frozenset(r.location.metro_id for r in prov_rows) or frozenset(
+                ix.locations[l].metro_id for p in provider_ids for l in ix.providers[p].location_ids)
+
+        place = self._place()
+        if place is None:
+            if provider_ids is not None:
+                if len(prov_metros) > 1:
+                    return self._ask_metro(prov_metros)
+                return _union(self._metro_rows(type_ids, prov_metros), prov_rows), None
+            if ix.multi_metro:
+                return self._ask_metro(frozenset())
+            return [r for tid in type_ids for r in ix.rows_by_type[tid]], None
+        if not place.sites and not place.anchors:
+            return self._miss("location")
+
+        metros = place.metro_ids(ix)
+        if provider_ids is not None and len(metros) > 1 and metros & prov_metros:
+            metros = metros & prov_metros
+            place = self._narrow(place, metros)
+        if len(metros) > 1:
+            states = [p.label for p in place.anchors if p.kind == "state"]
+            return self._ask_metro(metros, states[0] if len(states) == 1 else None)
+        if len(metros) == 1:
+            place = self._narrow(place, metros)
+
+        if place.sites:
+            site_ids = list(place.site_ids)
+            self.site_choice = len(site_ids) > 1 and all(c.via != "exact" for c in place.sites)
+            anchor = ix.gazetteer.sites.get(site_ids[0])
+            if anchor is None:
+                return _union([r for tid in type_ids for r in ix.rows_by_type[tid]], prov_rows), site_ids
+            self.dist = self._distances((anchor,), FINAL_RING_MI)
+            return _union(self._rows_at(type_ids, self.dist), prov_rows), site_ids
+        return self._ring(place.anchors, type_ids, provider_ids, prov_rows, has_service)
+
+    def _ring(self, anchors: tuple[Place, ...], type_ids: list[str], provider_ids: list[str] | None,
+              prov_rows: list[BookableRow] | None, has_service: bool):
+        """Widen around the area until some row there passes policy or needs only an answer."""
+        base = min(a.radius_mi for a in anchors)
+        radii = sorted({base, 2 * base, max(base, FINAL_RING_MI)})
+        allowed = set(provider_ids) if provider_ids is not None else None
+        for radius in radii:
+            dist = self._distances(anchors, radius)
+            if allowed is None:
+                cand = self._rows_at(type_ids, dist)
+            else:
+                cand = sorted((r for r in prov_rows or () if r.location.id in dist),
+                              key=lambda r: (dist[r.location.id], r.location.id, r.key))
+            # Rows come nearest first, so the first valid one is the nearest.
+            nearest = next((r for r in cand if not has_violation(check(r, self.patient))), None)
+            # Rows that only policy rules out end the search: that refusal is the useful answer.
+            if nearest or (cand and radius == radii[-1]):
+                break
+        else:
+            return self._none_nearby(anchors, radii[-1], type_ids, allowed, prov_rows, has_service)
+
+        local = cand if allowed is None else self._rows_at(type_ids, dist)
+        order = tuple(sorted(dist, key=lambda l: (dist[l], l)))
+        self.area, self.dist, self.site_choice = Area(anchors, radius, order), dist, True
+        self.notes.append(f"area {'/'.join(a.key for a in anchors)} within {radius:g} mi: {len(order)} sites")
+        if nearest and radius > radii[0]:
+            lid = nearest.location.id
+            self.preface += T.ring_preface(self.ix, lid, dist[lid], anchors[0].label)
+        return _union(local, prov_rows), list(order)
+
+    def _none_nearby(self, anchors: tuple[Place, ...], radius: float, type_ids: list[str],
+                     allowed: set[str] | None, prov_rows: list[BookableRow] | None, has_service: bool) -> Plan:
+        """Nothing in the widest ring: name the nearest valid site in the nearest metro that has
+        one, as a pickable alternative."""
+        ix, anchor = self.ix, anchors[0]
+        who = self._who(sorted(allowed)) if allowed else None
+        metros = set().union(*(ix.metros_by_type[t] for t in type_ids))
+        if allowed is not None:
+            metros &= {ix.locations[l].metro_id for p in allowed for l in ix.providers[p].location_ids}
+
+        def miles_to(lat: float | None, lon: float | None) -> float:
+            return haversine(anchor.lat, anchor.lon, lat, lon) if None not in (anchor.lat, lat) else math.inf
+
+        for mid in sorted(metros, key=lambda m: (miles_to(ix.metros[m].lat, ix.metros[m].lon), m)):
+            for lid in sorted(ix.locs_by_metro[mid], key=lambda l: (miles_to(ix.locations[l].lat, ix.locations[l].lon), l)):
+                at = ([r for r in prov_rows or () if r.location.id == lid] if allowed is not None
+                      else [r for tid in type_ids for r in ix.rows_by_type_loc.get((tid, lid), ())])
+                valid = [r for r in at if not has_violation(check(r, self.patient))]
+                if not valid:
+                    continue
+                best = min(valid, key=lambda r: (bool(check(r, self.patient)), -self.scores.get(r.type.id, 0.0), r.key))
+                alt = (best.type.id, best.provider.id, lid)
+                loc = ix.locations[lid]
+                return self._refuse("none_nearby", type_id=best.type.id if has_service else None, who=who,
+                                    alternatives=(alt,) if has_service else (), location_id=lid,
+                                    near=anchor.label, near_kind=anchor.kind, radius_mi=radius,
+                                    nearest_mi=miles_to(loc.lat, loc.lon))
+        return self._refuse("none_nearby", type_id=type_ids[0] if has_service and len(type_ids) == 1 else None,
+                            who=who, near=anchor.label, near_kind=anchor.kind, radius_mi=radius)
+
+    def _ask_metro(self, metros: frozenset[str], state: str | None = None) -> Plan:
+        ids = sorted(metros, key=lambda m: (self.ix.metros[m].name, self.ix.metros[m].state))
+        if 1 < len(ids) <= MAX_OPTIONS:
+            return self._ask("metro", options=tuple(ids))
+        return self._ask("metro", context=state)
+
+    def _place(self) -> PlaceMatch | None:
+        """The location phrase as sites or area anchors; an answer to "which city?" narrows it."""
+        if self.place_memo is not None:
+            return self.place_memo
+        s, ix = self.slots["location"], self.ix
+        if not s.heard:
+            return None
+        at_sites = [w for w in s.within if w in ix.locations]
+        if at_sites:
+            m = PlaceMatch(sites=tuple(match_locations(ix, s.heard, at_sites)))
+        else:
+            m = resolve_place(ix, s.heard)
+            options = frozenset(w for w in s.within if w in ix.metros)
+            if s.region:
+                answer = resolve_place(ix, s.region)
+                chosen = answer.metro_ids(ix)
+                if options & chosen:
+                    chosen &= options
+                narrowed = self._narrow(m, chosen) if chosen else PlaceMatch()
+                if narrowed.sites or narrowed.anchors:
+                    m = narrowed
+                else:
+                    # Not one of the cities asked about: the caller named another place.
+                    m = answer
+                    self.slots["location"] = replace(s, heard=s.region, region=None, within=())
+            elif options:
+                narrowed = self._narrow(m, options)
+                m = narrowed if narrowed.sites or narrowed.anchors else m
+        self.place_memo = m
+        return m
+
+    def _place_ids(self) -> list[str] | None:
+        """Locations a picked offer may be at, for _fits_change."""
+        place = self._place()
+        if place is None:
+            return None
+        if place.sites:
+            return list(place.site_ids)
+        return [l for m in sorted(place.metro_ids(self.ix)) for l in self.ix.locs_by_metro[m]]
+
+    def _narrow(self, m: PlaceMatch, metros: frozenset[str]) -> PlaceMatch:
+        """Keep what lies in `metros`; a state or multi-city anchor becomes those cities."""
+        sites = tuple(c for c in m.sites if self.ix.locations[c.id].metro_id in metros)
+        anchors: dict[str, Place] = {}
+        for p in m.anchors:
+            inside = set(p.metro_ids) & metros
+            if not inside:
+                continue
+            if p.kind == "state" or len(p.metro_ids) > len(inside):
+                for mid in sorted(inside):
+                    mp = self._metro_place(mid)
+                    anchors[mp.key] = mp
+            else:
+                anchors[p.key] = p
+        return PlaceMatch(sites=sites, anchors=tuple(anchors.values()))
+
+    def _metro_place(self, mid: str) -> Place:
+        m = self.ix.metros[mid]
+        return Place(f"metro:{mid}", "metro", m.name, m.lat, m.lon, (mid,), RADIUS_MI["metro"])
+
+    def _distances(self, anchors: tuple[Place, ...], radius: float) -> dict[str, float]:
+        """Miles to the nearest anchor for sites within `radius`; a city's own sites always count."""
+        out: dict[str, float] = {}
+        for a in anchors:
+            for lid, d in nearby(self.ix, a, radius):
+                out[lid] = min(d, out.get(lid, math.inf))
+            if a.kind == "metro":
+                for mid in a.metro_ids:
+                    for lid in self.ix.locs_by_metro.get(mid, ()):
+                        loc = self.ix.locations[lid]
+                        d = haversine(a.lat, a.lon, loc.lat, loc.lon) if loc.lat is not None else 0.0
+                        out[lid] = min(d, out.get(lid, math.inf))
+        return out
+
+    def _rows_at(self, type_ids: list[str], dist: dict[str, float]) -> list[BookableRow]:
+        order = sorted(dist, key=lambda l: (dist[l], l))
+        return [r for lid in order for tid in type_ids for r in self.ix.rows_by_type_loc.get((tid, lid), ())]
+
+    def _metro_rows(self, type_ids: list[str], metros: frozenset[str]) -> list[BookableRow]:
+        return self._rows_at(type_ids, {l: 0.0 for m in sorted(metros) for l in self.ix.locs_by_metro.get(m, ())})
+
+    def _consult_site(self, sites: list[str], type_id: str) -> Verdict:
+        s = self.slots["location"]
+        heard = ", ".join(filter(None, [s.heard, s.region]))
+        clue = self._place_clue(heard)
+        if not clue:
+            return DECLINE
+        verdict = self.site_chooser.pick_site(heard, type_id, sites)
+        self.notes.append(f"site chooser on {list(clue)}: {verdict.describe()}")
+        if verdict.pair and not set(verdict.pair) <= set(sites):
+            return DECLINE
+        return verdict
+
+    def _place_clue(self, heard: str) -> tuple[str, ...]:
+        """Words of the place phrase beyond filler and the names of the places it resolved to:
+        "the one on Lamar in Austin" -> ("lamar",); "Austin" or a misheard "Austen" -> ()."""
+        place = self._place() or PlaceMatch()
+        names: set[str] = set()
+        for p in place.anchors:
+            names.update(tokens(p.label))
+        for c in place.sites:
+            names.update(tokens(self.ix.locations[c.id].name))
+        for mid in place.metro_ids(self.ix):
+            m = self.ix.metros[mid]
+            names.update(tokens(" ".join([m.name, m.state, T.state_name(m.state), *m.aliases])))
+        names -= _PLACE_FILLER
+
+        def is_name(w: str) -> bool:
+            keys = phonetic_keys(w)
+            return any(w == n or jellyfish.jaro_winkler_similarity(w, n) >= 0.9
+                       or (len(w) > 3 and bool(keys & phonetic_keys(n))) for n in names)
+        return tuple(w for w in tokens(heard) if w not in _PLACE_FILLER and not w.isdigit() and not is_name(w))
+
+    def _nearer_ties(self, found: list[TimeSlot], ok: list[BookableRow]) -> list[TimeSlot]:
+        """Soonest first; at the same start, the nearer site. Each offer may be swapped for an
+        open slot at the same time at a nearer site, if the offers stay distinguishable."""
+        dist = self.dist
+        by_loc: dict[str, list[BookableRow]] = {}
+        for r in ok:
+            by_loc.setdefault(r.location.id, []).append(r)
+        nearer_first = sorted(by_loc, key=lambda l: (dist.get(l, math.inf), l))
+        out = list(found)
+        for i, s in enumerate(out):
+            mine = dist.get(s.location_id, math.inf)
+            minute = s.start.hour * 60 + s.start.minute
+            others = [o for j, o in enumerate(out) if j != i]
+            for lid in nearer_first:
+                if dist.get(lid, math.inf) >= mine:
+                    break
+                loc = self.ix.locations[lid]
+                if s.start.weekday() not in loc.open_weekdays:
+                    continue
+                swapped = None
+                for r in by_loc[lid]:
+                    dur = r.type.duration_min
+                    if minute < loc.open_minute or minute + dur > loc.close_minute or (minute - loc.open_minute) % dur:
+                        continue
+                    if any(o.start.date() == s.start.date() and (o.provider_id == r.provider.id or o.location_id == lid)
+                           for o in others):
+                        continue
+                    slot = TimeSlot(r.type.id, r.provider.id, lid, s.start, dur)
+                    if self.av.is_open(slot):
+                        swapped = slot
+                        break
+                if swapped:
+                    self.notes.append(f"offer {i + 1}: same time at nearer {lid}")
+                    out[i] = swapped
+                    break
+        return out
+
+    def _type_pool(self, pool: list[str], keep: list[str] = ()) -> list[str]:
+        """The types a model chooses among: all offered, cut to a shortlist on large catalogs."""
+        if len(pool) <= SHORTLIST_ABOVE:
+            return pool
+        s = self.slots["service"]
+        place = self._place() if self.geo else None
+        metros = place.metro_ids(self.ix) if place is not None else frozenset()
+        return sorted(set(type_shortlist(self.ix, s.heard, s.hint, metros or None)) | set(keep))
+
     # ---- type choice ---------------------------------------------------------------------
 
     def _consult_types(self) -> list[TypeCandidate] | None:
@@ -368,7 +724,7 @@ class _Resolution:
         if not s.heard or self.type_consulted:
             return None
         self.type_consulted = True
-        pool = [t for t in (s.within or sorted(self.ix.types)) if t not in self.ix.unoffered_types]
+        pool = self._type_pool([t for t in (s.within or sorted(self.ix.types)) if t not in self.ix.unoffered_types])
         verdict = self.dis.pick_type(s.heard, s.hint, pool)
         self.notes.append(f"type disambiguator: {verdict.describe()}")
         ids = [verdict.act] if verdict.act else list(verdict.pair or ())
@@ -389,7 +745,7 @@ class _Resolution:
             # them its answer is a prior ("MRI" -> brain 0.89), so the caller is asked instead.
             s = self.slots["service"]
             self.type_consulted = True
-            pool = sorted(t for t in self.ix.types if t not in self.ix.unoffered_types)
+            pool = self._type_pool(sorted(t for t in self.ix.types if t not in self.ix.unoffered_types), tie)
             verdict = self.dis.pick_type(s.heard or "", s.hint, pool)
             self.notes.append(f"type disambiguator: {verdict.describe()}")
             if verdict.act in pool:
@@ -432,10 +788,12 @@ class _Resolution:
         patient now (needs-info rows count, the caller can still answer). Same-site first."""
         valid = [r for r in rows if r.provider.id not in exclude_providers
                  and not has_violation(check(r, self.patient))]
+        near = self.dist
         if location_ids:
-            valid.sort(key=lambda r: (r.location.id not in location_ids, bool(check(r, self.patient)), r.key))
+            valid.sort(key=lambda r: (r.location.id not in location_ids, bool(check(r, self.patient)),
+                                      near.get(r.location.id, 0.0), r.key))
         else:
-            valid.sort(key=lambda r: (bool(check(r, self.patient)), r.key))
+            valid.sort(key=lambda r: (bool(check(r, self.patient)), near.get(r.location.id, 0.0), r.key))
         out, seen = [], set()
         for r in valid:
             # Two "Dr. Maria Garcia" alternatives in one sentence would be unanswerable.
@@ -534,7 +892,8 @@ class _Resolution:
         if new_req.alternatives:
             result["alternatives"] = _alternative_labels(self.ix, new_req.alternatives)
         return Plan(status=status, say=say, req=new_req, ask=ask, offers=offers, refusal=refusal, confirm=confirm,
-                    summary=summary, notes=tuple(self.notes), valid_rows=self.valid_rows, result=result)
+                    summary=summary, notes=tuple(self.notes), valid_rows=self.valid_rows, result=result,
+                    area=self.area)
 
 
 # ---- compact views for the LLM --------------------------------------------------------------
@@ -561,6 +920,24 @@ def _known(ix: CatalogIndex, req: Request) -> dict:
     return out
 
 
+def _union(rows: list[BookableRow], more: list[BookableRow] | None) -> list[BookableRow]:
+    if not more:
+        return rows
+    seen = {r.key for r in rows}
+    return rows + [r for r in more if r.key not in seen]
+
+
+# Words a place phrase carries that say nothing about which clinic: "I'm over near the clinic in".
+_PLACE_FILLER = frozenset({
+    "i", "m", "am", "im", "we", "re", "live", "living", "work", "stay", "staying", "located", "based", "in", "at",
+    "from", "um", "uh", "so", "well", "the", "over", "out", "here", "somewhere", "anywhere", "just", "a", "an",
+    "s", "it", "one", "of", "near", "nearby", "around", "by", "close", "closest", "nearest", "next", "to", "area",
+    "please", "neighborhood", "region", "metro", "city", "town", "health", "center", "centre", "clinic",
+    "clinics", "family", "specialty", "medical", "group", "community", "care", "office", "location", "on",
+    "and", "my", "me", "that", "is", "there", "you", "your", "any", "some", "okay", "ok", "yes", "yeah", "like",
+    "want", "would", "prefer", "go", "get", "see", "can", "could", "for", "with", "us", "our", "place"})
+
+
 def _time_fits(start: datetime, tp: TimePref) -> bool:
     if tp.days and WEEKDAY_NAMES[start.weekday()] not in tp.days:
         return False
@@ -573,6 +950,12 @@ def _alternative_labels(ix: CatalogIndex, alts: tuple[AltRef, ...]) -> list[str]
     return [" ".join(filter(None, [str(a.n), ix.types[a.type_id].name,
                                    a.provider_id and ix.providers[a.provider_id].name,
                                    a.location_id and ix.locations[a.location_id].short_name])) for a in alts]
+
+
+def _option_labels(ix: CatalogIndex, field: str, options: tuple[str, ...]) -> list[str]:
+    if field == "metro":
+        return T.metro_labels(ix, list(options))
+    return [_option_label(ix, field, o) for o in options]
 
 
 def _option_label(ix: CatalogIndex, field: str, option: str) -> str:
@@ -589,7 +972,7 @@ def _tool_result(ix, status, say, ask, offers, req, confirm) -> dict:
     out: dict = {"status": status, "say": say}
     if ask:
         out["ask"] = ask.field if not ask.options else {
-            "field": ask.field, "options": [_option_label(ix, ask.field, o) for o in ask.options]}
+            "field": ask.field, "options": _option_labels(ix, ask.field, ask.options)}
     if offers:
         out["offers"] = [f"{o.n} {T.short_when(o.start)} {ix.locations[o.location_id].short_name} "
                          f"{ix.providers[o.provider_id].name}" for o in offers]

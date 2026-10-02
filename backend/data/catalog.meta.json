@@ -1,7 +1,7 @@
 {
   "label": "SF sample (provided)",
   "sha256": "287d13bdc28af1672ad931c9dc37592f455b438d2d3123d38da27ab418e703d1",
-  "naive_tokens": 12925,
+  "naive_tokens": 8252,
   "counts": {
     "locations": 8,
     "providers": 50,
