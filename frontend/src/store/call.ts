@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { api } from '../lib/api'
+import type { GradeResult, GradeTurn } from '../types/grade'
 
 export type CallStatus = 'idle' | 'connecting' | 'live' | 'ended'
 
@@ -40,6 +42,13 @@ export type FlowEvent =
   | { type: 'call_ended'; reason: string }
   | { type: 'resolver_decision'; decision: Decision }
 
+/** Post-call JEV review of the last ended call. */
+export type Review =
+  | { status: 'idle' }
+  | { status: 'grading' }
+  | { status: 'done'; result: GradeResult }
+  | { status: 'error'; message: string }
+
 export const REJECTED: CallError = {
   message: 'The backend rejected this agent — fix the issues and retry.',
   hint: 'The bot ended the session before it was ready. Check the backend log for the validation error.',
@@ -57,6 +66,7 @@ interface CallState {
   collected: Record<string, unknown>
   endReason: string | null
   decisions: TimedDecision[]
+  review: Review
 
   begin: () => number
   /** BotReady. Ignored unless the current attempt is still connecting (a hang-up may have won the race). */
@@ -64,7 +74,11 @@ interface CallState {
   end: (error?: CallError) => void
   reset: () => void
   ingest: (event: FlowEvent) => void
+  /** Grades the ended call; a newer grade() or call makes an in-flight result moot. */
+  grade: (transcript: GradeTurn[], agent?: unknown) => Promise<void>
 }
+
+let gradeSeq = 0
 
 const fresh = {
   error: null,
@@ -75,6 +89,7 @@ const fresh = {
   collected: {},
   endReason: null,
   decisions: [],
+  review: { status: 'idle' } as Review,
 }
 
 export const useCall = create<CallState>()((set, get) => ({
@@ -119,6 +134,25 @@ export const useCall = create<CallState>()((set, get) => ({
       case 'resolver_decision':
         set({ decisions: [...get().decisions, { ...event.decision, at: Date.now() }] })
         break
+    }
+  },
+
+  grade: async (transcript, agent) => {
+    const { status, attempt, decisions, collected } = get()
+    if (status !== 'ended' || transcript.length === 0) return
+    const seq = ++gradeSeq
+    const current = () => seq === gradeSeq && get().attempt === attempt && get().status === 'ended'
+    set({ review: { status: 'grading' } })
+    try {
+      const result = await api.grade({
+        agent,
+        transcript,
+        decisions: decisions.map((d) => ({ status: d.status, say: d.say, offers: d.offers, reason: d.reason })),
+        collected,
+      })
+      if (current()) set({ review: { status: 'done', result } })
+    } catch (err) {
+      if (current()) set({ review: { status: 'error', message: err instanceof Error ? err.message : 'Grading failed.' } })
     }
   },
 }))

@@ -12,6 +12,7 @@ import { useEditor } from '../../store/editor'
 import { IconButton } from '../ui/Button'
 import { PanelHeader } from '../inspector/Panel'
 import { Tabs } from '../ui/Tabs'
+import { CallReview } from './CallReview'
 import { CollectedData } from './CollectedData'
 import { Decisions } from './Decisions'
 import { Transcript } from './Transcript'
@@ -130,6 +131,7 @@ export function TestCallPanel() {
           <CallCaption status={status} error={error} />
         )}
         {status === 'live' && <MicToggle />}
+        <CallReview />
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col border-t border-border-subtle bg-surface/60">

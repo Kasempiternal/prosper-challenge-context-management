@@ -1,4 +1,5 @@
 import type { AgentConfig, AgentNode, AgentSummary, ValidationIssue, Voice } from '../types/agent'
+import type { CheckName, GradeOutcome, GradeRequest, GradeResult } from '../types/grade'
 
 export class ApiError extends Error {
   readonly status: number
@@ -54,6 +55,33 @@ async function request(path: string, init?: RequestInit): Promise<Response> {
 
 const json = (value: unknown) => JSON.stringify(value)
 
+const OUTCOMES: GradeOutcome[] = ['booked', 'refused_correctly', 'handed_off', 'abandoned', 'unclear']
+const CHECKS: CheckName[] = ['booked_correctly', 'unnecessary_questions', 'unsupported_claims']
+const malformedGrade = () => new ApiError(0, 'JEV returned a malformed grade')
+const prob = (v: unknown): number => {
+  if (typeof v !== 'number' || !(v >= 0 && v <= 1)) throw malformedGrade()
+  return v
+}
+
+export function parseGrade(raw: unknown): GradeResult {
+  if (!isRecord(raw) || !isRecord(raw.scores)) throw malformedGrade()
+  const scores = raw.scores
+  const sub = (k: string) => (isRecord(scores[k]) ? scores[k] : {})
+  const outcome = sub('outcome')
+  const choice = OUTCOMES.find((o) => o === outcome.choice)
+  const effort = sub('caller_effort').level
+  if (!choice || typeof effort !== 'number' || !(effort >= 1 && effort <= 5)) throw malformedGrade()
+  const usage = isRecord(raw.usage) ? raw.usage : {}
+  return {
+    checks: Object.fromEntries(CHECKS.map((c) => [c, prob(sub(c).p)])) as Record<CheckName, number>,
+    effort,
+    outcome: { choice, confidence: prob(outcome.confidence) },
+    inputTokens: typeof usage.input_tokens === 'number' ? usage.input_tokens : 0,
+    usd: typeof usage.usd === 'number' ? usage.usd : 0,
+    ms: typeof raw.ms === 'number' ? raw.ms : 0,
+  }
+}
+
 export type SaveResult = { ok: true } | { ok: false; errors: ValidationIssue[] }
 
 export const api = {
@@ -94,5 +122,15 @@ export const api = {
   },
   async listModels(): Promise<string[]> {
     return (await request('/api/models')).json()
+  },
+  /** Errors carry the backend's `reason` (e.g. "JEV not configured") as the message. */
+  async grade(body: GradeRequest): Promise<GradeResult> {
+    const res = await fetch('/api/grade', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: json(body) })
+    const payload: unknown = await res.json().catch(() => null)
+    if (!res.ok) {
+      const reason = isRecord(payload) && typeof payload.reason === 'string' ? payload.reason : `Grading failed (${res.status})`
+      throw new ApiError(res.status, reason)
+    }
+    return parseGrade(payload)
   },
 }

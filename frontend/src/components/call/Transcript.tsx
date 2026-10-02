@@ -1,13 +1,10 @@
-import { usePipecatConversation, type BotOutputText, type ConversationMessage } from '@pipecat-ai/client-react'
+import { usePipecatConversation, type ConversationMessage } from '@pipecat-ai/client-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { ArrowRight, MessageSquareText } from 'lucide-react'
-import { isValidElement, useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 import { softSpring } from '../../lib/motion'
-
-function isBotText(text: unknown): text is BotOutputText {
-  return typeof text === 'object' && text !== null && !isValidElement(text) && 'spoken' in text
-}
+import { isBotText, plainText } from './messageText'
 
 function MessageText({ message }: { message: ConversationMessage }) {
   return (
@@ -34,12 +31,6 @@ function MessageText({ message }: { message: ConversationMessage }) {
   )
 }
 
-function plainText(message: ConversationMessage): string {
-  return message.parts
-    .map((part) => (typeof part.text === 'string' ? part.text : isBotText(part.text) ? part.text.spoken : ''))
-    .join(' ')
-    .trim()
-}
 
 export function Transcript() {
   const { messages } = usePipecatConversation()

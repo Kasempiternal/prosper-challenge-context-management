@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseFlowEvent, useCall } from './call'
 
 const ingestRaw = (raw: unknown) => {
@@ -88,5 +88,118 @@ describe('resolver_decision', () => {
     expect(ingestRaw({ type: 'resolver_decision', say: 'no status' })).toBeNull()
     expect(ingestRaw(null)).toBeNull()
     expect(useCall.getState().decisions).toEqual([])
+  })
+})
+
+// Response shape from backend/grader.py, values from a live JEV run.
+const GRADE_OK = {
+  ok: true,
+  scores: {
+    booked_correctly: { p: 0.88 },
+    unnecessary_questions: { p: 0.39 },
+    unsupported_claims: { p: 0.61 },
+    caller_effort: { level: 1.05, probabilities: { '1': 0.95, '2': 0.05, '3': 0, '4': 0, '5': 0 }, confidence: 0.95 },
+    outcome: { choice: 'booked', confidence: 1, probabilities: { booked: 1 } },
+  },
+  usage: { input_tokens: 847, output_tokens: 137, usd: 0.00003388 },
+  ms: 637,
+}
+const TURNS = [
+  { role: 'user' as const, text: 'Cardiology with Dr. Chen, soonest.' },
+  { role: 'bot' as const, text: 'Dr. Emily Chen has tomorrow at 8 at Downtown.' },
+]
+
+function endedCall() {
+  const call = useCall.getState()
+  call.begin()
+  call.connected()
+  ingestRaw(OFFER)
+  call.ingest({ type: 'node_entered', node: 'schedule', state: { visit: 'Cardiology Consultation' } })
+  call.end()
+}
+
+function mockFetch(status: number, body: unknown) {
+  let release: () => void = () => {}
+  const gate = new Promise<void>((r) => (release = r))
+  const fetch = vi.fn(async () => {
+    await gate
+    return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+  })
+  vi.stubGlobal('fetch', fetch)
+  return { fetch, release }
+}
+
+describe('grade', () => {
+  beforeEach(() => useCall.getState().reset())
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('idle -> grading -> done, posting the transcript, decisions and collected data', async () => {
+    endedCall()
+    const { fetch, release } = mockFetch(200, GRADE_OK)
+    expect(useCall.getState().review).toEqual({ status: 'idle' })
+
+    const done = useCall.getState().grade(TURNS, { name: 'Clinic' })
+    expect(useCall.getState().review).toEqual({ status: 'grading' })
+    release()
+    await done
+
+    expect(useCall.getState().review).toEqual({
+      status: 'done',
+      result: {
+        checks: { booked_correctly: 0.88, unnecessary_questions: 0.39, unsupported_claims: 0.61 },
+        effort: 1.05,
+        outcome: { choice: 'booked', confidence: 1 },
+        inputTokens: 847,
+        usd: 0.00003388,
+        ms: 637,
+      },
+    })
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/grade')
+    expect(JSON.parse(init.body as string)).toEqual({
+      agent: { name: 'Clinic' },
+      transcript: TURNS,
+      decisions: [{ status: 'offer', say: OFFER.say, offers: OFFER.offers, reason: null }],
+      collected: { visit: 'Cardiology Consultation' },
+    })
+  })
+
+  it('grading -> error with the backend reason', async () => {
+    endedCall()
+    const { release } = mockFetch(503, { ok: false, reason: 'JEV not configured' })
+    const done = useCall.getState().grade(TURNS)
+    release()
+    await done
+    expect(useCall.getState().review).toEqual({ status: 'error', message: 'JEV not configured' })
+  })
+
+  it('a malformed grade is an error, not a crash', async () => {
+    endedCall()
+    const { release } = mockFetch(200, { ok: true, scores: { outcome: { choice: 'teleported' } } })
+    const done = useCall.getState().grade(TURNS)
+    release()
+    await done
+    expect(useCall.getState().review).toEqual({ status: 'error', message: 'JEV returned a malformed grade' })
+  })
+
+  it('does nothing while the call is live or with an empty transcript', async () => {
+    const { fetch } = mockFetch(200, GRADE_OK)
+    useCall.getState().begin()
+    await useCall.getState().grade(TURNS)
+    useCall.getState().end()
+    await useCall.getState().grade([])
+    expect(fetch).not.toHaveBeenCalled()
+    expect(useCall.getState().review).toEqual({ status: 'idle' })
+  })
+
+  it('a new call discards an in-flight grade', async () => {
+    endedCall()
+    const { release } = mockFetch(200, GRADE_OK)
+    const done = useCall.getState().grade(TURNS)
+    useCall.getState().begin()
+    release()
+    await done
+    expect(useCall.getState().review).toEqual({ status: 'idle' })
   })
 })

@@ -19,8 +19,10 @@ from fastapi import APIRouter, Body, HTTPException, Response
 from fastapi.responses import JSONResponse
 from loguru import logger
 
+import grader
 from agent_builder import validate_agent
 from agent_builder.schema import DEFAULT_MODEL, DEFAULT_VOICE_ID
+from scheduling.jev import JevClient
 
 BACKEND_DIR = Path(__file__).parent
 DEFAULT_AGENTS_DIR = BACKEND_DIR / "agents"
@@ -80,7 +82,7 @@ def agents_dir_from_env() -> Path:
     return Path(os.environ.get("AGENTS_DIR") or DEFAULT_AGENTS_DIR)
 
 
-def create_router(agents_dir: Optional[Path] = None) -> APIRouter:
+def create_router(agents_dir: Optional[Path] = None, jev: Optional[JevClient] = None) -> APIRouter:
     agents_dir = Path(agents_dir) if agents_dir else agents_dir_from_env()
     seed_agents_dir(agents_dir)
     router = APIRouter(prefix="/api")
@@ -197,6 +199,21 @@ def create_router(agents_dir: Optional[Path] = None) -> APIRouter:
     def validate(agent: Any = Body(...)) -> dict:
         errors = validate_agent(agent)
         return {"ok": not errors, "errors": errors}
+
+    @router.post("/grade")
+    def grade(payload: Any = Body(...)):
+        nonlocal jev
+        try:
+            req = grader.parse_request(payload)
+            agent = req.agent
+            if agent is None and req.agent_id:
+                if not ID_RE.match(req.agent_id) or not agent_path(req.agent_id).is_file():
+                    raise grader.GradeError(422, f"agent_id: agent '{req.agent_id}' not found")
+                agent = read_agent(req.agent_id)
+            jev = jev or grader.client_from_env()
+            return grader.grade(jev, req, agent)
+        except grader.GradeError as e:
+            return JSONResponse(status_code=e.status, content={"ok": False, "reason": e.reason})
 
     @router.get("/voices")
     def voices() -> list[dict]:
