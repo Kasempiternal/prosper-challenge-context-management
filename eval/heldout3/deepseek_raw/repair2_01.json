@@ -1,0 +1,11 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h3-x03: Existing patient with no referral who has had heartburn and acid coming up almost every night for months; their regular doctor's pills did not help, so now they want a specialist for the stomach. They use the word 'specialist' but do not know the specialty's name. Fields: service_phrase = what the caller says they need, in their own words",
+ "response": "```json\n[\n  {\n    \"id\": \"h3-x03\",\n    \"service_phrase\": \"need a specialist for my stomach, the acid keeps comin' up at night and the pills from my regular doctor ain't helpin'\"\n  }\n]\n```\n",
+ "parsed": [
+  {
+   "id": "h3-x03",
+   "service_phrase": "need a specialist for my stomach, the acid keeps comin' up at night and the pills from my regular doctor ain't helpin'"
+  }
+ ]
+}

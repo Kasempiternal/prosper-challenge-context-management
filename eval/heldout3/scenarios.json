@@ -1,0 +1,2472 @@
+[
+ {
+  "id": "h3-01",
+  "category": "heldout3_type",
+  "kind": "test",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose heart doctor wants them to do the test where they walk on a treadmill while their heart is watched. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "stress"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_022"
+  },
+  "truth": {
+   "target": [
+    "appt_022"
+   ],
+   "type_names": [
+    "Stress Test"
+   ]
+  }
+ },
+ {
+  "id": "h3-02",
+  "category": "heldout3_type",
+  "kind": "test",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose doctor wants them to wear a small heart monitor at home for a day or two; they need to come in to have it put on. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "holter"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_024"
+  },
+  "truth": {
+   "target": [
+    "appt_024"
+   ],
+   "type_names": [
+    "Holter Monitor Fitting"
+   ]
+  }
+ },
+ {
+  "id": "h3-03",
+  "category": "heldout3_type",
+  "kind": "test",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose nerve doctor ordered a test that records their brain waves with wires stuck to the scalp. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "eeg",
+     "electroencephalo*"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_037"
+  },
+  "truth": {
+   "target": [
+    "appt_037"
+   ],
+   "type_names": [
+    "EEG"
+   ]
+  }
+ },
+ {
+  "id": "h3-04",
+  "category": "heldout3_type",
+  "kind": "test",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants the scratch test on their back to find out exactly what they are allergic to.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "scratch*"
+     ]
+    ],
+    "must_not": [
+     "skin test*"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_081"
+  },
+  "truth": {
+   "target": [
+    "appt_081"
+   ],
+   "type_names": [
+    "Allergy Skin Testing"
+   ]
+  }
+ },
+ {
+  "id": "h3-05",
+  "category": "heldout3_type",
+  "kind": "test",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose doctor wants their blood taken first thing in the morning before they have eaten anything. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "fasting",
+     "fast"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_073",
+   "location_ids": [
+    "loc_000"
+   ]
+  },
+  "truth": {
+   "target": [
+    "appt_073"
+   ],
+   "type_names": [
+    "Fasting Blood Test"
+   ]
+  }
+ },
+ {
+  "id": "h3-06",
+  "category": "heldout3_type",
+  "kind": "test",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose doctor ordered an MRI of their lower back.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "mri"
+     ]
+    ],
+    "must_not": [
+     "spine",
+     "spinal"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_064",
+   "location_ids": [
+    "loc_004",
+    "loc_005"
+   ]
+  },
+  "truth": {
+   "target": [
+    "appt_064"
+   ],
+   "type_names": [
+    "MRI - Spine"
+   ]
+  }
+ },
+ {
+  "id": "h3-07",
+  "category": "heldout3_type",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose hands have started shaking when they hold a cup, and it is getting worse. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "neuro*"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_036"
+  },
+  "truth": {
+   "target": [
+    "appt_036"
+   ],
+   "type_names": [
+    "Neurology Consultation"
+   ]
+  }
+ },
+ {
+  "id": "h3-08",
+  "category": "heldout3_type",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose voice has been hoarse for a month and whose throat feels like something is stuck in it. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "ent",
+     "otolaryng*",
+     "ear, nose"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_050"
+  },
+  "truth": {
+   "target": [
+    "appt_050"
+   ],
+   "type_names": [
+    "ENT Consultation"
+   ]
+  }
+ },
+ {
+  "id": "h3-09",
+  "category": "heldout3_type",
+  "kind": "symptom",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A new patient who just cut their hand badly in the kitchen, thinks it needs stitches and wants to be seen today. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "urgent"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_008",
+   "provider_ids": [
+    "prov_002",
+    "prov_003",
+    "prov_004",
+    "prov_008",
+    "prov_009",
+    "prov_012",
+    "prov_013",
+    "prov_016",
+    "prov_021",
+    "prov_030",
+    "prov_031",
+    "prov_032",
+    "prov_040",
+    "prov_041",
+    "prov_042",
+    "prov_044",
+    "prov_045",
+    "prov_047"
+   ]
+  },
+  "truth": {
+   "target": [
+    "appt_008"
+   ],
+   "type_names": [
+    "Urgent Care Visit"
+   ]
+  }
+ },
+ {
+  "id": "h3-10",
+  "category": "heldout3_type",
+  "kind": "symptom",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A new patient: a parent whose 3-year-old daughter has had a fever since last night and keeps tugging at her ear. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "pediatric*",
+     "sick"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_017"
+  },
+  "truth": {
+   "target": [
+    "appt_017"
+   ],
+   "type_names": [
+    "Pediatric Sick Visit"
+   ]
+  }
+ },
+ {
+  "id": "h3-11",
+  "category": "heldout3_type",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who broke their wrist six weeks ago; the bone doctor wants to see how it is healing. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "fracture*"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_034"
+  },
+  "truth": {
+   "target": [
+    "appt_034"
+   ],
+   "type_names": [
+    "Fracture Follow-up"
+   ]
+  }
+ },
+ {
+  "id": "h3-12",
+  "category": "heldout3_type",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who was given a prescription cream for their pimples and breakouts and needs to check back in about it. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "acne",
+     "dermatolog*"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_030"
+  },
+  "truth": {
+   "target": [
+    "appt_030"
+   ],
+   "type_names": [
+    "Acne Follow-up"
+   ]
+  }
+ },
+ {
+  "id": "h3-13",
+  "category": "heldout3_type",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who is having their gallbladder taken out next month; the surgeon needs their regular doctor to clear them for surgery first. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "pre-op*",
+     "preop*",
+     "evaluation"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_014"
+  },
+  "truth": {
+   "target": [
+    "appt_014"
+   ],
+   "type_names": [
+    "Pre-operative Evaluation"
+   ]
+  }
+ },
+ {
+  "id": "h3-14",
+  "category": "heldout3_type",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose regular doctor says their hormone levels are off and wants them to see a specialist for hormones and glands. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "endocrin*",
+     "thyroid"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_056"
+  },
+  "truth": {
+   "target": [
+    "appt_056"
+   ],
+   "type_names": [
+    "Endocrinology Consultation"
+   ]
+  }
+ },
+ {
+  "id": "h3-15",
+  "category": "heldout3_type",
+  "kind": "colloquial",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants a mole on their back cut off.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "removal",
+     "remove*"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_029",
+   "location_ids": [
+    "loc_000",
+    "loc_006",
+    "loc_007"
+   ]
+  },
+  "truth": {
+   "target": [
+    "appt_029"
+   ],
+   "type_names": [
+    "Mole Removal"
+   ]
+  }
+ },
+ {
+  "id": "h3-16",
+  "category": "heldout3_type",
+  "kind": "colloquial",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who gets a cortisone shot in their arthritic knee every few months and is due for the next one. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "injection*",
+     "joint"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_033"
+  },
+  "truth": {
+   "target": [
+    "appt_033"
+   ],
+   "type_names": [
+    "Joint Injection"
+   ]
+  }
+ },
+ {
+  "id": "h3-17",
+  "category": "heldout3_type",
+  "kind": "colloquial",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who already sees the nerve doctor here for their migraines and needs their next check-in about them.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "migraine*"
+     ]
+    ],
+    "must_not": [
+     "headache*",
+     "neuro*"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_038"
+  },
+  "truth": {
+   "target": [
+    "appt_038"
+   ],
+   "type_names": [
+    "Headache Follow-up"
+   ]
+  }
+ },
+ {
+  "id": "h3-18",
+  "category": "heldout3_type",
+  "kind": "colloquial",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who sees a counselor here every week to talk through their anxiety and needs to book the next weekly talk session.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "therap*",
+     "psychiatr*"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_060"
+  },
+  "truth": {
+   "target": [
+    "appt_060"
+   ],
+   "type_names": [
+    "Therapy Session"
+   ]
+  }
+ },
+ {
+  "id": "h3-19",
+  "category": "heldout3_type",
+  "kind": "colloquial",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose psychiatrist prescribes their antidepressant; they need a short visit to check the dose and keep the prescription going.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "management"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_061"
+  },
+  "truth": {
+   "target": [
+    "appt_061"
+   ],
+   "type_names": [
+    "Medication Management"
+   ]
+  }
+ },
+ {
+  "id": "h3-20",
+  "category": "heldout3_type",
+  "kind": "colloquial",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who takes about eight different pills from different doctors and wants their regular doctor to go through the whole list with them.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "review"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_009"
+  },
+  "truth": {
+   "target": [
+    "appt_009"
+   ],
+   "type_names": [
+    "Medication Review"
+   ]
+  }
+ },
+ {
+  "id": "h3-21",
+  "category": "heldout3_type",
+  "kind": "colloquial",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A new patient: a parent whose son is turning 18 months and needs his regular checkup for that age. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "well-child",
+     "well child",
+     "well-baby",
+     "well baby"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_015"
+  },
+  "truth": {
+   "target": [
+    "appt_015"
+   ],
+   "type_names": [
+    "Well-Child Visit"
+   ]
+  }
+ },
+ {
+  "id": "h3-22",
+  "category": "heldout3_type",
+  "kind": "colloquial",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient on Medicare who wants the once-a-year visit that Medicare covers for seniors; they mention Medicare.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "medicare"
+     ]
+    ],
+    "must_not": [
+     "wellness",
+     "physical"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_003"
+  },
+  "truth": {
+   "target": [
+    "appt_003"
+   ],
+   "type_names": [
+    "Annual Wellness Visit"
+   ]
+  }
+ },
+ {
+  "id": "h3-23",
+  "category": "heldout3_type",
+  "kind": "colloquial",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose stomach doctor wants to put a camera down their throat to look at their stomach. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "endoscop*",
+     "egd",
+     "scope"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_055"
+  },
+  "truth": {
+   "target": [
+    "appt_055"
+   ],
+   "type_names": [
+    "Endoscopy Consultation"
+   ]
+  }
+ },
+ {
+  "id": "h3-24",
+  "category": "heldout3_type",
+  "kind": "abbreviation",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A new patient who needs a tetanus booster because it has been more than ten years; they call it 'Tdap'.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "tdap"
+     ]
+    ],
+    "must_not": [
+     "vaccin*",
+     "immuniz*"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_010",
+   "provider_ids": [
+    "prov_002",
+    "prov_003",
+    "prov_004",
+    "prov_008",
+    "prov_009",
+    "prov_012",
+    "prov_013",
+    "prov_016",
+    "prov_021",
+    "prov_030",
+    "prov_031",
+    "prov_032",
+    "prov_040",
+    "prov_041",
+    "prov_042",
+    "prov_044",
+    "prov_045",
+    "prov_047"
+   ]
+  },
+  "truth": {
+   "target": [
+    "appt_010"
+   ],
+   "type_names": [
+    "Vaccination / Immunization"
+   ]
+  }
+ },
+ {
+  "id": "h3-25",
+  "category": "heldout3_type",
+  "kind": "abbreviation",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose doctor ordered a CBC blood test; they say 'CBC'.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "cbc"
+     ]
+    ],
+    "must_not": [
+     "lab work",
+     "draw"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_072",
+   "location_ids": [
+    "loc_000"
+   ]
+  },
+  "truth": {
+   "target": [
+    "appt_072"
+   ],
+   "type_names": [
+    "Blood Draw / Lab Work"
+   ]
+  }
+ },
+ {
+  "id": "h3-26",
+  "category": "heldout3_type",
+  "kind": "slang",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "An older existing patient whose doctor ordered pictures of their lungs; they call it 'chest films'.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "films"
+     ]
+    ],
+    "must_not": [
+     "x-ray*",
+     "xray*",
+     "x ray*"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_062",
+   "location_ids": [
+    "loc_004",
+    "loc_005"
+   ]
+  },
+  "truth": {
+   "target": [
+    "appt_062"
+   ],
+   "type_names": [
+    "X-Ray"
+   ]
+  }
+ },
+ {
+  "id": "h3-27",
+  "category": "heldout3_type",
+  "kind": "slang",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose doctor ordered the big magnet scan of their knee; they call it 'the magnet scan' and never say MRI.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "magnet*"
+     ],
+     [
+      "knee"
+     ]
+    ],
+    "must_not": [
+     "mri"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_065",
+   "location_ids": [
+    "loc_004",
+    "loc_005"
+   ]
+  },
+  "truth": {
+   "target": [
+    "appt_065"
+   ],
+   "type_names": [
+    "MRI - Knee"
+   ]
+  }
+ },
+ {
+  "id": "h3-28",
+  "category": "heldout3_type",
+  "kind": "slang",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose doctor ordered a sonogram of their thyroid; they say 'sonogram'.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "sonogram"
+     ]
+    ],
+    "must_not": [
+     "ultrasound"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_067",
+   "location_ids": [
+    "loc_004",
+    "loc_005"
+   ]
+  },
+  "truth": {
+   "target": [
+    "appt_067"
+   ],
+   "type_names": [
+    "Ultrasound"
+   ]
+  }
+ },
+ {
+  "id": "h3-29",
+  "category": "heldout3_type",
+  "kind": "slang",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants her yearly checkup with the gynecologist; she calls it her 'yearly with the gyno'.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "gyno"
+     ]
+    ],
+    "must_not": [
+     "well-woman",
+     "well woman",
+     "pap"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_041"
+  },
+  "truth": {
+   "target": [
+    "appt_041"
+   ],
+   "type_names": [
+    "Annual Well-Woman Exam"
+   ]
+  }
+ },
+ {
+  "id": "h3-30",
+  "category": "heldout3_type",
+  "kind": "ask_two",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose doctor ordered an MRI. They do not say which body part.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "mri"
+     ]
+    ],
+    "must_not": [
+     "brain",
+     "spine",
+     "knee",
+     "back",
+     "head",
+     "neck",
+     "leg",
+     "shoulder",
+     "hip"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "ask",
+   "ask_field": "service",
+   "ask_options": [
+    "appt_063",
+    "appt_064",
+    "appt_065"
+   ]
+  },
+  "truth": {
+   "target": [
+    "appt_063",
+    "appt_064",
+    "appt_065"
+   ],
+   "type_names": [
+    "MRI - Brain",
+    "MRI - Spine",
+    "MRI - Knee"
+   ]
+  }
+ },
+ {
+  "id": "h3-31",
+  "category": "heldout3_type",
+  "kind": "ask_two",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient whose stomach doctor said they need a scope, but they do not remember whether it goes down the throat or in from below.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "scope"
+     ]
+    ],
+    "must_not": [
+     "colonoscop*",
+     "endoscop*",
+     "colon"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "ask",
+   "ask_field": "service",
+   "ask_options": [
+    "appt_054",
+    "appt_055"
+   ]
+  },
+  "truth": {
+   "target": [
+    "appt_054",
+    "appt_055"
+   ],
+   "type_names": [
+    "Colonoscopy Consultation",
+    "Endoscopy Consultation"
+   ]
+  }
+ },
+ {
+  "id": "h3-32",
+  "category": "heldout3_type",
+  "kind": "ask_two",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants their yearly all-over skin check to look for signs of skin cancer.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "screening",
+     "full body",
+     "full-body",
+     "exam"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "ask",
+   "ask_field": "service",
+   "ask_options": [
+    "appt_027",
+    "appt_028"
+   ]
+  },
+  "truth": {
+   "target": [
+    "appt_027",
+    "appt_028"
+   ],
+   "type_names": [
+    "Skin Cancer Screening",
+    "Full Body Skin Exam"
+   ]
+  }
+ },
+ {
+  "id": "h3-33",
+  "category": "heldout3_type",
+  "kind": "ask_two",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing dental patient who is due for their regular six-month checkup at the dentist.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "cleaning",
+     "clean",
+     "exam"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "ask",
+   "ask_field": "service",
+   "ask_options": [
+    "appt_074",
+    "appt_075"
+   ]
+  },
+  "truth": {
+   "target": [
+    "appt_074",
+    "appt_075"
+   ],
+   "type_names": [
+    "Dental Cleaning",
+    "Dental Exam"
+   ]
+  }
+ },
+ {
+  "id": "h3-34",
+  "category": "heldout3_type",
+  "kind": "not_offered",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who just had shoulder surgery and needs to start PT; they say 'PT'.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "pt"
+     ]
+    ],
+    "must_not": [
+     "physical therapy"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_code": "not_offered"
+  },
+  "truth": {
+   "target": [
+    "appt_070"
+   ],
+   "type_names": [
+    "Physical Therapy Evaluation"
+   ]
+  }
+ },
+ {
+  "id": "h3-35",
+  "category": "heldout3_type",
+  "kind": "not_offered",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who keeps getting up at night to pee; their doctor told them to get their prostate looked at by a specialist. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "urolog*"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_code": "not_offered"
+  },
+  "truth": {
+   "target": [
+    "appt_077"
+   ],
+   "type_names": [
+    "Urology Consultation"
+   ]
+  }
+ },
+ {
+  "id": "h3-x01",
+  "category": "heldout3_policy",
+  "kind": "new_patient_type",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A brand-new patient who has never been seen here wants a cortisone shot in their knee; an outside doctor referred them.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "injection*",
+     "joint"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_code": "new_patient_type"
+  },
+  "truth": {
+   "target": [
+    "appt_033"
+   ],
+   "type_names": [
+    "Joint Injection"
+   ]
+  }
+ },
+ {
+  "id": "h3-x02",
+  "category": "heldout3_policy",
+  "kind": "new_patient_type",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A brand-new patient who has never been seen here needs an X-ray of their ankle; an outside doctor referred them.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": []
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_code": "new_patient_type"
+  },
+  "truth": {
+   "target": [
+    "appt_062"
+   ],
+   "type_names": [
+    "X-Ray"
+   ]
+  }
+ },
+ {
+  "id": "h3-x03",
+  "category": "heldout3_policy",
+  "kind": "referral",
+  "patient": {
+   "is_new": false,
+   "has_referral": false
+  },
+  "situation": "Existing patient with no referral who has had heartburn and acid coming up almost every night for months; their regular doctor's pills did not help, so now they want a specialist for the stomach. They use the word 'specialist' but do not know the specialty's name.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     [
+      "specialist"
+     ]
+    ],
+    "must_not": [
+     "gastro*",
+     "gi"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_code": "referral"
+  },
+  "truth": {
+   "target": [
+    "appt_053"
+   ],
+   "type_names": [
+    "GI Consultation"
+   ]
+  }
+ },
+ {
+  "id": "h3-x04",
+  "category": "heldout3_policy",
+  "kind": "new_patient_provider",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A brand-new patient whose outside doctor found hormone problems in their blood tests and referred them to a specialist for hormones and glands. They do not know the medical name for it.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": [
+     "endocrin*",
+     "thyroid"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_code": "new_patient_provider"
+  },
+  "truth": {
+   "target": [
+    "appt_056"
+   ],
+   "type_names": [
+    "Endocrinology Consultation"
+   ]
+  }
+ },
+ {
+  "id": "h3-x05",
+  "category": "heldout3_policy",
+  "kind": "new_patient_provider",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A brand-new patient who just moved here and wants to start seeing a gynecologist at this clinic.",
+  "fields": {
+   "service_phrase": "what the caller says they need, in their own words"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [],
+    "must_not": []
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_code": "new_patient_provider"
+  },
+  "truth": {
+   "target": [
+    "appt_040"
+   ],
+   "type_names": [
+    "OB/GYN New Patient Visit"
+   ]
+  }
+ },
+ {
+  "id": "h3-p01",
+  "category": "heldout3_provider",
+  "kind": "specialty",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants a medication management with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: Dr. Smith, and that it is the psychiatrist (no first name)"
+  },
+  "fixed": {
+   "service_phrase": "medication management"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "smith"
+     ],
+     [
+      "psychiatr*"
+     ]
+    ],
+    "must_not": [
+     "daniel",
+     "fatima",
+     "wei"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "ask",
+   "ask_field": "provider",
+   "ask_options": [
+    "prov_006",
+    "prov_011"
+   ]
+  },
+  "truth": {
+   "surname": [
+    "prov_006",
+    "prov_011",
+    "prov_035"
+   ],
+   "fits_clue": [
+    "prov_006",
+    "prov_011"
+   ],
+   "offers_type": [
+    "prov_006",
+    "prov_011"
+   ],
+   "valid": [
+    "prov_006",
+    "prov_011"
+   ]
+  }
+ },
+ {
+  "id": "h3-p02",
+  "category": "heldout3_provider",
+  "kind": "specialty",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A brand-new patient who wants a psychiatric evaluation with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: Dr. Smith, and that it is the psychiatrist (no first name)"
+  },
+  "fixed": {
+   "service_phrase": "psychiatric evaluation"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "smith"
+     ],
+     [
+      "psychiatr*"
+     ]
+    ],
+    "must_not": [
+     "daniel",
+     "fatima",
+     "wei"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_059",
+   "provider_ids": [
+    "prov_011"
+   ]
+  },
+  "truth": {
+   "surname": [
+    "prov_006",
+    "prov_011",
+    "prov_035"
+   ],
+   "fits_clue": [
+    "prov_006",
+    "prov_011"
+   ],
+   "offers_type": [
+    "prov_006",
+    "prov_011"
+   ],
+   "valid": [
+    "prov_011"
+   ]
+  }
+ },
+ {
+  "id": "h3-p03",
+  "category": "heldout3_provider",
+  "kind": "title",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants a sick visit with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: Dr. Hernandez, and that it is the nurse practitioner (no first name)"
+  },
+  "fixed": {
+   "service_phrase": "sick visit"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "hernandez"
+     ],
+     [
+      "nurse practitioner",
+      "np",
+      "n.p."
+     ]
+    ],
+    "must_not": [
+     "fatima",
+     "patricia",
+     "tomas"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_007",
+   "provider_ids": [
+    "prov_025"
+   ]
+  },
+  "truth": {
+   "surname": [
+    "prov_009",
+    "prov_025",
+    "prov_049"
+   ],
+   "fits_clue": [
+    "prov_025"
+   ],
+   "offers_type": [
+    "prov_025"
+   ],
+   "valid": [
+    "prov_025"
+   ]
+  }
+ },
+ {
+  "id": "h3-p04",
+  "category": "heldout3_provider",
+  "kind": "title",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A brand-new patient who wants a sick visit with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: Dr. Hernandez, and that it is the nurse practitioner (no first name)"
+  },
+  "fixed": {
+   "service_phrase": "sick visit"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "hernandez"
+     ],
+     [
+      "nurse practitioner",
+      "np",
+      "n.p."
+     ]
+    ],
+    "must_not": [
+     "fatima",
+     "patricia",
+     "tomas"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_code": "new_patient_provider"
+  },
+  "truth": {
+   "surname": [
+    "prov_009",
+    "prov_025",
+    "prov_049"
+   ],
+   "fits_clue": [
+    "prov_025"
+   ],
+   "offers_type": [
+    "prov_025"
+   ],
+   "valid": []
+  }
+ },
+ {
+  "id": "h3-p05",
+  "category": "heldout3_provider",
+  "kind": "language",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants a annual wellness visit with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: Dr. Hernandez, the one who speaks Spanish (no first name)"
+  },
+  "fixed": {
+   "service_phrase": "annual wellness visit"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "hernandez"
+     ],
+     [
+      "spanish"
+     ]
+    ],
+    "must_not": [
+     "fatima",
+     "patricia",
+     "tomas"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_003",
+   "provider_ids": [
+    "prov_009"
+   ]
+  },
+  "truth": {
+   "surname": [
+    "prov_009",
+    "prov_025",
+    "prov_049"
+   ],
+   "fits_clue": [
+    "prov_009",
+    "prov_049"
+   ],
+   "offers_type": [
+    "prov_009"
+   ],
+   "valid": [
+    "prov_009"
+   ]
+  }
+ },
+ {
+  "id": "h3-p06",
+  "category": "heldout3_provider",
+  "kind": "full_name",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants a an EKG with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: the doctor's full name, Dr. Linda Ramirez, and nothing else about her"
+  },
+  "fixed": {
+   "service_phrase": "an EKG"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "linda"
+     ],
+     [
+      "ramirez"
+     ]
+    ],
+    "must_not": [
+     "priya"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_023",
+   "provider_ids": [
+    "prov_005"
+   ]
+  },
+  "truth": {
+   "surname": [
+    "prov_005",
+    "prov_014",
+    "prov_021"
+   ],
+   "fits_clue": [
+    "prov_005",
+    "prov_014"
+   ],
+   "offers_type": [
+    "prov_005"
+   ],
+   "valid": [
+    "prov_005"
+   ]
+  }
+ },
+ {
+  "id": "h3-p07",
+  "category": "heldout3_provider",
+  "kind": "language",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants a sick visit with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: Dr. Michael Sato, the one who speaks Vietnamese"
+  },
+  "fixed": {
+   "service_phrase": "sick visit"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "michael"
+     ],
+     [
+      "sato"
+     ],
+     [
+      "vietnamese"
+     ]
+    ],
+    "must_not": [
+     "leila",
+     "olivia",
+     "omar",
+     "wei"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_007",
+   "provider_ids": [
+    "prov_032"
+   ]
+  },
+  "truth": {
+   "surname": [
+    "prov_026",
+    "prov_029",
+    "prov_032",
+    "prov_038",
+    "prov_040",
+    "prov_048"
+   ],
+   "fits_clue": [
+    "prov_032"
+   ],
+   "offers_type": [
+    "prov_032"
+   ],
+   "valid": [
+    "prov_032"
+   ]
+  }
+ },
+ {
+  "id": "h3-p08",
+  "category": "heldout3_provider",
+  "kind": "gender",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants a flu shot with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: Dr. Garcia, making clear the doctor is a man, e.g. 'he' or 'the male one' (no first name)"
+  },
+  "fixed": {
+   "service_phrase": "flu shot"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "garcia"
+     ],
+     [
+      "he",
+      "him",
+      "his",
+      "man",
+      "male",
+      "guy",
+      "gentleman"
+     ]
+    ],
+    "must_not": [
+     "carlos",
+     "maria"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_011",
+   "provider_ids": [
+    "prov_008"
+   ]
+  },
+  "truth": {
+   "surname": [
+    "prov_002",
+    "prov_003",
+    "prov_008"
+   ],
+   "fits_clue": [
+    "prov_008"
+   ],
+   "offers_type": [
+    "prov_008"
+   ],
+   "valid": [
+    "prov_008"
+   ]
+  }
+ },
+ {
+  "id": "h3-p09",
+  "category": "heldout3_provider",
+  "kind": "gender",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants a annual physical with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: Dr. Patel, making clear the doctor is a woman, e.g. 'she' or 'the lady doctor' (no first name)"
+  },
+  "fixed": {
+   "service_phrase": "annual physical"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "patel"
+     ],
+     [
+      "she",
+      "her",
+      "woman",
+      "lady",
+      "female"
+     ]
+    ],
+    "must_not": [
+     "andre",
+     "fatima",
+     "kenji",
+     "olivia",
+     "sofia"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "ask",
+   "ask_field": "provider",
+   "ask_options": [
+    "prov_042",
+    "prov_045"
+   ]
+  },
+  "truth": {
+   "surname": [
+    "prov_007",
+    "prov_031",
+    "prov_042",
+    "prov_044",
+    "prov_045"
+   ],
+   "fits_clue": [
+    "prov_007",
+    "prov_042",
+    "prov_045"
+   ],
+   "offers_type": [
+    "prov_042",
+    "prov_045"
+   ],
+   "valid": [
+    "prov_042",
+    "prov_045"
+   ]
+  }
+ },
+ {
+  "id": "h3-p10",
+  "category": "heldout3_provider",
+  "kind": "site",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants a follow-up visit with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: Dr. Nguyen, the one at the Midtown clinic (no first name)"
+  },
+  "fixed": {
+   "service_phrase": "follow-up visit"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "nguyen"
+     ],
+     [
+      "midtown"
+     ]
+    ],
+    "must_not": [
+     "carlos",
+     "daniel",
+     "elizabeth",
+     "hannah",
+     "jennifer",
+     "linda",
+     "maria",
+     "nina"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "ask",
+   "ask_field": "provider",
+   "ask_options": [
+    "prov_016",
+    "prov_030"
+   ]
+  },
+  "truth": {
+   "surname": [
+    "prov_015",
+    "prov_016",
+    "prov_023",
+    "prov_024",
+    "prov_028",
+    "prov_030",
+    "prov_036",
+    "prov_037"
+   ],
+   "fits_clue": [
+    "prov_015",
+    "prov_016",
+    "prov_023",
+    "prov_030",
+    "prov_037"
+   ],
+   "offers_type": [
+    "prov_016",
+    "prov_030"
+   ],
+   "valid": [
+    "prov_016",
+    "prov_030"
+   ]
+  }
+ },
+ {
+  "id": "h3-p11",
+  "category": "heldout3_provider",
+  "kind": "site",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants a medication review with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: Dr. Chen, the one at the North Gate clinic (no first name)"
+  },
+  "fixed": {
+   "service_phrase": "medication review"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "chen"
+     ],
+     [
+      "north gate"
+     ]
+    ],
+    "must_not": [
+     "daniel",
+     "david",
+     "emily",
+     "lucas",
+     "michael",
+     "nina",
+     "wei"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_009",
+   "provider_ids": [
+    "prov_004"
+   ],
+   "location_ids": [
+    "loc_003"
+   ]
+  },
+  "truth": {
+   "surname": [
+    "prov_000",
+    "prov_001",
+    "prov_004",
+    "prov_012",
+    "prov_039",
+    "prov_046",
+    "prov_047"
+   ],
+   "fits_clue": [
+    "prov_004",
+    "prov_039"
+   ],
+   "offers_type": [
+    "prov_004"
+   ],
+   "valid": [
+    "prov_004"
+   ]
+  }
+ },
+ {
+  "id": "h3-p12",
+  "category": "heldout3_provider",
+  "kind": "language",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants a pulmonology consultation with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: Dr. Nguyen, the one who speaks Mandarin (no first name)"
+  },
+  "fixed": {
+   "service_phrase": "pulmonology consultation"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "nguyen"
+     ],
+     [
+      "mandarin"
+     ]
+    ],
+    "must_not": [
+     "carlos",
+     "daniel",
+     "elizabeth",
+     "hannah",
+     "jennifer",
+     "linda",
+     "maria",
+     "nina"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_078",
+   "provider_ids": [
+    "prov_024"
+   ]
+  },
+  "truth": {
+   "surname": [
+    "prov_015",
+    "prov_016",
+    "prov_023",
+    "prov_024",
+    "prov_028",
+    "prov_030",
+    "prov_036",
+    "prov_037"
+   ],
+   "fits_clue": [
+    "prov_016",
+    "prov_024"
+   ],
+   "offers_type": [
+    "prov_024"
+   ],
+   "valid": [
+    "prov_024"
+   ]
+  }
+ },
+ {
+  "id": "h3-p13",
+  "category": "heldout3_provider",
+  "kind": "full_name",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A brand-new patient who wants a well-child visit with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: the doctor's full name, Dr. Maria Garcia, and nothing else about her"
+  },
+  "fixed": {
+   "service_phrase": "well-child visit"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "maria"
+     ],
+     [
+      "garcia"
+     ]
+    ],
+    "must_not": [
+     "carlos"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_015",
+   "provider_ids": [
+    "prov_002"
+   ]
+  },
+  "truth": {
+   "surname": [
+    "prov_002",
+    "prov_003",
+    "prov_008"
+   ],
+   "fits_clue": [
+    "prov_002",
+    "prov_003"
+   ],
+   "offers_type": [
+    "prov_002"
+   ],
+   "valid": [
+    "prov_002"
+   ]
+  }
+ },
+ {
+  "id": "h3-p14",
+  "category": "heldout3_provider",
+  "kind": "site",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants a flu shot with a specific doctor.",
+  "fields": {
+   "provider_phrase": "how the caller names the doctor: Dr. Michael Sato, the one at the Sunset clinic"
+  },
+  "fixed": {
+   "service_phrase": "flu shot"
+  },
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     [
+      "michael"
+     ],
+     [
+      "sato"
+     ],
+     [
+      "sunset"
+     ]
+    ],
+    "must_not": [
+     "leila",
+     "olivia",
+     "omar",
+     "wei"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "type_id": "appt_011",
+   "provider_ids": [
+    "prov_026"
+   ],
+   "location_ids": [
+    "loc_006"
+   ]
+  },
+  "truth": {
+   "surname": [
+    "prov_026",
+    "prov_029",
+    "prov_032",
+    "prov_038",
+    "prov_040",
+    "prov_048"
+   ],
+   "fits_clue": [
+    "prov_026"
+   ],
+   "offers_type": [
+    "prov_026"
+   ],
+   "valid": [
+    "prov_026"
+   ]
+  }
+ }
+]

@@ -1,0 +1,73 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat3-sym-07: Existing patient (has any referral needed) who has shoulder pain when reaching overhead and cannot sleep on that side. They do not know which kind of doctor they need. They are in Indianapolis. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Indianapolis\n- id nat3-sym-08: Existing patient (has any referral needed) who feels their heart skip beats and flutter several times a day. They do not know which kind of doctor they need. They are in San Diego. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: San Diego\n- id nat3-dup-01: Existing patient who wants Flu Shot with Dr. Scott Miller. They do not say where at first; asked which city, they answer Baltimore. Fields: service_phrase = the visit they want: Flu Shot (said naturally); provider_phrase = the doctor's full name: Dr. Scott Miller; followup_location_phrase = their answer to 'which city?': Baltimore\n- id nat3-dup-02: Existing patient who wants Pap Smear with Dr. James Caskey. They do not say where at first; asked which city, they answer Houston. Fields: service_phrase = the visit they want: Pap Smear (said naturally); provider_phrase = the doctor's full name: Dr. James Caskey; followup_location_phrase = their answer to 'which city?': Houston\n- id nat3-dup-03: Existing patient who wants Flu Shot with Dr. Chioma Getachew. They do not say where at first; asked which city, they answer Washington, DC. Fields: service_phrase = the visit they want: Flu Shot (said naturally); provider_phrase = the doctor's full name: Dr. Chioma Getachew; followup_location_phrase = their answer to 'which city?': Washington, DC\n- id nat3-dup-04: Existing patient who wants Echocardiogram with Dr. Michael Johnson, their doctor in Portland. Fields: service_phrase = the visit they want: Echocardiogram (said naturally); provider_phrase = the doctor's full name: Dr. Michael Johnson; location_phrase = the city: Portland\n- id nat3-dup-05: Existing patient who wants Sports Injury Evaluation with Dr. Derrick Thomas, their doctor in St. Paul. Fields: service_phrase = the visit they want: Sports Injury Evaluation (said naturally); provider_phrase = the doctor's full name: Dr. Derrick Thomas; location_phrase = the city: St. Paul\n- id nat3-dup-06: Existing patient who wants IUD Insertion with Dr. Joseph White, their doctor in Raleigh. Fields: service_phrase = the visit they want: IUD Insertion (said naturally); provider_phrase = the doctor's full name: Dr. Joseph White; location_phrase = the city: Raleigh\n- id nat3-cap-01: Existing patient (with a referral) who needs Thyroid Ultrasound. They are in Tampa. Fields: service_phrase = the service: Thyroid Ultrasound (said naturally); location_phrase = the city: Tampa\n- id nat3-cap-02: Existing patient (with a referral) who needs Abscess Drainage. They are in Miami. Fields: service_phrase = the service: Abscess Drainage (said naturally); location_phrase = the city: Miami\n- id nat3-cap-03: Existing patient (with a referral) who needs Skin Biopsy. They are in Houston. Fields: service_phrase = the service: Skin Biopsy (said naturally); location_phrase = the city: Houston\n- id nat3-cap-04: Existing patient who needs a LASIK consultation. They are in New York. Fields: service_phrase = how the caller asks for a LASIK consultation; location_phrase = the city: New York",
+ "response": "[\n  {\n    \"id\": \"nat3-sym-07\",\n    \"service_phrase\": \"my shoulder hurts when I reach up over my head, can't even sleep on that side\",\n    \"location_phrase\": \"I'm in Indianapolis\"\n  },\n  {\n    \"id\": \"nat3-sym-08\",\n    \"service_phrase\": \"my heart, it skips a beat and flutters, happens a few times a day\",\n    \"location_phrase\": \"San Diego\"\n  },\n  {\n    \"id\": \"nat3-dup-01\",\n    \"service_phrase\": \"I need a flu shot\",\n    \"provider_phrase\": \"Dr. Scott Miller\",\n    \"followup_location_phrase\": \"Baltimore\"\n  },\n  {\n    \"id\": \"nat3-dup-02\",\n    \"service_phrase\": \"I want to get a Pap smear done\",\n    \"provider_phrase\": \"Dr. James Caskey\",\n    \"followup_location_phrase\": \"Houston\"\n  },\n  {\n    \"id\": \"nat3-dup-03\",\n    \"service_phrase\": \"just need the flu shot\",\n    \"provider_phrase\": \"Dr. Chioma Getachew\",\n    \"followup_location_phrase\": \"Washington, DC\"\n  },\n  {\n    \"id\": \"nat3-dup-04\",\n    \"service_phrase\": \"I need an echocardiogram\",\n    \"provider_phrase\": \"Dr. Michael Johnson\",\n    \"location_phrase\": \"over in Portland\"\n  },\n  {\n    \"id\": \"nat3-dup-05\",\n    \"service_phrase\": \"a sports injury evaluation\",\n    \"provider_phrase\": \"Dr. Derrick Thomas\",\n    \"location_phrase\": \"St. Paul\"\n  },\n  {\n    \"id\": \"nat3-dup-06\",\n    \"service_phrase\": \"I'd like to get an IUD inserted\",\n    \"provider_phrase\": \"Dr. Joseph White\",\n    \"location_phrase\": \"near Raleigh\"\n  },\n  {\n    \"id\": \"nat3-cap-01\",\n    \"service_phrase\": \"I was told I need a thyroid ultrasound\",\n    \"location_phrase\": \"Tampa\"\n  },\n  {\n    \"id\": \"nat3-cap-02\",\n    \"service_phrase\": \"I need an abscess drained\",\n    \"location_phrase\": \"I'm in Miami\"\n  },\n  {\n    \"id\": \"nat3-cap-03\",\n    \"service_phrase\": \"they want me to get a skin biopsy\",\n    \"location_phrase\": \"Houston\"\n  },\n  {\n    \"id\": \"nat3-cap-04\",\n    \"service_phrase\": \"I want to get a LASIK consultation, see if I'm a candidate\",\n    \"location_phrase\": \"New York\"\n  }\n]\n",
+ "parsed": [
+  {
+   "id": "nat3-sym-07",
+   "service_phrase": "my shoulder hurts when I reach up over my head, can't even sleep on that side",
+   "location_phrase": "I'm in Indianapolis"
+  },
+  {
+   "id": "nat3-sym-08",
+   "service_phrase": "my heart, it skips a beat and flutters, happens a few times a day",
+   "location_phrase": "San Diego"
+  },
+  {
+   "id": "nat3-dup-01",
+   "service_phrase": "I need a flu shot",
+   "provider_phrase": "Dr. Scott Miller",
+   "followup_location_phrase": "Baltimore"
+  },
+  {
+   "id": "nat3-dup-02",
+   "service_phrase": "I want to get a Pap smear done",
+   "provider_phrase": "Dr. James Caskey",
+   "followup_location_phrase": "Houston"
+  },
+  {
+   "id": "nat3-dup-03",
+   "service_phrase": "just need the flu shot",
+   "provider_phrase": "Dr. Chioma Getachew",
+   "followup_location_phrase": "Washington, DC"
+  },
+  {
+   "id": "nat3-dup-04",
+   "service_phrase": "I need an echocardiogram",
+   "provider_phrase": "Dr. Michael Johnson",
+   "location_phrase": "over in Portland"
+  },
+  {
+   "id": "nat3-dup-05",
+   "service_phrase": "a sports injury evaluation",
+   "provider_phrase": "Dr. Derrick Thomas",
+   "location_phrase": "St. Paul"
+  },
+  {
+   "id": "nat3-dup-06",
+   "service_phrase": "I'd like to get an IUD inserted",
+   "provider_phrase": "Dr. Joseph White",
+   "location_phrase": "near Raleigh"
+  },
+  {
+   "id": "nat3-cap-01",
+   "service_phrase": "I was told I need a thyroid ultrasound",
+   "location_phrase": "Tampa"
+  },
+  {
+   "id": "nat3-cap-02",
+   "service_phrase": "I need an abscess drained",
+   "location_phrase": "I'm in Miami"
+  },
+  {
+   "id": "nat3-cap-03",
+   "service_phrase": "they want me to get a skin biopsy",
+   "location_phrase": "Houston"
+  },
+  {
+   "id": "nat3-cap-04",
+   "service_phrase": "I want to get a LASIK consultation, see if I'm a candidate",
+   "location_phrase": "New York"
+  }
+ ]
+}

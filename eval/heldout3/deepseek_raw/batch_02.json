@@ -1,0 +1,55 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h3-13: Existing patient who is having their gallbladder taken out next month; the surgeon needs their regular doctor to clear them for surgery first. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-14: Existing patient whose regular doctor says their hormone levels are off and wants them to see a specialist for hormones and glands. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-15: Existing patient who wants a mole on their back cut off. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-16: Existing patient who gets a cortisone shot in their arthritic knee every few months and is due for the next one. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-17: Existing patient who already sees the nerve doctor here for their migraines and needs their next check-in about them. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-18: Existing patient who sees a counselor here every week to talk through their anxiety and needs to book the next weekly talk session. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-19: Existing patient whose psychiatrist prescribes their antidepressant; they need a short visit to check the dose and keep the prescription going. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-20: Existing patient who takes about eight different pills from different doctors and wants their regular doctor to go through the whole list with them. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-21: A new patient: a parent whose son is turning 18 months and needs his regular checkup for that age. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-22: Existing patient on Medicare who wants the once-a-year visit that Medicare covers for seniors; they mention Medicare. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-23: Existing patient whose stomach doctor wants to put a camera down their throat to look at their stomach. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-24: A new patient who needs a tetanus booster because it has been more than ten years; they call it 'Tdap'. Fields: service_phrase = what the caller says they need, in their own words",
+ "response": "```json\n[\n  { \"id\": \"h3-13\", \"service_phrase\": \"my gallbladder's coming out next month and the surgeon wants my regular doctor to clear me first\" },\n  { \"id\": \"h3-14\", \"service_phrase\": \"my doctor says my hormones are off, wants me to see someone about my hormones and glands\" },\n  { \"id\": \"h3-15\", \"service_phrase\": \"I got a mole on my back I want cut off\" },\n  { \"id\": \"h3-16\", \"service_phrase\": \"I get a shot in my arthritic knee every few months and it's about time for the next one\" },\n  { \"id\": \"h3-17\", \"service_phrase\": \"I see the nerve doctor here for my migraines and need my next check-in about them\" },\n  { \"id\": \"h3-18\", \"service_phrase\": \"I see the counselor here every week for my anxiety, need to book next week's talk session\" },\n  { \"id\": \"h3-19\", \"service_phrase\": \"my psychiatrist prescribes my antidepressant, I need a short visit to check the dose and keep the prescription going\" },\n  { \"id\": \"h3-20\", \"service_phrase\": \"I take about eight different pills from different doctors and want my regular doctor to go through the whole list with me\" },\n  { \"id\": \"h3-21\", \"service_phrase\": \"my son is turning 18 months and needs his checkup for that age\" },\n  { \"id\": \"h3-22\", \"service_phrase\": \"I'm on Medicare and want the once-a-year visit Medicare covers for seniors\" },\n  { \"id\": \"h3-23\", \"service_phrase\": \"my stomach doctor wants to put a camera down my throat to look at my stomach\" },\n  { \"id\": \"h3-24\", \"service_phrase\": \"I need my Tdap booster, it's been more than ten years\" }\n]\n```\n",
+ "parsed": [
+  {
+   "id": "h3-13",
+   "service_phrase": "my gallbladder's coming out next month and the surgeon wants my regular doctor to clear me first"
+  },
+  {
+   "id": "h3-14",
+   "service_phrase": "my doctor says my hormones are off, wants me to see someone about my hormones and glands"
+  },
+  {
+   "id": "h3-15",
+   "service_phrase": "I got a mole on my back I want cut off"
+  },
+  {
+   "id": "h3-16",
+   "service_phrase": "I get a shot in my arthritic knee every few months and it's about time for the next one"
+  },
+  {
+   "id": "h3-17",
+   "service_phrase": "I see the nerve doctor here for my migraines and need my next check-in about them"
+  },
+  {
+   "id": "h3-18",
+   "service_phrase": "I see the counselor here every week for my anxiety, need to book next week's talk session"
+  },
+  {
+   "id": "h3-19",
+   "service_phrase": "my psychiatrist prescribes my antidepressant, I need a short visit to check the dose and keep the prescription going"
+  },
+  {
+   "id": "h3-20",
+   "service_phrase": "I take about eight different pills from different doctors and want my regular doctor to go through the whole list with me"
+  },
+  {
+   "id": "h3-21",
+   "service_phrase": "my son is turning 18 months and needs his checkup for that age"
+  },
+  {
+   "id": "h3-22",
+   "service_phrase": "I'm on Medicare and want the once-a-year visit Medicare covers for seniors"
+  },
+  {
+   "id": "h3-23",
+   "service_phrase": "my stomach doctor wants to put a camera down my throat to look at my stomach"
+  },
+  {
+   "id": "h3-24",
+   "service_phrase": "I need my Tdap booster, it's been more than ten years"
+  }
+ ]
+}

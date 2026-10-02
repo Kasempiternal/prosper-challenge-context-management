@@ -1,0 +1,55 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h3-25: Existing patient whose doctor ordered a CBC blood test; they say 'CBC'. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-26: An older existing patient whose doctor ordered pictures of their lungs; they call it 'chest films'. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-27: Existing patient whose doctor ordered the big magnet scan of their knee; they call it 'the magnet scan' and never say MRI. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-28: Existing patient whose doctor ordered a sonogram of their thyroid; they say 'sonogram'. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-29: Existing patient who wants her yearly checkup with the gynecologist; she calls it her 'yearly with the gyno'. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-30: Existing patient whose doctor ordered an MRI. They do not say which body part. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-31: Existing patient whose stomach doctor said they need a scope, but they do not remember whether it goes down the throat or in from below. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-32: Existing patient who wants their yearly all-over skin check to look for signs of skin cancer. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-33: Existing dental patient who is due for their regular six-month checkup at the dentist. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-34: Existing patient who just had shoulder surgery and needs to start PT; they say 'PT'. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-35: Existing patient who keeps getting up at night to pee; their doctor told them to get their prostate looked at by a specialist. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-x01: A brand-new patient who has never been seen here wants a cortisone shot in their knee; an outside doctor referred them. Fields: service_phrase = what the caller says they need, in their own words",
+ "response": "[\n  {\"id\": \"h3-25\", \"service_phrase\": \"need a CBC blood test\"},\n  {\"id\": \"h3-26\", \"service_phrase\": \"doctor wants pictures of my lungs, the chest films\"},\n  {\"id\": \"h3-27\", \"service_phrase\": \"get the magnet scan on my knee\"},\n  {\"id\": \"h3-28\", \"service_phrase\": \"sonogram of my thyroid\"},\n  {\"id\": \"h3-29\", \"service_phrase\": \"my yearly with the gyno\"},\n  {\"id\": \"h3-30\", \"service_phrase\": \"my doctor ordered an MRI\"},\n  {\"id\": \"h3-31\", \"service_phrase\": \"my stomach doctor said I need a scope, but I don't remember if it goes down my throat or up from below\"},\n  {\"id\": \"h3-32\", \"service_phrase\": \"my yearly all-over skin check to look for skin cancer\"},\n  {\"id\": \"h3-33\", \"service_phrase\": \"due for my regular six-month dental checkup\"},\n  {\"id\": \"h3-34\", \"service_phrase\": \"start PT after my shoulder surgery\"},\n  {\"id\": \"h3-35\", \"service_phrase\": \"I keep getting up at night to pee, and my doctor told me to get my prostate looked at by a specialist\"},\n  {\"id\": \"h3-x01\", \"service_phrase\": \"an outside doctor sent me over for a cortisone shot in my knee\"}\n]\n",
+ "parsed": [
+  {
+   "id": "h3-25",
+   "service_phrase": "need a CBC blood test"
+  },
+  {
+   "id": "h3-26",
+   "service_phrase": "doctor wants pictures of my lungs, the chest films"
+  },
+  {
+   "id": "h3-27",
+   "service_phrase": "get the magnet scan on my knee"
+  },
+  {
+   "id": "h3-28",
+   "service_phrase": "sonogram of my thyroid"
+  },
+  {
+   "id": "h3-29",
+   "service_phrase": "my yearly with the gyno"
+  },
+  {
+   "id": "h3-30",
+   "service_phrase": "my doctor ordered an MRI"
+  },
+  {
+   "id": "h3-31",
+   "service_phrase": "my stomach doctor said I need a scope, but I don't remember if it goes down my throat or up from below"
+  },
+  {
+   "id": "h3-32",
+   "service_phrase": "my yearly all-over skin check to look for skin cancer"
+  },
+  {
+   "id": "h3-33",
+   "service_phrase": "due for my regular six-month dental checkup"
+  },
+  {
+   "id": "h3-34",
+   "service_phrase": "start PT after my shoulder surgery"
+  },
+  {
+   "id": "h3-35",
+   "service_phrase": "I keep getting up at night to pee, and my doctor told me to get my prostate looked at by a specialist"
+  },
+  {
+   "id": "h3-x01",
+   "service_phrase": "an outside doctor sent me over for a cortisone shot in my knee"
+  }
+ ]
+}

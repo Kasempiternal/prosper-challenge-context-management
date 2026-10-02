@@ -1,0 +1,67 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat3-geo-01: Existing patient who needs a pelvic ultrasound their doctor ordered. They are in Seattle, Washington. Fields: service_phrase = how the caller asks for a pelvic ultrasound their doctor ordered; location_phrase = where they are: the caller names the city only (Seattle)\n- id nat3-geo-02: Existing patient who needs an X-ray of their spine that their doctor ordered. They are in New York, New York. Fields: service_phrase = how the caller asks for an X-ray of their spine that their doctor ordered; location_phrase = where they are: the caller names the city only (New York)\n- id nat3-geo-03: Existing patient who needs an X-ray of their spine that their doctor ordered. They are in Kansas City, Missouri. Fields: service_phrase = how the caller asks for an X-ray of their spine that their doctor ordered; location_phrase = where they are: the caller says they are in / live in the city (Kansas City)\n- id nat3-geo-04: Existing patient who needs a drug test for a new job. They are in San Diego, California. Fields: service_phrase = how the caller asks for a drug test for a new job; location_phrase = where they are: the caller says they are in / live in the city (San Diego)\n- id nat3-geo-05: Existing patient who needs a pelvic ultrasound their doctor ordered. They live in Fort Lauderdale, Florida (a suburb; do not mention the bigger nearby city). Fields: service_phrase = how the caller asks for a pelvic ultrasound their doctor ordered; location_phrase = where they are: the town name Fort Lauderdale\n- id nat3-geo-06: Existing patient who needs an X-ray of their spine that their doctor ordered. Their ZIP code is 63122. Fields: service_phrase = how the caller asks for an X-ray of their spine that their doctor ordered; location_phrase = where they are: the caller gives the ZIP code 63122\n- id nat3-geo-07: Existing patient who needs an X-ray of their spine that their doctor ordered. Their ZIP code is 60626. Fields: service_phrase = how the caller asks for an X-ray of their spine that their doctor ordered; location_phrase = where they are: the caller gives the ZIP code 60626\n- id nat3-geo-08: Existing patient who needs an MRI of their hip that their doctor ordered. Their ZIP code is 60501. Fields: service_phrase = how the caller asks for an MRI of their hip that their doctor ordered; location_phrase = where they are: the caller gives the ZIP code 60501\n- id nat3-geo-09: Existing patient who needs an A1C blood sugar test their doctor ordered. They are near the Cherry Creek neighborhood of Denver (any clinic close by is fine). Fields: service_phrase = how the caller asks for an A1C blood sugar test their doctor ordered; location_phrase = where they are: that they are near / around Cherry Creek (do not name the city)\n- id nat3-geo-10: Existing patient who needs a drug test for a new job. They are near the Rockridge neighborhood of Oakland (any clinic close by is fine). Fields: service_phrase = how the caller asks for a drug test for a new job; location_phrase = where they are: that they are near / around Rockridge (do not name the city)\n- id nat3-geo-11: Existing patient who needs a CT scan of their head that their doctor ordered. They live in the Lake Nona neighborhood of Orlando. Fields: service_phrase = how the caller asks for a CT scan of their head that their doctor ordered; location_phrase = where they are: the neighborhood they are in: Lake Nona (do not name the city)\n- id nat3-geo-12: Existing patient who needs a pelvic ultrasound their doctor ordered. They live in the Wicker Park neighborhood of Chicago. Fields: service_phrase = how the caller asks for a pelvic ultrasound their doctor ordered; location_phrase = where they are: the neighborhood they are in: Wicker Park (do not name the city)",
+ "response": "[\n  {\n    \"id\": \"nat3-geo-01\",\n    \"service_phrase\": \"my doctor sent over an order for a pelvic ultrasound\",\n    \"location_phrase\": \"Seattle\"\n  },\n  {\n    \"id\": \"nat3-geo-02\",\n    \"service_phrase\": \"I need an X-ray of my spine, my doctor ordered it\",\n    \"location_phrase\": \"New York\"\n  },\n  {\n    \"id\": \"nat3-geo-03\",\n    \"service_phrase\": \"I'm supposed to get an X-ray done on my spine, doctor ordered it\",\n    \"location_phrase\": \"I'm in Kansas City\"\n  },\n  {\n    \"id\": \"nat3-geo-04\",\n    \"service_phrase\": \"I need a drug test, I'm starting a new job\",\n    \"location_phrase\": \"I live in San Diego\"\n  },\n  {\n    \"id\": \"nat3-geo-05\",\n    \"service_phrase\": \"my doctor ordered a pelvic ultrasound and I need to get it done\",\n    \"location_phrase\": \"Fort Lauderdale\"\n  },\n  {\n    \"id\": \"nat3-geo-06\",\n    \"service_phrase\": \"I've got an order for an X-ray of my spine\",\n    \"location_phrase\": \"my ZIP is 63122\"\n  },\n  {\n    \"id\": \"nat3-geo-07\",\n    \"service_phrase\": \"want to get my spine X-rayed, doctor ordered it\",\n    \"location_phrase\": \"60626\"\n  },\n  {\n    \"id\": \"nat3-geo-08\",\n    \"service_phrase\": \"I need an MRI of my hip that my doctor ordered\",\n    \"location_phrase\": \"60501\"\n  },\n  {\n    \"id\": \"nat3-geo-09\",\n    \"service_phrase\": \"I need to come in for an A1C, blood sugar test, doctor ordered it\",\n    \"location_phrase\": \"I'm near Cherry Creek\"\n  },\n  {\n    \"id\": \"nat3-geo-10\",\n    \"service_phrase\": \"I gotta get a drug test for a new job\",\n    \"location_phrase\": \"I'm over by Rockridge\"\n  },\n  {\n    \"id\": \"nat3-geo-11\",\n    \"service_phrase\": \"my doctor ordered a CT scan of my head\",\n    \"location_phrase\": \"I'm in Lake Nona\"\n  },\n  {\n    \"id\": \"nat3-geo-12\",\n    \"service_phrase\": \"I need a pelvic ultrasound, my doctor ordered it\",\n    \"location_phrase\": \"Wicker Park\"\n  }\n]\n",
+ "parsed": [
+  {
+   "id": "nat3-geo-01",
+   "service_phrase": "my doctor sent over an order for a pelvic ultrasound",
+   "location_phrase": "Seattle"
+  },
+  {
+   "id": "nat3-geo-02",
+   "service_phrase": "I need an X-ray of my spine, my doctor ordered it",
+   "location_phrase": "New York"
+  },
+  {
+   "id": "nat3-geo-03",
+   "service_phrase": "I'm supposed to get an X-ray done on my spine, doctor ordered it",
+   "location_phrase": "I'm in Kansas City"
+  },
+  {
+   "id": "nat3-geo-04",
+   "service_phrase": "I need a drug test, I'm starting a new job",
+   "location_phrase": "I live in San Diego"
+  },
+  {
+   "id": "nat3-geo-05",
+   "service_phrase": "my doctor ordered a pelvic ultrasound and I need to get it done",
+   "location_phrase": "Fort Lauderdale"
+  },
+  {
+   "id": "nat3-geo-06",
+   "service_phrase": "I've got an order for an X-ray of my spine",
+   "location_phrase": "my ZIP is 63122"
+  },
+  {
+   "id": "nat3-geo-07",
+   "service_phrase": "want to get my spine X-rayed, doctor ordered it",
+   "location_phrase": "60626"
+  },
+  {
+   "id": "nat3-geo-08",
+   "service_phrase": "I need an MRI of my hip that my doctor ordered",
+   "location_phrase": "60501"
+  },
+  {
+   "id": "nat3-geo-09",
+   "service_phrase": "I need to come in for an A1C, blood sugar test, doctor ordered it",
+   "location_phrase": "I'm near Cherry Creek"
+  },
+  {
+   "id": "nat3-geo-10",
+   "service_phrase": "I gotta get a drug test for a new job",
+   "location_phrase": "I'm over by Rockridge"
+  },
+  {
+   "id": "nat3-geo-11",
+   "service_phrase": "my doctor ordered a CT scan of my head",
+   "location_phrase": "I'm in Lake Nona"
+  },
+  {
+   "id": "nat3-geo-12",
+   "service_phrase": "I need a pelvic ultrasound, my doctor ordered it",
+   "location_phrase": "Wicker Park"
+  }
+ ]
+}

@@ -3,12 +3,12 @@
 Ground truth comes only from catalog queries here (the 6 policies + haversine distance). Caller
 wording comes from DeepSeek, which sees scenario facts in plain language and nothing else.
 
-  python eval/national/build_cases.py [--set national|national2] scenarios  # seeded sampler -> <dir>/scenarios.json
+  python eval/national/build_cases.py [--set national|national2|national3] scenarios  # seeded sampler -> <dir>/scenarios.json
   python eval/national/build_cases.py [--set ...] phrase      # DeepSeek via cmdc -> <dir>/deepseek_raw/*.json
   python eval/national/build_cases.py [--set ...] merge       # scenarios + phrasings -> eval/cases_<set>.jsonl
 
 A set is a Profile: seed, id prefix, the service/symptom/type lists it samples from, and optionally
-another set whose scenarios it avoids (same type+metro, same site, provider, name or place).
+other sets whose scenarios it avoids (same type+metro, same site, provider, name or place).
 `phrase` skips batches whose raw file exists, so reruns cost nothing and reproduce the same file.
 """
 
@@ -23,6 +23,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -121,6 +122,41 @@ NO_NEW_TYPES2 = ["appt_289", "appt_255", "appt_236"]
 UNOFFERED2 = ["appt_311", "appt_310", "appt_130"]
 CAPABILITY_TYPES2 = ["appt_205", "appt_218", "appt_184", "appt_231", "appt_240", "appt_029"]
 
+# national3: a third held-out draw, authored blind to resolver results, over services, symptoms and types
+# that neither earlier set used.
+GEO_SERVICES3 = [
+    ("an A1C blood sugar test their doctor ordered", ["appt_232", "appt_072"]),
+    ("a CT scan of their head that their doctor ordered", ["appt_209", "appt_066"]),
+    ("a pelvic ultrasound their doctor ordered", ["appt_214", "appt_067"]),
+    ("an X-ray of their spine that their doctor ordered", ["appt_220", "appt_062"]),
+    ("a drug test for a new job", ["appt_233", "appt_072"]),
+    ("an MRI of their hip that their doctor ordered", ["appt_206"]),
+]
+SYMPTOMS3 = [
+    ("woke up with a hot, red, swollen big toe joint that hurts to even touch with a sheet",
+     ["appt_263", "appt_259", "appt_285"], ["gout", "rheumatolog", "podiatr"]),
+    ("has a bulge in the groin that aches when lifting things and goes away lying down",
+     ["appt_302", "appt_301"], ["hernia", "surg"]),
+    ("gets sharp pain under the right ribs after fatty meals", ["appt_303", "appt_053", "appt_301"],
+     ["gallbladder", "gastro", "gi ", "surg"]),
+    ("has a 9-year-old son whose teacher says he cannot sit still or focus in class",
+     ["appt_106", "appt_203"], ["adhd", "psychiatr", "attention deficit"]),
+    ("has hot flashes, night sweats and irregular periods at age 51", ["appt_161", "appt_096"],
+     ["menopause", "gyn"]),
+    ("has bulging, twisted veins on both legs that ache by the end of the day", ["appt_308"],
+     ["varicose"]),
+    ("has shoulder pain when reaching overhead and cannot sleep on that side", ["appt_134", "appt_032"],
+     ["orthop"]),
+    ("feels their heart skip beats and flutter several times a day", ["appt_114", "appt_020"],
+     ["arrhythm", "cardiolog"]),
+]
+NEW_OK_TYPES3 = ["appt_103", "appt_145", "appt_159", "appt_238", "appt_110", "appt_101"]
+NO_NEW_TYPES3 = ["appt_282", "appt_253", "appt_122"]
+UNOFFERED3 = ["appt_221", "appt_310", "appt_269"]
+CAPABILITY_TYPES3 = ["appt_116", "appt_117", "appt_190", "appt_268", "appt_120", "appt_307"]
+MISSPELLED3 = {**MISSPELLED, "phoenix-az": "Pheonix", "seattle-wa": "Seatle", "baltimore-md": "Baltimoor",
+               "charlotte-nc": "Sharlot", "houston-tx": "Hueston"}
+
 
 @dataclass(frozen=True)
 class FarPlace:
@@ -146,7 +182,11 @@ class Profile:
     capability: list[str]
     eye: tuple[str, list[str]]
     far: FarPlace
-    exclude: str | None = None
+    excludes: tuple[str, ...] = ()
+    misspelled: dict[str, str] = field(default_factory=lambda: MISSPELLED)
+    # The catalog has 4 twin towns and few cross-metro namesakes. A third set reuses a twin town with the
+    # metro no earlier set chose, and admits namesakes who practice in several metros.
+    reuse_pools: bool = False
 
     @property
     def scenarios(self) -> Path:
@@ -168,7 +208,11 @@ PROFILES = {p.name: p for p in (
     Profile("national2", 20261117, "nat2", ROOT / "eval" / "national2", GEO_SERVICES2, SYMPTOMS2, NEW_OK_TYPES2,
             NO_NEW_TYPES2, UNOFFERED2, CAPABILITY_TYPES2, ("a contact lens fitting", ["appt_048"]),
             FarPlace("far_place", "Billings", "Montana", (45.7833, -108.5007), (46.9653, -109.5337)),
-            exclude="national"),
+            excludes=("national",)),
+    Profile("national3", 20261003, "nat3", ROOT / "eval" / "national3", GEO_SERVICES3, SYMPTOMS3, NEW_OK_TYPES3,
+            NO_NEW_TYPES3, UNOFFERED3, CAPABILITY_TYPES3, ("a LASIK consultation", ["appt_171"]),
+            FarPlace("far_place", "Fargo", "North Dakota", (46.8772, -96.7898), (47.4501, -100.4659)),
+            excludes=("national", "national2"), misspelled=MISSPELLED3, reuse_pools=True),
 )}
 
 
@@ -255,7 +299,7 @@ def facts(cat: Catalog, s: dict) -> dict[str, set]:
 
 @dataclass
 class Avoid:
-    """Facts already used by another set. Empty for a set with no `exclude`, which leaves sampling unchanged."""
+    """Facts already used by other sets. Empty for a set with no `excludes`, which leaves sampling unchanged."""
     metros: set = field(default_factory=set)
     types: set = field(default_factory=set)
     sites: set = field(default_factory=set)
@@ -264,6 +308,8 @@ class Avoid:
     places: set = field(default_factory=set)
     pairs: set = field(default_factory=set)
     kind_metros: set = field(default_factory=set)
+    twin_choices: set = field(default_factory=set)
+    expected_providers: set = field(default_factory=set)
 
     @classmethod
     def of(cls, cat: Catalog, scen: list[dict]) -> Avoid:
@@ -273,6 +319,9 @@ class Avoid:
             for k in ("metros", "types", "sites", "providers", "names", "places", "pairs"):
                 getattr(a, k).update(f[k])
             a.kind_metros.update((s["kind"], m) for m in f["metros"])
+            a.expected_providers.update(s["expected"].get("provider_ids", ()))
+            if s["kind"] == "either_or":
+                a.twin_choices.add((s["checks"]["location_phrase"]["must"][0], s["truth"]["chosen"]))
         return a
 
     def fresh(self, types, m: str) -> bool:
@@ -442,6 +491,8 @@ def build(cat: Catalog, prof: Profile, avoid: Avoid) -> list[dict]:
     made = Counter()
     for lid in nbs:
         x = cat.locs[lid]
+        if x["city"].lower() in x["neighborhood"].lower():  # "Downtown Brooklyn" names its city
+            continue
         for desc, types in svc_order():
             if not avoid.fresh(types, x["metro_id"]):
                 continue
@@ -484,10 +535,12 @@ def build(cat: Catalog, prof: Profile, avoid: Avoid) -> list[dict]:
     # either/or: a town name that exists in two metros
     twins = sorted((c, sorted(ms)) for c, ms in
                    ((c, {mm for cc, mm in {(x["city"], x["metro_id"]) for x in cat.locs.values()} if cc == c})
-                    for c in {x["city"] for x in cat.locs.values()}) if len(ms) == 2 and c not in avoid.places)
+                    for c in {x["city"] for x in cat.locs.values()})
+                   if len(ms) == 2 and (c not in avoid.places
+                                        or prof.reuse_pools and any((c, m) not in avoid.twin_choices for m in ms)))
     rng.shuffle(twins)
     for city, ms in twins[:2]:
-        chosen = rng.choice(ms)
+        chosen = rng.choice([m for m in ms if (city, m) not in avoid.twin_choices])
         st_names = [STATE_NAMES[cat.locs[lid]["state"]] for lid in cat.locs if cat.locs[lid]["city"] == city]
         pts = [cat.xy(lid) for lid, x in cat.locs.items() if x["city"] == city and x["metro_id"] == chosen]
         anchor = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
@@ -534,7 +587,8 @@ def build(cat: Catalog, prof: Profile, avoid: Avoid) -> list[dict]:
             break
 
     # misspelled metro name (fixed by hand, not by DeepSeek)
-    miss = sorted(m for m in MISSPELLED if m in cat.metros and ("misspelled_city", m) not in avoid.kind_metros)
+    miss = sorted(m for m in prof.misspelled if m in cat.metros and ("misspelled_city", m) not in avoid.kind_metros
+                  and any(metro_strict(m, t, EXISTING) for _, t in prof.geo_services))
     for m in rng.sample(miss, 2):
         order = svc_order()
         ok = [(d, t) for d, t in order if metro_strict(m, t, EXISTING)]
@@ -542,7 +596,7 @@ def build(cat: Catalog, prof: Profile, avoid: Avoid) -> list[dict]:
         valid = metro_strict(m, types, EXISTING)
         out.append(scenario(gid(), "geo", "misspelled_city", EXISTING,
                             f"Existing patient who needs {desc}. They are in {label(m)}.",
-                            svc_field(desc), offer(types, valid), fixed={"location_phrase": MISSPELLED[m]},
+                            svc_field(desc), offer(types, valid), fixed={"location_phrase": prof.misspelled[m]},
                             truth={"metro": m}))
 
     # ---------------- symptoms -> specialty ----------------
@@ -578,29 +632,50 @@ def build(cat: Catalog, prof: Profile, avoid: Avoid) -> list[dict]:
         base = cat.types[tid]["name"].lower()
         return sorted({tid} | {t for t in p["appointment_type_ids"] if cat.types[t]["name"].lower().startswith(base)})
 
+    def solo_sites(ps):
+        """(provider, metro) where that provider is the only namesake practicing in the metro, and their other
+        metros are far enough away that naming this city cannot also mean those sites."""
+        return [(p, m) for p in ps for m in sorted(cat.prov_metros(p))
+                if sum(m in cat.prov_metros(q) for q in ps) == 1
+                and all(miles(cat.metro_xy(m), cat.metro_xy(o)) > 50 for o in cat.prov_metros(p) - {m})
+                and any(distinctive(t) and cat.in_metro(cat.valid_locs([t], EXISTING, {p["id"]}), m)
+                        for t in p["appointment_type_ids"])]
+
     shared_dup, other_dup = [], []
     for name, ps in sorted(cat.by_name.items()):
-        if name in avoid.names or len(ps) < 2 or any(len(cat.prov_metros(p)) != 1 for p in ps)                 or len(set().union(*(cat.prov_metros(p) for p in ps))) < 2:
+        reused = name in avoid.names
+        if reused and not prof.reuse_pools or len(ps) < 2 or len(set().union(*(cat.prov_metros(p) for p in ps))) < 2:
+            continue
+        if any(len(cat.prov_metros(p)) != 1 for p in ps) and not (prof.reuse_pools and solo_sites(ps)):
             continue
         shared = sorted(t for t in set.intersection(*(set(p["appointment_type_ids"]) for p in ps)) if distinctive(t))
         hit = next(((name, t, pm) for t in shared for pm in [namesakes_by_metro(ps, t)]
                     if len(pm) in (2, 3) and all(len(v) == 1 for v in pm.values())
                     and all(avoid.fresh([t], mm) for mm in pm)), None)
-        (shared_dup if hit else other_dup).append(hit or (name, None, None))
+        if hit:
+            shared_dup.append(hit)
+        elif not reused:
+            other_dup.append((name, None, None))
     rng.shuffle(shared_dup)
     rng.shuffle(other_dup)
     for i, (name, tid, per_metro) in enumerate(shared_dup[:3] + other_dup[:6 - len(shared_dup[:3])], 1):
         ps = cat.by_name[name]
         no_city = tid is not None
         if no_city:
-            mm = rng.choice(sorted(per_metro))
+            unused = [m for m in sorted(per_metro) if per_metro[m][0] not in avoid.expected_providers]
+            mm = rng.choice(unused or sorted(per_metro))
             p = cat.provs[per_metro[mm][0]]
+        elif prof.reuse_pools:
+            p, mm = rng.choice(solo_sites(ps))
+            tid = rng.choice([t for t in p["appointment_type_ids"]
+                              if distinctive(t) and cat.in_metro(cat.valid_locs([t], EXISTING, {p["id"]}), mm)])
         else:
             solo = [p for p in ps if sum(cat.prov_metros(p) == cat.prov_metros(q) for q in ps) == 1]
             p = rng.choice(solo)
             mm = next(iter(cat.prov_metros(p)))
             tid = rng.choice([t for t in p["appointment_type_ids"]
                               if distinctive(t) and cat.valid_locs([t], EXISTING, {p["id"]})])
+        if not no_city:
             per_metro = {m: [q["id"] for q in ps if m in cat.prov_metros(q)]
                          for m in sorted(set().union(*(cat.prov_metros(q) for q in ps)))}
         types = same_family(p, tid)
@@ -819,17 +894,19 @@ Scenarios:
 """
 
 
-def ask_deepseek(batch: list[dict]) -> tuple[str, str]:
+def ask_deepseek(batch: list[dict], preamble: str = PROMPT) -> tuple[str, str]:
     lines = []
     for s in batch:
         fields = "; ".join(f"{k} = {v}" for k, v in s["fields"].items())
         lines.append(f"- id {s['id']}: {s['situation']} Fields: {fields}")
-    prompt = PROMPT + "\n".join(lines)
+    prompt = preamble + "\n".join(lines)
     exe = shutil.which("cmdc.cmd") or shutil.which("cmdc")
     if not exe:
         sys.exit("cmdc not found on PATH")
-    res = subprocess.run([exe, "-p", "-m", MODEL, "--no-session", "--skip-onboarding", "--max-turns", "1"],
-                         input=prompt, capture_output=True, text=True, encoding="utf-8", timeout=180)
+    # An empty working directory: the model must not be able to open eval files, aliases or resolver code.
+    with tempfile.TemporaryDirectory(prefix="cmdc_") as empty:
+        res = subprocess.run([exe, "-p", "-m", MODEL, "--no-session", "--skip-onboarding", "--max-turns", "1"],
+                             input=prompt, capture_output=True, text=True, encoding="utf-8", timeout=180, cwd=empty)
     if res.returncode != 0:
         sys.exit(f"cmdc failed ({res.returncode}): {res.stderr[:500]}\n--- stdout ---\n{res.stdout[:1500]}")
     return prompt, res.stdout
@@ -840,7 +917,8 @@ def parse_array(text: str) -> list[dict]:
     return json.loads(m.group(0)) if m else []
 
 
-def phrase(scen: list[dict], raw_dir: Path, only: list[str] | None = None, tag: str = "batch") -> None:
+def phrase(scen: list[dict], raw_dir: Path, only: list[str] | None = None, tag: str = "batch",
+           preamble: str = PROMPT) -> None:
     raw_dir.mkdir(parents=True, exist_ok=True)
     todo = [s for s in scen if s["fields"] and (only is None or s["id"] in only)]
     for i in range(0, len(todo), BATCH):
@@ -849,7 +927,7 @@ def phrase(scen: list[dict], raw_dir: Path, only: list[str] | None = None, tag: 
             print(f"skip {path.name} (exists)")
             continue
         batch = todo[i:i + BATCH]
-        prompt, text = ask_deepseek(batch)
+        prompt, text = ask_deepseek(batch, preamble)
         path.write_text(json.dumps({"model": MODEL, "prompt": prompt, "response": text,
                                     "parsed": parse_array(text)}, indent=1, ensure_ascii=False), encoding="utf-8")
         print(f"wrote {path.name}: {len(batch)} scenarios")
@@ -955,7 +1033,7 @@ def main() -> None:
     step = args[0] if args else "scenarios"
     if step == "scenarios":
         cat = Catalog(json.loads(CATALOG.read_text(encoding="utf-8")))
-        other = load_scenarios(PROFILES[prof.exclude]) if prof.exclude else []
+        other = [s for ex in prof.excludes for s in load_scenarios(PROFILES[ex])]
         scen = build(cat, prof, Avoid.of(cat, other))
         prof.dir.mkdir(parents=True, exist_ok=True)
         prof.scenarios.write_text(json.dumps(scen, indent=1, ensure_ascii=False), encoding="utf-8")
@@ -969,7 +1047,7 @@ def main() -> None:
                   f"  locs={len(e.get('location_ids_subset', []))} {s['truth']}")
         if other:
             hits = overlap(cat, scen, other)
-            print(f"type+metro overlap with {prof.exclude}: {len(hits)}/{len(scen)} scenarios")
+            print(f"type+metro overlap with {'+'.join(prof.excludes)}: {len(hits)}/{len(scen)} scenarios")
             for sid, ids in hits:
                 print(f"  {sid} shares a type+metro with {', '.join(ids)}")
         return

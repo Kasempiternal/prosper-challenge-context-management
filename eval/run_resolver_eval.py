@@ -51,8 +51,8 @@ CACHE = EVAL / ".jev_cache.json"
 OPENAI_CACHE = EVAL / ".openai_cache.json"
 OPENAI_LIVE_LIMIT = 600
 CHOOSER_LABEL = {"jev": "JEV", "openai": "OpenAI", "embed": "embeddings", "none": "no model"}
-SETS = ("main", "heldout", "heldout2", "tune")
-NATIONAL_SETS = ("national", "national2", "street")
+SETS = ("main", "heldout", "heldout2", "tune", "heldout3")
+NATIONAL_SETS = ("national", "national2", "street", "national3")
 SF_CATALOG = ROOT / "backend" / "data" / "catalog.json"
 NATIONAL_CATALOG = ROOT / "backend" / "data" / "national" / "catalog.json"
 LATENCY_REPEATS = 20
@@ -63,7 +63,9 @@ COMMIT = {"offer", "confirm"}
 def load_set(name: str) -> list[dict]:
     path = {"heldout2": EVAL / "cases_heldout2.jsonl", "tune": EVAL / "cases_tune.jsonl",
             "national": EVAL / "cases_national.jsonl",
-            "national2": EVAL / "cases_national2.jsonl", "street": EVAL / "cases_street.jsonl"}.get(name, EVAL / "cases.jsonl")
+            "national2": EVAL / "cases_national2.jsonl", "street": EVAL / "cases_street.jsonl",
+            "heldout3": EVAL / "cases_heldout3.jsonl",
+            "national3": EVAL / "cases_national3.jsonl"}.get(name, EVAL / "cases.jsonl")
     cases = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     if name == "main":
         return [c for c in cases if c["category"] != "heldout"]

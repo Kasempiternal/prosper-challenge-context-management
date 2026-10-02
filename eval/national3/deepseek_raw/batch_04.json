@@ -1,0 +1,69 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat3-cap-05: Existing patient (with a referral) who needs Thyroid Ultrasound and insists on going to the clinic called River North Care Center in Chicago, which they always use. Fields: service_phrase = the service: Thyroid Ultrasound (said naturally); location_phrase = that specific clinic by name: River North Care Center (not 'near' it)\n- id nat3-new-01: A brand-new patient who has never been seen at these clinics needs Lactation Consultation. They are in St. Paul. Fields: service_phrase = the service: Lactation Consultation (said naturally); location_phrase = the city: St. Paul\n- id nat3-new-02: A brand-new patient who has never been seen at these clinics needs Concussion Evaluation. They are in Sacramento. Fields: service_phrase = the service: Concussion Evaluation (said naturally); location_phrase = the city: Sacramento\n- id nat3-new-03: A brand-new patient wants Annual Physical with Dr. Inna Volkov in Phoenix (a friend recommended this doctor). Fields: service_phrase = the service: Annual Physical (said naturally); provider_phrase = the doctor's full name: Dr. Inna Volkov; location_phrase = the city: Phoenix\n- id nat3-new-04: A brand-new patient wants Kidney Stone Evaluation with Dr. Hailey Morgan in Miami (a friend recommended this doctor). Fields: service_phrase = the service: Kidney Stone Evaluation (said naturally); provider_phrase = the doctor's full name: Dr. Hailey Morgan; location_phrase = the city: Miami\n- id nat3-new-05: A brand-new patient who has never been seen here wants Trigger Point Injection. They are in Detroit. Fields: service_phrase = the service: Trigger Point Injection (said naturally); location_phrase = the city: Detroit\n- id nat3-noloc-01: Existing patient who needs an A1C blood sugar test their doctor ordered. They do not say where they are at first; asked which city, they answer Phoenix. Fields: service_phrase = how the caller asks for an A1C blood sugar test their doctor ordered; followup_location_phrase = their answer to 'which city?': Phoenix\n- id nat3-noloc-02: Existing patient who needs a pelvic ultrasound their doctor ordered. They do not say where they are at first; asked which city, they answer San Jose. Fields: service_phrase = how the caller asks for a pelvic ultrasound their doctor ordered; followup_location_phrase = their answer to 'which city?': San Jose\n- id nat3-noloc-03: Existing patient who needs a CT scan of their head that their doctor ordered. They do not say where they are at first; asked which city, they answer Baltimore. Fields: service_phrase = how the caller asks for a CT scan of their head that their doctor ordered; followup_location_phrase = their answer to 'which city?': Baltimore\n- id nat3-unoff-01: Existing patient who wants pet scan. They are in Nashville. Fields: service_phrase = the service: pet scan (said naturally); location_phrase = the city: Nashville\n- id nat3-unoff-02: Existing patient who wants hyperbaric oxygen therapy consultation. They are in San Francisco. Fields: service_phrase = the service: hyperbaric oxygen therapy consultation (said naturally); location_phrase = the city: San Francisco\n- id nat3-ring-01: Existing patient who needs lasik consultation (has any referral needed). They are in Salt Lake City. Fields: service_phrase = the service: lasik consultation (said naturally); location_phrase = the city: Salt Lake City",
+ "response": "[\n  {\"id\": \"nat3-cap-05\", \"service_phrase\": \"I need a thyroid ultrasound, yeah a thyroid ultrasound\", \"location_phrase\": \"River North Care Center, over in Chicago — that's the one I always go to\"},\n  {\"id\": \"nat3-new-01\", \"service_phrase\": \"I'm looking to get a lactation consultation\", \"location_phrase\": \"I'm in St. Paul\"},\n  {\"id\": \"nat3-new-02\", \"service_phrase\": \"concussion evaluation\", \"location_phrase\": \"Sacramento\"},\n  {\"id\": \"nat3-new-03\", \"service_phrase\": \"I want make an annual physical\", \"provider_phrase\": \"Dr. Inna Volkov, a friend told me about her\", \"location_phrase\": \"in Phoenix\"},\n  {\"id\": \"nat3-new-04\", \"service_phrase\": \"I'd like to get a kidney stone evaluation\", \"provider_phrase\": \"Dr. Hailey Morgan\", \"location_phrase\": \"near Miami\"},\n  {\"id\": \"nat3-new-05\", \"service_phrase\": \"I need a trigger point injection\", \"location_phrase\": \"I'm in Detroit\"},\n  {\"id\": \"nat3-noloc-01\", \"service_phrase\": \"my doctor ordered an A1C, you know, the blood sugar test\", \"followup_location_phrase\": \"Phoenix\"},\n  {\"id\": \"nat3-noloc-02\", \"service_phrase\": \"I need a pelvic ultrasound, my doctor ordered it\", \"followup_location_phrase\": \"San Jose\"},\n  {\"id\": \"nat3-noloc-03\", \"service_phrase\": \"a CT scan of my head, doctor ordered it\", \"followup_location_phrase\": \"Baltimore\"},\n  {\"id\": \"nat3-unoff-01\", \"service_phrase\": \"pet scan\", \"location_phrase\": \"Nashville\"},\n  {\"id\": \"nat3-unoff-02\", \"service_phrase\": \"I want to get a hyperbaric oxygen therapy consultation\", \"location_phrase\": \"I'm over by San Francisco\"},\n  {\"id\": \"nat3-ring-01\", \"service_phrase\": \"lasik consultation\", \"location_phrase\": \"Salt Lake City\"}\n]\n",
+ "parsed": [
+  {
+   "id": "nat3-cap-05",
+   "service_phrase": "I need a thyroid ultrasound, yeah a thyroid ultrasound",
+   "location_phrase": "River North Care Center, over in Chicago — that's the one I always go to"
+  },
+  {
+   "id": "nat3-new-01",
+   "service_phrase": "I'm looking to get a lactation consultation",
+   "location_phrase": "I'm in St. Paul"
+  },
+  {
+   "id": "nat3-new-02",
+   "service_phrase": "concussion evaluation",
+   "location_phrase": "Sacramento"
+  },
+  {
+   "id": "nat3-new-03",
+   "service_phrase": "I want make an annual physical",
+   "provider_phrase": "Dr. Inna Volkov, a friend told me about her",
+   "location_phrase": "in Phoenix"
+  },
+  {
+   "id": "nat3-new-04",
+   "service_phrase": "I'd like to get a kidney stone evaluation",
+   "provider_phrase": "Dr. Hailey Morgan",
+   "location_phrase": "near Miami"
+  },
+  {
+   "id": "nat3-new-05",
+   "service_phrase": "I need a trigger point injection",
+   "location_phrase": "I'm in Detroit"
+  },
+  {
+   "id": "nat3-noloc-01",
+   "service_phrase": "my doctor ordered an A1C, you know, the blood sugar test",
+   "followup_location_phrase": "Phoenix"
+  },
+  {
+   "id": "nat3-noloc-02",
+   "service_phrase": "I need a pelvic ultrasound, my doctor ordered it",
+   "followup_location_phrase": "San Jose"
+  },
+  {
+   "id": "nat3-noloc-03",
+   "service_phrase": "a CT scan of my head, doctor ordered it",
+   "followup_location_phrase": "Baltimore"
+  },
+  {
+   "id": "nat3-unoff-01",
+   "service_phrase": "pet scan",
+   "location_phrase": "Nashville"
+  },
+  {
+   "id": "nat3-unoff-02",
+   "service_phrase": "I want to get a hyperbaric oxygen therapy consultation",
+   "location_phrase": "I'm over by San Francisco"
+  },
+  {
+   "id": "nat3-ring-01",
+   "service_phrase": "lasik consultation",
+   "location_phrase": "Salt Lake City"
+  }
+ ]
+}

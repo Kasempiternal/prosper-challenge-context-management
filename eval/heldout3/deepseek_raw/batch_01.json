@@ -1,0 +1,55 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h3-01: Existing patient whose heart doctor wants them to do the test where they walk on a treadmill while their heart is watched. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-02: Existing patient whose doctor wants them to wear a small heart monitor at home for a day or two; they need to come in to have it put on. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-03: Existing patient whose nerve doctor ordered a test that records their brain waves with wires stuck to the scalp. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-04: Existing patient who wants the scratch test on their back to find out exactly what they are allergic to. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-05: Existing patient whose doctor wants their blood taken first thing in the morning before they have eaten anything. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-06: Existing patient whose doctor ordered an MRI of their lower back. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-07: Existing patient whose hands have started shaking when they hold a cup, and it is getting worse. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-08: Existing patient whose voice has been hoarse for a month and whose throat feels like something is stuck in it. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-09: A new patient who just cut their hand badly in the kitchen, thinks it needs stitches and wants to be seen today. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-10: A new patient: a parent whose 3-year-old daughter has had a fever since last night and keeps tugging at her ear. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-11: Existing patient who broke their wrist six weeks ago; the bone doctor wants to see how it is healing. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-12: Existing patient who was given a prescription cream for their pimples and breakouts and needs to check back in about it. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words",
+ "response": "[\n  {\"id\": \"h3-01\", \"service_phrase\": \"gotta do that test where you walk on a treadmill and they watch your heart\"},\n  {\"id\": \"h3-02\", \"service_phrase\": \"doctor wants me to wear one of them little heart monitors at home a day or two, gotta come in so they can put it on me\"},\n  {\"id\": \"h3-03\", \"service_phrase\": \"nerve doctor ordered a test for my head, they stick wires on your scalp and record your brain\"},\n  {\"id\": \"h3-04\", \"service_phrase\": \"the scratch test on my back to find out what I'm allergic to\"},\n  {\"id\": \"h3-05\", \"service_phrase\": \"need my blood took first thing in the morning before I've et anything\"},\n  {\"id\": \"h3-06\", \"service_phrase\": \"need an MRI of my lower back\"},\n  {\"id\": \"h3-07\", \"service_phrase\": \"my hands have started shaking on me, when I hold a cup, and it's getting worse\"},\n  {\"id\": \"h3-08\", \"service_phrase\": \"my voice has been hoarse for a month and my throat feels like something's stuck in it\"},\n  {\"id\": \"h3-09\", \"service_phrase\": \"just cut my hand bad in the kitchen, think it needs stitches, wanna be seen today\"},\n  {\"id\": \"h3-10\", \"service_phrase\": \"my 3-year-old daughter, she's had a fever since last night and she keeps tugging at her ear\"},\n  {\"id\": \"h3-11\", \"service_phrase\": \"broke my wrist six weeks ago, bone doctor wants to see how it's healing\"},\n  {\"id\": \"h3-12\", \"service_phrase\": \"that cream I was given for my pimples and breakouts, need to check back in about it\"}\n]\n",
+ "parsed": [
+  {
+   "id": "h3-01",
+   "service_phrase": "gotta do that test where you walk on a treadmill and they watch your heart"
+  },
+  {
+   "id": "h3-02",
+   "service_phrase": "doctor wants me to wear one of them little heart monitors at home a day or two, gotta come in so they can put it on me"
+  },
+  {
+   "id": "h3-03",
+   "service_phrase": "nerve doctor ordered a test for my head, they stick wires on your scalp and record your brain"
+  },
+  {
+   "id": "h3-04",
+   "service_phrase": "the scratch test on my back to find out what I'm allergic to"
+  },
+  {
+   "id": "h3-05",
+   "service_phrase": "need my blood took first thing in the morning before I've et anything"
+  },
+  {
+   "id": "h3-06",
+   "service_phrase": "need an MRI of my lower back"
+  },
+  {
+   "id": "h3-07",
+   "service_phrase": "my hands have started shaking on me, when I hold a cup, and it's getting worse"
+  },
+  {
+   "id": "h3-08",
+   "service_phrase": "my voice has been hoarse for a month and my throat feels like something's stuck in it"
+  },
+  {
+   "id": "h3-09",
+   "service_phrase": "just cut my hand bad in the kitchen, think it needs stitches, wanna be seen today"
+  },
+  {
+   "id": "h3-10",
+   "service_phrase": "my 3-year-old daughter, she's had a fever since last night and she keeps tugging at her ear"
+  },
+  {
+   "id": "h3-11",
+   "service_phrase": "broke my wrist six weeks ago, bone doctor wants to see how it's healing"
+  },
+  {
+   "id": "h3-12",
+   "service_phrase": "that cream I was given for my pimples and breakouts, need to check back in about it"
+  }
+ ]
+}

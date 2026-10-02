@@ -1,0 +1,31 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h3-p09: Existing patient who wants a annual physical with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Patel, making clear the doctor is a woman, e.g. 'she' or 'the lady doctor' (no first name)\n- id h3-p10: Existing patient who wants a follow-up visit with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Nguyen, the one at the Midtown clinic (no first name)\n- id h3-p11: Existing patient who wants a medication review with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Chen, the one at the North Gate clinic (no first name)\n- id h3-p12: Existing patient who wants a pulmonology consultation with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Nguyen, the one who speaks Mandarin (no first name)\n- id h3-p13: A brand-new patient who wants a well-child visit with a specific doctor. Fields: provider_phrase = how the caller names the doctor: the doctor's full name, Dr. Maria Garcia, and nothing else about her\n- id h3-p14: Existing patient who wants a flu shot with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Michael Sato, the one at the Sunset clinic",
+ "response": "[\n  {\"id\": \"h3-p09\", \"provider_phrase\": \"Dr. Patel, she's the lady doctor\"},\n  {\"id\": \"h3-p10\", \"provider_phrase\": \"Dr. Nguyen, the one over at the Midtown clinic\"},\n  {\"id\": \"h3-p11\", \"provider_phrase\": \"Dr. Chen. North Gate clinic.\"},\n  {\"id\": \"h3-p12\", \"provider_phrase\": \"Dr. Nguyen — the one who speaks Mandarin, that Dr. Nguyen\"},\n  {\"id\": \"h3-p13\", \"provider_phrase\": \"Dr. Maria Garcia\"},\n  {\"id\": \"h3-p14\", \"provider_phrase\": \"Dr. Michael Sato, the one at the Sunset clinic\"}\n]\n",
+ "parsed": [
+  {
+   "id": "h3-p09",
+   "provider_phrase": "Dr. Patel, she's the lady doctor"
+  },
+  {
+   "id": "h3-p10",
+   "provider_phrase": "Dr. Nguyen, the one over at the Midtown clinic"
+  },
+  {
+   "id": "h3-p11",
+   "provider_phrase": "Dr. Chen. North Gate clinic."
+  },
+  {
+   "id": "h3-p12",
+   "provider_phrase": "Dr. Nguyen — the one who speaks Mandarin, that Dr. Nguyen"
+  },
+  {
+   "id": "h3-p13",
+   "provider_phrase": "Dr. Maria Garcia"
+  },
+  {
+   "id": "h3-p14",
+   "provider_phrase": "Dr. Michael Sato, the one at the Sunset clinic"
+  }
+ ]
+}

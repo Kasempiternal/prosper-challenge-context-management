@@ -1,0 +1,55 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h3-x02: A brand-new patient who has never been seen here needs an X-ray of their ankle; an outside doctor referred them. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-x03: Existing patient with no referral who has had heartburn and acid coming up almost every night for months and wants to see a stomach specialist about it. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-x04: A brand-new patient whose outside doctor found hormone problems in their blood tests and referred them to a specialist for hormones and glands. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-x05: A brand-new patient who just moved here and wants to start seeing a gynecologist at this clinic. Fields: service_phrase = what the caller says they need, in their own words\n- id h3-p01: Existing patient who wants a medication management with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Smith, and that it is the psychiatrist (no first name)\n- id h3-p02: A brand-new patient who wants a psychiatric evaluation with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Smith, and that it is the psychiatrist (no first name)\n- id h3-p03: Existing patient who wants a sick visit with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Hernandez, and that it is the nurse practitioner (no first name)\n- id h3-p04: A brand-new patient who wants a sick visit with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Hernandez, and that it is the nurse practitioner (no first name)\n- id h3-p05: Existing patient who wants a annual wellness visit with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Hernandez, the one who speaks Spanish (no first name)\n- id h3-p06: Existing patient who wants a an EKG with a specific doctor. Fields: provider_phrase = how the caller names the doctor: the doctor's full name, Dr. Linda Ramirez, and nothing else about her\n- id h3-p07: Existing patient who wants a sick visit with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Michael Sato, the one who speaks Vietnamese\n- id h3-p08: Existing patient who wants a flu shot with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Garcia, making clear the doctor is a man, e.g. 'he' or 'the male one' (no first name)",
+ "response": "[{\"id\":\"h3-x02\",\"service_phrase\":\"need an x-ray on my ankle, my doctor sent me over\"},\n{\"id\":\"h3-x03\",\"service_phrase\":\"heartburn's been awful, acid keeps coming up most every night for months, want to see somebody about my stomach\"},\n{\"id\":\"h3-x04\",\"service_phrase\":\"my doctor, he found problem with my hormones in the blood test, said I need a specialist for hormones and the glands\"},\n{\"id\":\"h3-x05\",\"service_phrase\":\"just moved here, want to start seeing a gynecologist\"},\n{\"id\":\"h3-p01\",\"provider_phrase\":\"Dr. Smith, the psychiatrist\"},\n{\"id\":\"h3-p02\",\"provider_phrase\":\"Dr. Smith, the psychiatrist one\"},\n{\"id\":\"h3-p03\",\"provider_phrase\":\"Dr. Hernandez, the nurse practitioner\"},\n{\"id\":\"h3-p04\",\"provider_phrase\":\"the nurse practitioner, Dr. Hernandez\"},\n{\"id\":\"h3-p05\",\"provider_phrase\":\"Dr. Hernandez, the one who speaks Spanish\"},\n{\"id\":\"h3-p06\",\"provider_phrase\":\"Dr. Linda Ramirez\"},\n{\"id\":\"h3-p07\",\"provider_phrase\":\"Dr. Michael Sato, the one who speaks Vietnamese\"},\n{\"id\":\"h3-p08\",\"provider_phrase\":\"Dr. Garcia, the male one\"}]\n",
+ "parsed": [
+  {
+   "id": "h3-x02",
+   "service_phrase": "need an x-ray on my ankle, my doctor sent me over"
+  },
+  {
+   "id": "h3-x03",
+   "service_phrase": "heartburn's been awful, acid keeps coming up most every night for months, want to see somebody about my stomach"
+  },
+  {
+   "id": "h3-x04",
+   "service_phrase": "my doctor, he found problem with my hormones in the blood test, said I need a specialist for hormones and the glands"
+  },
+  {
+   "id": "h3-x05",
+   "service_phrase": "just moved here, want to start seeing a gynecologist"
+  },
+  {
+   "id": "h3-p01",
+   "provider_phrase": "Dr. Smith, the psychiatrist"
+  },
+  {
+   "id": "h3-p02",
+   "provider_phrase": "Dr. Smith, the psychiatrist one"
+  },
+  {
+   "id": "h3-p03",
+   "provider_phrase": "Dr. Hernandez, the nurse practitioner"
+  },
+  {
+   "id": "h3-p04",
+   "provider_phrase": "the nurse practitioner, Dr. Hernandez"
+  },
+  {
+   "id": "h3-p05",
+   "provider_phrase": "Dr. Hernandez, the one who speaks Spanish"
+  },
+  {
+   "id": "h3-p06",
+   "provider_phrase": "Dr. Linda Ramirez"
+  },
+  {
+   "id": "h3-p07",
+   "provider_phrase": "Dr. Michael Sato, the one who speaks Vietnamese"
+  },
+  {
+   "id": "h3-p08",
+   "provider_phrase": "Dr. Garcia, the male one"
+  }
+ ]
+}

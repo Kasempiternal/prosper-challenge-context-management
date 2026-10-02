@@ -1,0 +1,67 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat3-geo-13: Existing patient who needs a CT scan of their head that their doctor ordered. They only say which state they live in: Minnesota. Fields: service_phrase = how the caller asks for a CT scan of their head that their doctor ordered; location_phrase = the state only: Minnesota (no city)\n- id nat3-geo-14: Existing patient who needs a CT scan of their head that their doctor ordered. They live in Glendale, Arizona. In the first sentence they only say the town name; when asked which one, they say the state. Fields: service_phrase = how the caller asks for a CT scan of their head that their doctor ordered; location_phrase = the town name Glendale only (no state, no bigger city); followup_location_phrase = their answer to 'which Glendale?': the state Arizona\n- id nat3-geo-15: Existing patient who needs an A1C blood sugar test their doctor ordered. They live in Arlington, Virginia. In the first sentence they only say the town name; when asked which one, they say the state. Fields: service_phrase = how the caller asks for an A1C blood sugar test their doctor ordered; location_phrase = the town name Arlington only (no state, no bigger city); followup_location_phrase = their answer to 'which Arlington?': the state Virginia\n- id nat3-geo-16: Existing patient who needs a drug test for a new job. They live in Fargo, North Dakota. Fields: service_phrase = how the caller asks for a drug test for a new job; location_phrase = where they are: Fargo, North Dakota (say both words)\n- id nat3-geo-17: Existing patient who needs an X-ray of their spine that their doctor ordered. They are in Houston. Fields: service_phrase = how the caller asks for an X-ray of their spine that their doctor ordered\n- id nat3-geo-18: Existing patient who needs a CT scan of their head that their doctor ordered. They are in Sacramento. Fields: service_phrase = how the caller asks for a CT scan of their head that their doctor ordered\n- id nat3-sym-01: Existing patient (has any referral needed) who woke up with a hot, red, swollen big toe joint that hurts to even touch with a sheet. They do not know which kind of doctor they need. They are in Indianapolis. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Indianapolis\n- id nat3-sym-02: Existing patient (has any referral needed) who has a bulge in the groin that aches when lifting things and goes away lying down. They do not know which kind of doctor they need. They are in Orlando. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Orlando\n- id nat3-sym-03: Existing patient (has any referral needed) who gets sharp pain under the right ribs after fatty meals. They do not know which kind of doctor they need. They are in Sacramento. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Sacramento\n- id nat3-sym-04: Existing patient (has any referral needed) who has a 9-year-old son whose teacher says he cannot sit still or focus in class. They do not know which kind of doctor they need. They are in Indianapolis. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Indianapolis\n- id nat3-sym-05: Existing patient (has any referral needed) who has hot flashes, night sweats and irregular periods at age 51. They do not know which kind of doctor they need. They are in Atlanta. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Atlanta\n- id nat3-sym-06: Existing patient (has any referral needed) who has bulging, twisted veins on both legs that ache by the end of the day. They do not know which kind of doctor they need. They are in Minneapolis. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Minneapolis",
+ "response": "```json\n[\n  {\n    \"id\": \"nat3-geo-13\",\n    \"service_phrase\": \"my doctor ordered a CT scan of my head\",\n    \"location_phrase\": \"Minnesota\"\n  },\n  {\n    \"id\": \"nat3-geo-14\",\n    \"service_phrase\": \"got a CT scan ordered for my head\",\n    \"location_phrase\": \"Glendale\",\n    \"followup_location_phrase\": \"Arizona\"\n  },\n  {\n    \"id\": \"nat3-geo-15\",\n    \"service_phrase\": \"doctor sent me for an A1C blood sugar test\",\n    \"location_phrase\": \"Arlington\",\n    \"followup_location_phrase\": \"Virginia\"\n  },\n  {\n    \"id\": \"nat3-geo-16\",\n    \"service_phrase\": \"need a drug test for a new job\",\n    \"location_phrase\": \"Fargo, North Dakota\"\n  },\n  {\n    \"id\": \"nat3-geo-17\",\n    \"service_phrase\": \"doctor ordered an X-ray of my spine\"\n  },\n  {\n    \"id\": \"nat3-geo-18\",\n    \"service_phrase\": \"CT scan of my head, doctor ordered it\"\n  },\n  {\n    \"id\": \"nat3-sym-01\",\n    \"service_phrase\": \"woke up with my big toe hot, red and swollen, hurts even to touch with a sheet\",\n    \"location_phrase\": \"Indianapolis\"\n  },\n  {\n    \"id\": \"nat3-sym-02\",\n    \"service_phrase\": \"there's a bulge in my groin, aches when I lift things, goes away lying down\",\n    \"location_phrase\": \"Orlando\"\n  },\n  {\n    \"id\": \"nat3-sym-03\",\n    \"service_phrase\": \"sharp pain under my right ribs after fatty meals\",\n    \"location_phrase\": \"Sacramento\"\n  },\n  {\n    \"id\": \"nat3-sym-04\",\n    \"service_phrase\": \"my 9-year-old son's teacher says he can't sit still or focus in class\",\n    \"location_phrase\": \"Indianapolis\"\n  },\n  {\n    \"id\": \"nat3-sym-05\",\n    \"service_phrase\": \"hot flashes, night sweats and periods all irregular, I'm 51\",\n    \"location_phrase\": \"Atlanta\"\n  },\n  {\n    \"id\": \"nat3-sym-06\",\n    \"service_phrase\": \"bulging twisted veins on both legs, ache by the end of the day\",\n    \"location_phrase\": \"Minneapolis\"\n  }\n]\n```\n",
+ "parsed": [
+  {
+   "id": "nat3-geo-13",
+   "service_phrase": "my doctor ordered a CT scan of my head",
+   "location_phrase": "Minnesota"
+  },
+  {
+   "id": "nat3-geo-14",
+   "service_phrase": "got a CT scan ordered for my head",
+   "location_phrase": "Glendale",
+   "followup_location_phrase": "Arizona"
+  },
+  {
+   "id": "nat3-geo-15",
+   "service_phrase": "doctor sent me for an A1C blood sugar test",
+   "location_phrase": "Arlington",
+   "followup_location_phrase": "Virginia"
+  },
+  {
+   "id": "nat3-geo-16",
+   "service_phrase": "need a drug test for a new job",
+   "location_phrase": "Fargo, North Dakota"
+  },
+  {
+   "id": "nat3-geo-17",
+   "service_phrase": "doctor ordered an X-ray of my spine"
+  },
+  {
+   "id": "nat3-geo-18",
+   "service_phrase": "CT scan of my head, doctor ordered it"
+  },
+  {
+   "id": "nat3-sym-01",
+   "service_phrase": "woke up with my big toe hot, red and swollen, hurts even to touch with a sheet",
+   "location_phrase": "Indianapolis"
+  },
+  {
+   "id": "nat3-sym-02",
+   "service_phrase": "there's a bulge in my groin, aches when I lift things, goes away lying down",
+   "location_phrase": "Orlando"
+  },
+  {
+   "id": "nat3-sym-03",
+   "service_phrase": "sharp pain under my right ribs after fatty meals",
+   "location_phrase": "Sacramento"
+  },
+  {
+   "id": "nat3-sym-04",
+   "service_phrase": "my 9-year-old son's teacher says he can't sit still or focus in class",
+   "location_phrase": "Indianapolis"
+  },
+  {
+   "id": "nat3-sym-05",
+   "service_phrase": "hot flashes, night sweats and periods all irregular, I'm 51",
+   "location_phrase": "Atlanta"
+  },
+  {
+   "id": "nat3-sym-06",
+   "service_phrase": "bulging twisted veins on both legs, ache by the end of the day",
+   "location_phrase": "Minneapolis"
+  }
+ ]
+}

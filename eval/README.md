@@ -396,3 +396,36 @@ gpt-4o conversation itself (inferred), so the choice is about wrong commits and 
 
 OpenAI spend for all of this work: 87 requests, 64,048 input + 87 output tokens, about $0.009
 (51,007 gpt-4o-mini tokens at $0.15/M and 13,041 gpt-4.1-nano tokens at $0.10/M).
+
+## Held-out round 3 (`heldout3`, `national3`)
+
+Both sets were authored blind on 2026-10-03, while resolver changes were in progress. The author did
+not read resolver code, resolver results or failure transcripts, and has not scored either set. Every
+expectation comes from catalog queries in the generators. DeepSeek (12 calls via `cmdc`) wrote only
+the caller's words, from plain-language scenario facts. Relabels and uncertain labels are listed in
+`heldout3/label_notes.md`. sha256 values are of the committed (LF) bytes.
+
+- `cases_heldout3.jsonl` (SF catalog, 54 cases): sha256
+  `300e08e424db0446f08969c62212139b525fb041b89becf31bf5f86eae468400`. heldout3_type 35 (test 6,
+  symptom 8, colloquial 9, abbreviation 2, slang 4, two types fit so ask 4, not offered 2);
+  heldout3_provider 14 (specialty 2, title 2, language 3, full name 2, gender 2, site 3);
+  heldout3_policy 5 (new_patient_type 2, referral 1, new_patient_provider 2). Expected: 39 offer,
+  7 ask, 8 refuse.
+- `cases_national3.jsonl` (national catalog, 48 cases, each pinning `catalog_sha256`): sha256
+  `2bd6dd084954b5c287ed23e2fdbafa71a46b6cf93bfacaa25a5a5ba8e6771c2b`. geo 18, symptom 8,
+  dup_name_metro 6, capability_metro 5, new_patient 5, no_location 3, unoffered 2, ring 1 (the same
+  mix as national2). Seed 20261003. No type+metro pair is shared with national or national2.
+
+Regenerate (raw DeepSeek outputs are committed, so reruns make no calls):
+
+```
+backend/.venv/Scripts/python eval/heldout3/build_cases.py scenarios
+backend/.venv/Scripts/python eval/heldout3/build_cases.py merge
+backend/.venv/Scripts/python eval/national/build_cases.py --set national3 scenarios
+backend/.venv/Scripts/python eval/national/build_cases.py --set national3 merge
+backend/.venv/Scripts/python eval/validate_case_format.py heldout3 national3   # format only, no scoring
+```
+
+`phrase` (and `repair IDS TAG`) is the step that calls DeepSeek. The national merge needs
+`backend/data/national/catalog.json` checked out with LF line endings, so that its sha256 matches
+`catalog.meta.json`.
