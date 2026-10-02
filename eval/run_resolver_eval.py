@@ -14,6 +14,10 @@ Usage:
            repeated alongside it and printed side by side.
 --live     with --jev on: send every distinct JEV request to the network, refresh the cache and
            report the measured latency. Costs money (~$0.0001 per request).
+
+--chooser jev|openai|embed|none  which model answers the resolver's hooks (--jev on|off are aliases
+           for jev|none). openai reads eval/.openai_cache.json; with --live it sends only the requests
+           missing from it (~$0.0002 each) and aborts past OPENAI_LIVE_LIMIT. embed runs locally.
 """
 
 from __future__ import annotations
@@ -35,13 +39,18 @@ sys.path.insert(0, str(ROOT / "backend"))
 from scheduling.availability import MockAvailability  # noqa: E402
 from scheduling.catalog_index import CatalogIndex  # noqa: E402
 from scheduling.decision import Gate  # noqa: E402
-from scheduling.jev import USD_PER_INPUT_TOKEN, JevClient, JevProviderChooser, JevSiteChooser, JevTypeDisambiguator  # noqa: E402
+from scheduling.embed_chooser import EmbedChooser, EmbedClient, shared_embedder  # noqa: E402
+from scheduling.jev import JevClient, JevProviderChooser, JevSiteChooser, JevTypeDisambiguator  # noqa: E402
+from scheduling.openai_chooser import MODEL as OPENAI_MODEL, OpenAIChoiceClient  # noqa: E402
 from scheduling.lookup import lookup  # noqa: E402
 from scheduling.request import Request, Update, merge  # noqa: E402
 from scheduling.resolver import Plan, plan_json, resolve  # noqa: E402
 
 EVAL = ROOT / "eval"
 CACHE = EVAL / ".jev_cache.json"
+OPENAI_CACHE = EVAL / ".openai_cache.json"
+OPENAI_LIVE_LIMIT = 600
+CHOOSER_LABEL = {"jev": "JEV", "openai": "OpenAI", "embed": "embeddings", "none": "no model"}
 SETS = ("main", "heldout", "heldout2", "tune")
 NATIONAL_SETS = ("national", "national2", "street")
 SF_CATALOG = ROOT / "backend" / "data" / "catalog.json"
@@ -162,9 +171,14 @@ def pct(xs, p):
     return xs[min(len(xs) - 1, int(round(p / 100 * (len(xs) - 1))))]
 
 
-def make_hooks(index, client: JevClient | None, gate: Gate = Gate()) -> dict:
+def make_hooks(index, client, gate: Gate = Gate()) -> dict:
+    """client: a JevClient or OpenAIChoiceClient (both answer the JEV hooks' questions), or an
+    EmbedClient."""
     if client is None:
         return {}
+    if client.provider == "embed":
+        hook = EmbedChooser(index, client, gate)
+        return {"disambiguator": hook, "chooser": hook, "site_chooser": hook}
     return {"disambiguator": JevTypeDisambiguator(index, client, gate), "chooser": JevProviderChooser(index, client, gate),
             "site_chooser": JevSiteChooser(index, client, gate)}
 
@@ -241,24 +255,24 @@ def evaluate(index, cases: list[dict], hooks: dict, client: JevClient | None, la
 def _jev_rows(m: dict) -> list[tuple[str, str]]:
     calls = m["jev_calls"]
     if not calls:
-        return [("JEV requests; turns where a JEV hook fired", f"0; {m['jev_turns']} of {m['all_turns']} turns")]
+        return [("model requests; turns where a hook fired", f"0; {m['jev_turns']} of {m['all_turns']} turns")]
     live = [c.latency_ms for c in calls if c.source == "live"]
     recorded = [c.latency_ms for c in calls if c.source == "cache"]
     failed = sum(1 for c in calls if c.source == "failed")
     in_tok = [c.input_tokens for c in calls if c.source != "failed"]
     rows = [
-        ("JEV requests (rate per resolve turn)", f"{len(calls)} ({len(calls) / max(m['all_turns'], 1):.1%}); "
-                                                f"live {len(live)}, disk cache {len(recorded)}, failed {failed}"),
+        ("model requests (rate per resolve turn)", f"{len(calls)} ({len(calls) / max(m['all_turns'], 1):.1%}); "
+                                                  f"live {len(live)}, disk cache {len(recorded)}, failed {failed}"),
     ]
     if live:
-        rows.append(("JEV latency p50 / p95 / max (live)", f"{pct(live, 50):.0f} / {pct(live, 95):.0f} / {max(live):.0f} ms"))
+        rows.append(("model latency p50 / p95 / max (live)", f"{pct(live, 50):.0f} / {pct(live, 95):.0f} / {max(live):.0f} ms"))
         rows.append(("  ... over the 1.2 s live budget", f"{sum(1 for x in live if x > 1200)} of {len(live)}"))
     if recorded:
-        rows.append(("JEV latency p50 / p95 / max (recorded)", f"{pct(recorded, 50):.0f} / {pct(recorded, 95):.0f} / "
-                                                              f"{max(recorded):.0f} ms  (as measured when cached)"))
+        rows.append(("model latency p50 / p95 / max (recorded)", f"{pct(recorded, 50):.0f} / {pct(recorded, 95):.0f} / "
+                                                                f"{max(recorded):.0f} ms  (as measured when cached)"))
     if in_tok:
-        rows.append(("JEV input tokens total / per request", f"{sum(in_tok)} / {statistics.mean(in_tok):.0f}"))
-        rows.append(("JEV cost if every request were live", f"${sum(in_tok) * USD_PER_INPUT_TOKEN:.5f}"))
+        rows.append(("model input tokens total / per request", f"{sum(in_tok)} / {statistics.mean(in_tok):.0f}"))
+        rows.append(("model cost if every request were live", f"${sum(c.usd for c in calls):.5f}"))
     return rows
 
 
@@ -314,7 +328,7 @@ def wrong_commit(m: dict) -> str:
     return f"{m['wrong_commits']}/{m['commits']} = {m['wrong_commits'] / max(m['commits'], 1):.1%}"
 
 
-def print_headline(results: dict) -> None:
+def print_headline(results: dict, model: str = "JEV") -> None:
     """Per set, with the held-out sets (never used to write rules or tune thresholds) on their own."""
     groups = [("main (rules written against)", ("main",)), ("tune (thresholds chosen on)", ("tune",)),
               ("HELD-OUT heldout", ("heldout",)), ("HELD-OUT heldout2", ("heldout2",)),
@@ -330,7 +344,7 @@ def print_headline(results: dict) -> None:
         return {k: sum(m[k] for m in ms) for k in keys}
 
     print("\n=== HEADLINE: wrong commits per commit; top-1 per evaluated turn ===")
-    print(f"{'set':<30}{'JEV off':<36}" + ("JEV on" if with_jev else ""))
+    print(f"{'set':<30}{'no model':<36}" + (model if with_jev else ""))
     for label, names in groups:
         cols = []
         for which in (0, 1) if with_jev else (0,):
@@ -340,35 +354,59 @@ def print_headline(results: dict) -> None:
             print(f"{label:<30}" + "".join(f"{c:<36}" for c in cols))
 
 
-def print_comparison(name: str, off: dict, on: dict) -> None:
-    def row(m):
-        live = [c.latency_ms for c in m["jev_calls"] if c.source == "live"]
-        tok = sum(c.input_tokens for c in m["jev_calls"] if c.source != "failed")
-        return [wrong_commit(m),
-                f"{m['correct']}/{m['evaluated']} ({m['correct'] / max(m['evaluated'], 1):.1%})",
-                f"{m['qpb']:.2f}",
-                f"{len(m['jev_calls'])} ({len(m['jev_calls']) / max(m['all_turns'], 1):.0%})",
-                f"{pct(live, 50):.0f}/{pct(live, 95):.0f}/{max(live):.0f} ms" if live else "-",
-                f"${tok * USD_PER_INPUT_TOKEN:.5f}"]
-    labels = ["wrong-commit (per commit)", "top-1", "questions per booking", "JEV requests (rate)",
-              "JEV latency p50/p95/max (live)", "JEV $ (input tokens x $0.04/M)"]
-    a, b = row(off), row(on)
-    print(f"\n--- {name}: JEV off vs on ---")
-    print(f"{'metric':<32}{'off':<26}{'on':<26}")
-    for label, x, y in zip(labels, a, b):
-        print(f"{label:<32}{x:<26}{y:<26}")
+def comparison_row(m: dict) -> list[str]:
+    """Latency is as measured when each request was fetched (live now, or recorded in the cache)."""
+    ms = [c.latency_ms for c in m["jev_calls"] if c.source in ("live", "cache")]
+    usd = sum(c.usd for c in m["jev_calls"])
+    return [wrong_commit(m),
+            f"{m['correct']}/{m['evaluated']} ({m['correct'] / max(m['evaluated'], 1):.1%})",
+            f"{m['qpb']:.2f}",
+            f"{len(m['jev_calls'])} ({len(m['jev_calls']) / max(m['all_turns'], 1):.0%})",
+            f"{pct(ms, 50):.0f}/{pct(ms, 95):.0f}/{max(ms):.0f} ms" if ms else "-",
+            f"${usd:.5f} (${usd / max(m['all_turns'], 1) * 1000:.4f}/1k turns)"]
+
+
+COMPARISON_LABELS = ["wrong-commit (per commit)", "top-1", "questions per booking", "model requests (rate)",
+                     "model latency p50/p95/max", "model $ per run (per 1k turns)"]
+
+
+def print_comparison(name: str, off: dict, on: dict, chooser: str = "jev") -> None:
+    a, b = comparison_row(off), comparison_row(on)
+    print(f"\n--- {name}: no model vs {CHOOSER_LABEL[chooser]} ---")
+    print(f"{'metric':<32}{'off':<32}{'on'}")
+    for label, x, y in zip(COMPARISON_LABELS, a, b):
+        print(f"{label:<32}{x:<32}{y}")
+
+
+def make_client(chooser: str, live: bool = False, openai_model: str = OPENAI_MODEL):
+    """Offline settings: patient timeout, no per-turn budget, so the cache gets filled. The live
+    call path uses each client's call defaults; see "over the live budget"."""
+    if chooser == "jev":
+        return JevClient.from_env(mode="live" if live else "cache", cache_path=CACHE, timeout_s=2.5, retries=1,
+                                  turn_budget_s=None)
+    if chooser == "openai":
+        return OpenAIChoiceClient.from_env(mode="auto" if live else "cache", cache_path=OPENAI_CACHE, model=openai_model,
+                                           timeout_s=10.0, turn_budget_s=None, live_limit=OPENAI_LIVE_LIMIT)
+    if chooser == "embed":
+        return EmbedClient(shared_embedder())
+    return None
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--set", default="all", choices=(*SETS, "all", *NATIONAL_SETS))
     ap.add_argument("--catalog", type=Path, help="catalog.json (default: SF, or national for --set national)")
-    ap.add_argument("--jev", default="off", choices=("off", "on"))
+    ap.add_argument("--jev", choices=("off", "on"), help="alias: on = --chooser jev, off = --chooser none")
+    ap.add_argument("--chooser", choices=tuple(CHOOSER_LABEL))
+    ap.add_argument("--openai-model", default=OPENAI_MODEL)
     ap.add_argument("--live", action="store_true")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
-    if args.live and args.jev != "on":
-        ap.error("--live needs --jev on")
+    if args.jev and args.chooser and args.chooser != {"on": "jev", "off": "none"}[args.jev]:
+        ap.error("--jev and --chooser disagree")
+    chooser = args.chooser or ("jev" if args.jev == "on" else "none")
+    if args.live and chooser not in ("jev", "openai"):
+        ap.error("--live needs --chooser jev or openai")
 
     catalog = args.catalog or (NATIONAL_CATALOG if args.set in NATIONAL_SETS else SF_CATALOG)
     if args.set in NATIONAL_SETS:
@@ -378,13 +416,12 @@ def main() -> None:
             ap.error(f"{catalog} has sha256 {actual}; cases_{args.set}.jsonl is pinned to {sorted(map(str, pinned))}")
     index = CatalogIndex.load(catalog)
     names = SETS if args.set == "all" else (args.set,)
-    # Offline settings: patient timeout and one connect retry so the cache gets filled. The live
-    # call path uses JevClient defaults (1.2 s per turn, no retry); see "over the live budget".
-    client = JevClient.from_env(mode="live" if args.live else "cache", cache_path=CACHE, timeout_s=2.5, retries=1,
-                                turn_budget_s=None) if args.jev == "on" else None
+    client = make_client(chooser, args.live, args.openai_model)
+    if chooser == "embed":
+        client.warm_up(index)  # as the live startup preload does; not counted in the latencies
     hooks = make_hooks(index, client)
-    print(f"Resolver eval (o200k_base tokenizer); JEV {args.jev}"
-          + (" (LIVE network)" if args.live else " (disk cache only)" if client else ""))
+    print(f"Resolver eval (o200k_base tokenizer); chooser {chooser}"
+          + (" (LIVE network)" if args.live else " (disk cache only)" if chooser in ("jev", "openai") else ""))
 
     results = {}
     try:
@@ -393,9 +430,9 @@ def main() -> None:
             off = evaluate(index, cases, {}, None)
             on = evaluate(index, cases, hooks, client) if client else None
             results[name] = (off, on)
-            print_table(f"{name}: JEV off", off)
+            print_table(f"{name}: no model", off)
             if on:
-                print_table(f"{name}: JEV on", on)
+                print_table(f"{name}: {CHOOSER_LABEL[chooser]}", on)
             if args.verbose:
                 for case in cases:
                     for i, t in enumerate(run_case(index, case, hooks)):
@@ -408,12 +445,12 @@ def main() -> None:
 
     if client:
         for name, (off, on) in results.items():
-            print_comparison(name, off, on)
-        live = [c for c in client.calls if c.source == "live"]
+            print_comparison(name, off, on, chooser)
+        live = [c for c in client.calls if c.source == "live"] if chooser != "embed" else []
         if live:
             spent = sum(c.input_tokens for c in live)
-            print(f"\nLIVE this run: {len(live)} requests, {spent} input tokens, ${spent * USD_PER_INPUT_TOKEN:.5f}")
-    print_headline(results)
+            print(f"\nLIVE this run: {len(live)} requests, {spent} input tokens, ${sum(c.usd for c in live):.5f}")
+    print_headline(results, CHOOSER_LABEL[chooser])
 
 
 if __name__ == "__main__":

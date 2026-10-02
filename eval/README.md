@@ -337,3 +337,62 @@ Misses with JEV on (4):
 - nat2-geo-17: refused a chest X-ray at the named site and offered two nearby alternatives, where the
   case expected an offer.
 - nat2-dup-06: asked "annual physical or annual wellness visit?" where the case expected an offer.
+
+## Without JEV: OpenAI and local embeddings as the chooser
+
+```
+backend/.venv/Scripts/python eval/run_resolver_eval.py --set tune --chooser openai|embed|jev|none
+backend/.venv/Scripts/python eval/tune_embed_temperature.py       # dev sets only
+backend/.venv/Scripts/python eval/compare_choosers.py             # held-out table, from the caches
+```
+
+The same three hooks (type, provider, site), the same option texts and the same Gate (act_p 0.8,
+margin 0.6, pair_p 0.85, chosen on `cases_tune.jsonl` for JEV) with a different model behind them:
+
+- **OpenAI** (`scheduling/openai_chooser.py`): gpt-4o-mini sees the caller's phrase and the options
+  behind numeric keys (`1`..`N`, each one o200k token; `0` means "none of these") and answers one
+  token. The `top_logprobs` (20) of that token are the distribution. Mass on `0`, on non-key tokens
+  and outside the top 20 is not renormalized onto the options: it lowers the top p, so a hesitant
+  answer asks instead of acting. gpt-4.1-nano was tried on the tune set and made 9 wrong commits of
+  24 against gpt-4o-mini's 4 of 24, so gpt-4o-mini it is. Answers are cached in
+  `eval/.openai_cache.json` (keyed by request body hash) and replay offline.
+- **Embeddings** (`scheduling/embed_chooser.py`): fastembed `BAAI/bge-small-en-v1.5` (ONNX, CPU,
+  64 MB downloaded once), cosine similarity between the phrase and each option, softmax with
+  temperature T. T=0.0125 was chosen on `cases_tune` + `cases_national` by the Gate's objective
+  (fewest wrong commits, then top-1, then questions); the bge query prefix was tried and gained 1 turn
+  of 82, so it was left out. Startup cost, measured: model load 1.0 s, national catalog's 314 types
+  and 299 sites 3.4 s, both in the background preload thread; the 5,000 providers would take ~34 s,
+  so they are embedded on first use (only same-named providers ever reach the chooser). One phrase:
+  ~6 ms.
+
+### Held-out results (run once, after tuning was frozen)
+
+Recorded in `eval/results/chooser_comparison.txt`. Model rate: model requests per resolve turn (the
+hooks fire on the same turns in every mode). Latency: per request as measured when fetched (network
+round trip for JEV and OpenAI, local CPU for embeddings). $ per 1k turns: priced as if every request
+were live.
+
+| set | mode | wrong commits | top-1 | q/booking | model rate | p50/p95 ms | $ / 1k turns |
+|---|---|---|---|---|---|---|---|
+| national2 | JEV | 1/37 (2.7%) | 50/54 (92.6%) | 0.21 | 31% | 533/720 | $0.017 |
+| national2 | OpenAI | 1/35 (2.9%) | 48/54 (88.9%) | 0.23 | 31% | 504/771 | $0.027 |
+| national2 | Embeddings | 2/33 (6.1%) | 45/54 (83.3%) | 0.31 | 31% | 8/11 | $0 |
+| national2 | Off | 1/24 (4.2%) | 37/54 (68.5%) | 0.54 | 0% | - | $0 |
+| SF heldout2 | JEV | 2/33 (6.1%) | 37/49 (75.5%) | 0.20 | 61% | 525/684 | $0.042 |
+| SF heldout2 | OpenAI | 8/38 (21.1%) | 33/49 (67.3%) | 0.12 | 61% | 508/652 | $0.071 |
+| SF heldout2 | Embeddings | 6/32 (18.8%) | 29/49 (59.2%) | 0.28 | 61% | 6/22 | $0 |
+| SF heldout2 | Off | 3/17 (17.6%) | 18/49 (36.7%) | 0.57 | 0% | - | $0 |
+
+Trade-offs. On the national held-out set the commodity choosers recover most of JEV's gain (measured:
+top-1 68.5% off, 83.3% embeddings, 88.9% OpenAI, 92.6% JEV, with wrong commits flat at 1 to 2). On the
+SF held-out set, where most hook calls split same-named doctors by clue words ("the lady", "he speaks
+Spanish", "works at Mission Bay"), both alternatives commit wrongly far more often than JEV (measured:
+8 and 6 wrong commits against 2); gpt-4o-mini puts p=1.00 on wrong doctors, so a Gate tuned to JEV's
+calibration acts on them (inferred: the logprobs are overconfident, and the Gate would need its own
+tuning per model). Embeddings are free, local and about 60x faster per request, but a pronoun or a language does not
+move a cosine similarity much, so they are a fair fallback for visit types and a poor one for people
+(inferred from the misses). Model cost is at most $0.07 per 1,000 turns (measured), small next to the
+gpt-4o conversation itself (inferred), so the choice is about wrong commits and latency, not money.
+
+OpenAI spend for all of this work: 87 requests, 64,048 input + 87 output tokens, about $0.009
+(51,007 gpt-4o-mini tokens at $0.15/M and 13,041 gpt-4.1-nano tokens at $0.10/M).

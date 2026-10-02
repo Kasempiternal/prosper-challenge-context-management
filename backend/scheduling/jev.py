@@ -43,6 +43,10 @@ class JevCall:
     latency_ms: float      # this process for live/failed; the original fetch for cache hits
     input_tokens: int
 
+    @property
+    def usd(self) -> float:
+        return 0.0 if self.source in ("memo", "failed") else self.input_tokens * USD_PER_INPUT_TOKEN
+
 
 class JevClient:
     """mode "live": every request not yet seen in this process goes to the network and refreshes
@@ -52,6 +56,8 @@ class JevClient:
     Defaults are for a live call: 1.2 s per request, no retry, and at most `turn_budget_s` of JEV
     time between begin_turn() calls (one resolve() can consult JEV twice: type, then provider).
     The offline eval passes a longer timeout and one retry on connect errors."""
+
+    provider = "jev"
 
     def __init__(self, api_key: str | None, *, mode: str = "auto", cache_path: Path | None = None,
                  timeout_s: float = 1.2, retries: int = 0, turn_budget_s: float | None = 1.2,

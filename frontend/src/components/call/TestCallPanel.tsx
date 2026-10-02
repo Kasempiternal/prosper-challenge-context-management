@@ -17,6 +17,7 @@ import { CostPanel } from '../dev/CostPanel'
 import { DevTranscript } from '../dev/DevTranscript'
 import { LatencyWaterfall } from '../dev/LatencyWaterfall'
 import { CallReview } from './CallReview'
+import { ChooserControl } from './ChooserControl'
 import { CollectedData } from './CollectedData'
 import { Decisions } from './Decisions'
 import { Transcript } from './Transcript'
@@ -144,6 +145,7 @@ export function TestCallPanel() {
           <CallCaption status={status} error={error} />
         )}
         {status === 'live' && <MicToggle />}
+        {scheduling && <ChooserControl id="call-chooser" />}
         <CallReview />
       </div>
 

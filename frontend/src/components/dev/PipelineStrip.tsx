@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { AudioLines, Brain, Mic, Speaker, Volume2, Wrench, type LucideIcon } from 'lucide-react'
 import { Fragment } from 'react'
+import { modeLabel } from '../../lib/chooser'
 import { cn } from '../../lib/cn'
 import { softSpring } from '../../lib/motion'
 import { usd } from '../../lib/pricing'
@@ -13,7 +14,7 @@ const META: Record<Stage, { label: string; vendor: string; icon: LucideIcon; met
   mic: { label: 'Mic', vendor: 'caller', icon: Mic, metric: '' },
   stt: { label: 'STT', vendor: 'ElevenLabs', icon: AudioLines, metric: 'TTFB' },
   llm: { label: 'LLM', vendor: 'OpenAI', icon: Brain, metric: 'TTFB' },
-  tools: { label: 'Tools', vendor: 'resolver · JEV', icon: Wrench, metric: 'last call' },
+  tools: { label: 'Tools', vendor: 'resolver', icon: Wrench, metric: 'last call' },
   tts: { label: 'TTS', vendor: 'ElevenLabs', icon: Volume2, metric: 'TTFB' },
   speaker: { label: 'Speaker', vendor: 'agent', icon: Speaker, metric: '' },
 }
@@ -57,7 +58,9 @@ export function PipelineStrip() {
 }
 
 function StageChip({ stage, state }: { stage: Stage; state: StageState }) {
-  const { label, vendor, icon: Icon, metric } = META[stage]
+  const mode = useTelemetry((s) => s.mode)
+  const { label, icon: Icon, metric } = META[stage]
+  const vendor = stage === 'tools' && mode ? `resolver · ${modeLabel(mode)}` : META[stage].vendor
   const latency = stage === 'speaker' || stage === 'mic' ? null : state.ms
   return (
     <div

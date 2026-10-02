@@ -6,16 +6,18 @@ export interface Prices {
   openaiOutPerM: number
   ttsPer1kChars: number
   sttPerHour: number
-  jevPerM: number
 }
 
-/** gpt-4o list prices; ElevenLabs and JEV rates are estimates for the demo, editable in the UI. */
+/**
+ * gpt-4o list prices; ElevenLabs rates are estimates for the demo, editable in the UI. The
+ * disambiguator is priced per request by the backend (JEV $0.04/M input, gpt-4o-mini $0.15/$0.60 per M,
+ * embeddings free), so it has no field here.
+ */
 export const DEFAULT_PRICES: Prices = {
   openaiInPerM: 2.5,
   openaiOutPerM: 10,
   ttsPer1kChars: 0.3,
   sttPerHour: 0.4,
-  jevPerM: 0.04,
 }
 
 export const PRICE_FIELDS: ReadonlyArray<{ key: keyof Prices; label: string; unit: string }> = [
@@ -23,11 +25,10 @@ export const PRICE_FIELDS: ReadonlyArray<{ key: keyof Prices; label: string; uni
   { key: 'openaiOutPerM', label: 'OpenAI output', unit: '$ / M tok' },
   { key: 'ttsPer1kChars', label: 'ElevenLabs TTS', unit: '$ / 1k chars' },
   { key: 'sttPerHour', label: 'ElevenLabs STT', unit: '$ / hour' },
-  { key: 'jevPerM', label: 'JEV input', unit: '$ / M tok' },
 ]
 
 export interface CostLine {
-  key: 'openai' | 'tts' | 'stt' | 'jev'
+  key: 'openai' | 'tts' | 'stt' | 'model'
   label: string
   detail: string
   usd: number
@@ -36,7 +37,8 @@ export interface CostLine {
 
 const n = (v: number) => Math.round(v).toLocaleString('en-US')
 
-export function costLines(usage: Usage, sttSeconds: number, prices: Prices): CostLine[] {
+/** `model`: the disambiguator's label (JEV, OpenAI, Embeddings) for its line. */
+export function costLines(usage: Usage, sttSeconds: number, prices: Prices, model = 'Disambiguator'): CostLine[] {
   return [
     {
       key: 'openai',
@@ -60,10 +62,10 @@ export function costLines(usage: Usage, sttSeconds: number, prices: Prices): Cos
       estimate: true,
     },
     {
-      key: 'jev',
-      label: 'JEV',
-      detail: `${n(usage.jevTokens)} tok · ${usage.jevCalls} ${usage.jevCalls === 1 ? 'call' : 'calls'}`,
-      usd: (usage.jevTokens * prices.jevPerM) / 1e6,
+      key: 'model',
+      label: model,
+      detail: `${n(usage.modelTokens)} tok · ${usage.modelCalls} ${usage.modelCalls === 1 ? 'call' : 'calls'}`,
+      usd: usage.modelUsd,
       estimate: false,
     },
   ]

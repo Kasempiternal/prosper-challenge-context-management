@@ -2,9 +2,11 @@ import { Settings2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { catalogCounts, catalogOptions, useCatalogs } from '../../lib/catalogs'
+import { effectiveChooser, effectiveTimeoutMs } from '../../lib/chooser'
 import { fieldErrors } from '../../lib/issues'
 import { useEditor } from '../../store/editor'
 import type { AgentConfig, ResolverConfig, Voice } from '../../types/agent'
+import { ChooserControl } from '../call/ChooserControl'
 import { Field, FieldErrors, Input, Select, Textarea } from '../ui/Field'
 import { Toggle } from '../ui/Toggle'
 import { PanelBody, PanelHeader, Section } from './Panel'
@@ -123,8 +125,6 @@ export function AgentSettings() {
   )
 }
 
-const JEV_TIMEOUT_DEFAULT = 2500
-
 interface SchedulingProps {
   catalog: string
   resolver: ResolverConfig
@@ -137,11 +137,9 @@ interface SchedulingProps {
 function Scheduling({ catalog, resolver, errs, onCatalogChange, onChange }: SchedulingProps) {
   const catalogs = useCatalogs()
   const selected = catalogs?.find((c) => c.path === catalog)
-  const jev = resolver.jev ?? {}
   const speakDirect = resolver.speak_direct ?? true
-  const jevEnabled = jev.enabled ?? true
-  const setJev = (patch: Partial<NonNullable<ResolverConfig['jev']>>, coalesce?: string) =>
-    onChange({ ...resolver, jev: { ...jev, ...patch } }, coalesce)
+  const chooser = effectiveChooser(resolver)
+  const networked = chooser === 'jev' || chooser === 'openai'
 
   return (
     <div className="mt-2 border-t border-border-subtle pt-5">
@@ -182,34 +180,28 @@ function Scheduling({ catalog, resolver, errs, onCatalogChange, onChange }: Sche
             />
           </label>
           <div className="flex flex-col gap-2.5 px-3.5 py-2.5">
-            <label htmlFor="resolver-jev" className="flex cursor-pointer items-center justify-between gap-3">
-              <div>
-                <p className="text-[13px] font-medium">JEV disambiguation</p>
-                <p className="text-[12px] leading-snug text-muted">Asks a small model to settle ambiguous doctor or service names.</p>
-              </div>
-              <Toggle id="resolver-jev" label="JEV disambiguation" checked={jevEnabled} onChange={(v) => setJev({ enabled: v })} />
-            </label>
+            <ChooserControl id="resolver-chooser" />
             <div className="flex items-center justify-between gap-3">
-              <label htmlFor="resolver-jev-timeout" className={jevEnabled ? 'text-[12.5px] text-ink-soft' : 'text-[12.5px] text-faint'}>
-                Timeout
+              <label htmlFor="resolver-timeout" className={networked ? 'text-[12.5px] text-ink-soft' : 'text-[12.5px] text-faint'}>
+                Model timeout per turn
               </label>
               <div className="relative w-[120px]">
                 <Input
-                  id="resolver-jev-timeout"
+                  id="resolver-timeout"
                   type="number"
                   min={1}
                   max={30000}
                   step={100}
                   inputMode="numeric"
-                  disabled={!jevEnabled}
+                  disabled={!networked}
                   className="[appearance:textfield] pr-9 text-right font-mono tabular-nums disabled:opacity-50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  placeholder={String(JEV_TIMEOUT_DEFAULT)}
+                  placeholder={String(effectiveTimeoutMs(resolver))}
                   invalid={errs('resolver').length > 0}
-                  value={jev.timeout_ms ?? ''}
+                  value={resolver.timeout_ms ?? ''}
                   onChange={(e) => {
-                    const { timeout_ms: _drop, ...rest } = jev
+                    const { timeout_ms: _drop, ...rest } = resolver
                     const ms = e.target.valueAsNumber
-                    onChange({ ...resolver, jev: Number.isFinite(ms) ? { ...rest, timeout_ms: Math.round(ms) } : rest }, 'jev-timeout')
+                    onChange(Number.isFinite(ms) ? { ...rest, timeout_ms: Math.round(ms) } : rest, 'resolver-timeout')
                   }}
                 />
                 <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[12px] text-faint">ms</span>

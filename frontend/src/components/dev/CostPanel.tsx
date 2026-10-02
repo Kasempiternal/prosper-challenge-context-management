@@ -13,7 +13,7 @@ const SWATCH: Record<CostLine['key'], string> = {
   openai: 'bg-accent',
   tts: 'bg-success',
   stt: 'bg-info',
-  jev: 'bg-ink-soft',
+  model: 'bg-ink-soft',
 }
 
 export function CostPanel() {

@@ -8,7 +8,8 @@ import { toSignals, type TelemetryEvent } from './telemetry'
  */
 export const RECORDED_CALL: ReadonlyArray<readonly [number, RTVIEvent, unknown?]> = [
   [100, RTVIEvent.ServerMessage, { type: 'node_entered', node: 'greeting', state: {} }],
-  [120, RTVIEvent.ServerMessage, { type: 'jev_call', purpose: 'warmup', ms: 820, input_tokens: 300, usd: 0.000012, ok: true, p: null }],
+  [110, RTVIEvent.ServerMessage, { type: 'resolver_mode', requested: 'jev', active: 'jev' }],
+  [120, RTVIEvent.ServerMessage, { type: 'model_call', provider: 'jev', purpose: 'warmup', ms: 820, input_tokens: 300, usd: 0.000012, ok: true, p: null }],
   [200, RTVIEvent.BotLlmStarted],
   [650, RTVIEvent.Metrics, { ttfb: [{ processor: 'SerialToolCallsLLMService#0', model: 'gpt-4o', value: 0.45 }] }],
   [700, RTVIEvent.BotLlmText, { text: 'Hi! ' }],
@@ -62,10 +63,10 @@ export const RECORDED_CALL: ReadonlyArray<readonly [number, RTVIEvent, unknown?]
   [11800, RTVIEvent.Metrics, { ttfb: [{ processor: 'SerialToolCallsLLMService#0', model: 'gpt-4o', value: 0.38 }] }],
   [11810, RTVIEvent.LLMFunctionCallStarted, {}],
   [11812, RTVIEvent.LLMFunctionCallInProgress, { tool_call_id: 'call_2' }],
-  [12355, RTVIEvent.ServerMessage, { type: 'jev_call', purpose: 'provider', ms: 540, input_tokens: 1800, usd: 0.000072, ok: true, p: 0.92 }],
+  [12355, RTVIEvent.ServerMessage, { type: 'model_call', provider: 'jev', purpose: 'provider', ms: 540, input_tokens: 1800, usd: 0.000072, ok: true, p: 0.92 }],
   [12362, RTVIEvent.ServerMessage, {
     type: 'resolver_decision', status: 'offer', ms: 552, say: 'Dr. Emily Chen has Tuesday at 9. Does that work?',
-    offers: ['1 Tue 09:00 Downtown Dr. Emily Chen'], jev: { used: true, p: 0.92, ms: 540 }, tokens: { result: 77 },
+    offers: ['1 Tue 09:00 Downtown Dr. Emily Chen'], model: { used: true, provider: 'jev', p: 0.92, ms: 540 }, tokens: { result: 77 },
   }],
   [12365, RTVIEvent.LLMFunctionCallStopped, { tool_call_id: 'call_2', cancelled: false }],
   [12370, RTVIEvent.BotLlmStopped],

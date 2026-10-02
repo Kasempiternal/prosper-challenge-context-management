@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { GitBranch } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { naiveBaseline, useCatalogs } from '../../lib/catalogs'
+import { chooserLabel } from '../../lib/chooser'
 import { cn } from '../../lib/cn'
 import { softSpring } from '../../lib/motion'
 import { clock } from '../../lib/time'
@@ -31,7 +32,7 @@ export function Decisions() {
 
   const counted = decisions.filter((d) => d.tokens !== null)
   const avgTokens = counted.length ? Math.round(counted.reduce((sum, d) => sum + (d.tokens ?? 0), 0) / counted.length) : null
-  const jevCalls = decisions.filter((d) => d.jev).length
+  const modelCalls = decisions.filter((d) => d.model).length
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -39,7 +40,7 @@ export function Decisions() {
         <dl className="grid grid-cols-3 gap-3">
           <Stat label="Decisions" value={String(decisions.length)} />
           <Stat label="Avg tokens" value={avgTokens === null ? '—' : String(avgTokens)} />
-          <Stat label="JEV calls" value={String(jevCalls)} />
+          <Stat label="Model calls" value={String(modelCalls)} />
         </dl>
         <p className="flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted">
           Baseline
@@ -144,19 +145,20 @@ function DecisionCard({ decision: d, elapsed }: { decision: TimedDecision; elaps
         )}
 
         {d.reason && <p className="font-mono text-[11px] text-danger">reason: {d.reason}</p>}
-        {d.jev && <JevChip p={d.jev.p} ms={d.jev.ms} />}
+        {d.model && <ModelChip {...d.model} />}
       </article>
     </>
   )
 }
 
-function JevChip({ p, ms }: { p: number | null; ms: number }) {
+function ModelChip({ provider, p, ms }: NonNullable<TimedDecision['model']>) {
+  const label = provider ? chooserLabel(provider) : 'Model'
   return (
     <span
-      title="The JEV disambiguator was consulted for this turn"
+      title={`The ${label} disambiguator was consulted for this turn`}
       className="inline-flex items-center gap-1.5 self-start rounded-[6px] border border-border-subtle bg-surface px-1.5 py-px font-mono text-[10.5px] text-ink-soft tabular-nums"
     >
-      JEV
+      {label}
       {p !== null && (
         <>
           <span className="relative h-1 w-8 overflow-hidden rounded-full bg-border-strong" aria-hidden>

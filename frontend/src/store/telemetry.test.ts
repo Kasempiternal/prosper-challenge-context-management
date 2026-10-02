@@ -66,7 +66,7 @@ describe('telemetry reducer on a recorded call', () => {
         segments: [
           { kind: 'stt', label: 'STT final', start: 0, ms: 0 },
           { kind: 'llm', label: 'LLM TTFB', start: 20, ms: 380 },
-          { kind: 'jev', label: 'JEV provider', start: 415, ms: 540 },
+          { kind: 'model', label: 'JEV provider', start: 415, ms: 540 },
           { kind: 'resolver', label: 'resolver', start: 410, ms: 552 },
           { kind: 'tool', label: 'tool call', start: 412, ms: 553 },
           { kind: 'llm', label: 'LLM TTFB', start: 1000, ms: 360 },
@@ -119,7 +119,7 @@ describe('telemetry reducer on a recorded call', () => {
 
   it('raises tool bubbles on the node that was active, skipping the JEV warm-up', () => {
     expect(run().bubbles.map(({ id: _id, at, ...b }) => ({ ...b, at: at - T0 }))).toEqual([
-      { node: 'schedule', label: 'JEV provider', detail: 'p=0.92 · 540 ms', tone: 'jev', at: 12355 },
+      { node: 'schedule', label: 'JEV provider', detail: 'p=0.92 · 540 ms', tone: 'model', at: 12355 },
       { node: 'schedule', label: 'update_request', detail: 'offer · 552 ms', tone: 'tool', at: 12362 },
     ])
   })
@@ -131,16 +131,41 @@ describe('telemetry reducer on a recorded call', () => {
       completionTokens: 73,
       ttsChars: 129,
       sttSeconds: 11.6,
-      jevTokens: 2100,
-      jevCalls: 2,
+      modelTokens: 2100,
+      modelCalls: 2,
+      modelUsd: expect.closeTo(0.000084, 12),
       promptPerCall: [812, 930, 951, 1012, 1104],
     })
-    const lines = costLines(usage, usage.sttSeconds ?? 0, DEFAULT_PRICES)
-    expect(lines.map((l) => [l.key, Number(l.usd.toFixed(7))])).toEqual([
-      ['openai', 0.0127525],
-      ['tts', 0.0387],
-      ['stt', 0.0012889],
-      ['jev', 0.000084],
+    const lines = costLines(usage, usage.sttSeconds ?? 0, DEFAULT_PRICES, 'JEV')
+    expect(lines.map((l) => [l.key, l.label, Number(l.usd.toFixed(7))])).toEqual([
+      ['openai', 'OpenAI', 0.0127525],
+      ['tts', 'ElevenLabs TTS', 0.0387],
+      ['stt', 'ElevenLabs STT', 0.0012889],
+      ['model', 'JEV', 0.000084],
+    ])
+  })
+
+  it('records which disambiguator the call runs', () => {
+    expect(run().mode).toEqual({ requested: 'jev', active: 'jev' })
+  })
+})
+
+describe('disambiguator telemetry', () => {
+  it('labels each request with its provider and keeps the backend price', () => {
+    const [signal] = toSignals(RTVIEvent.ServerMessage, {
+      type: 'model_call', provider: 'openai', purpose: 'type', ms: 612, input_tokens: 1105, usd: 0.00016635, ok: true, p: 1,
+    })
+    const s = reduce(reduce(initialTelemetry, { kind: 'user_stopped', at: 0 }), { ...signal, at: 700 })
+    expect(s.turns[0].segments).toEqual([{ kind: 'model', label: 'OpenAI type', start: 88, ms: 612 }])
+    expect(s.bubbles.map((b) => [b.label, b.detail, b.tone])).toEqual([['OpenAI type', 'p=1.00 · 612 ms', 'model']])
+    expect(s.usage).toMatchObject({ modelTokens: 1105, modelCalls: 1, modelUsd: 0.00016635 })
+  })
+
+  it('drops a model_call from an unknown provider and a malformed resolver_mode', () => {
+    expect(toSignals(RTVIEvent.ServerMessage, { type: 'model_call', provider: 'gpt5', ms: 1 })).toEqual([])
+    expect(toSignals(RTVIEvent.ServerMessage, { type: 'resolver_mode', requested: 'openai' })).toEqual([])
+    expect(toSignals(RTVIEvent.ServerMessage, { type: 'resolver_mode', requested: 'openai', active: 'none' })).toEqual([
+      { kind: 'resolver_mode', requested: 'openai', active: 'none' },
     ])
   })
 

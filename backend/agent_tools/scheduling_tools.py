@@ -34,7 +34,7 @@ from scheduling.request import PARTS_OF_DAY, SLOT_NAMES, WEEKDAY_NAMES, Request,
 from scheduling.resolver import Offer, Plan, resolve
 from scheduling.templates import spoken_when, type_label
 
-from .context import ToolContext, jev_call_event
+from .context import ToolContext, model_call_event
 
 FILLER = "One moment."
 FILLER_AFTER_S = 0.3
@@ -116,7 +116,7 @@ def _update_request_properties(ctx: ToolContext) -> dict:
     }
 
 
-def _decision_event(ctx: ToolContext, plan: Plan, result: dict, jev_ms: float) -> dict:
+def _decision_event(ctx: ToolContext, plan: Plan, result: dict, elapsed_ms: float) -> dict:
     event = {"type": "resolver_decision", "status": plan.status, "say": plan.say,
              "summary": plan.summary, "notes": list(plan.notes), "valid_rows": plan.valid_rows}
     if "offers" in result:
@@ -127,19 +127,19 @@ def _decision_event(ctx: ToolContext, plan: Plan, result: dict, jev_ms: float) -
         event["reason"] = plan.refusal.code
     called = [v for v in ctx.disambiguator.verdicts if v.called]
     if called:
-        event["jev"] = {"used": True, "p": called[-1].top[0][1] if called[-1].top else None,
-                        "ms": round(jev_ms)}
+        event["model"] = {"used": True, "provider": ctx.provider,
+                          "p": called[-1].top[0][1] if called[-1].top else None, "ms": round(elapsed_ms)}
     else:
-        event["jev"] = {"used": False}
+        event["model"] = {"used": False}
     event["tokens"] = {"result": count_tokens(result)}
-    event["ms"] = round(jev_ms)
+    event["ms"] = round(elapsed_ms)
     return event
 
 
 async def _resolve_with_filler(ctx: ToolContext, req: Request, flow_manager: FlowManager) -> Plan:
     """Resolve off the event loop. If a model hook is still running after FILLER_AFTER_S (a cache
     hit returns in microseconds, so this is a network call), tell the caller to hold on."""
-    ctx.jev_client.begin_turn()
+    ctx.model_client.begin_turn()
     task = asyncio.ensure_future(asyncio.to_thread(resolve, ctx.index, req, ctx.availability,
                                                    ctx.disambiguator, ctx.disambiguator, ctx.disambiguator))
     done, _ = await asyncio.wait({task}, timeout=FILLER_AFTER_S)
@@ -192,14 +192,14 @@ def _with_day_word(args: dict, today: date) -> dict:
 async def _resolve(ctx: ToolContext, req: Request, flow_manager: FlowManager) -> Plan:
     ctx.disambiguator.verdicts.clear()
     ctx.disambiguator.purposes.clear()
-    if ctx.jev_client is None:
+    if ctx.model_client is None:
         return resolve(ctx.index, req, ctx.availability, ctx.disambiguator, ctx.disambiguator, ctx.disambiguator)
-    first_call = len(ctx.jev_client.calls)
+    first_call = len(ctx.model_client.calls)
     plan = await _resolve_with_filler(ctx, req, flow_manager)
     called = [(purpose, v) for purpose, v in zip(ctx.disambiguator.purposes, ctx.disambiguator.verdicts) if v.called]
-    for (purpose, verdict), call in zip(called, ctx.jev_client.calls[first_call:]):
+    for (purpose, verdict), call in zip(called, ctx.model_client.calls[first_call:]):
         p = verdict.top[0][1] if verdict.top else None
-        await ctx.emit(jev_call_event(purpose, call, call.latency_ms, p))
+        await ctx.emit(model_call_event(ctx.provider, purpose, call, call.latency_ms, p))
     return plan
 
 

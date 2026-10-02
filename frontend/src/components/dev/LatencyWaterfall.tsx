@@ -12,10 +12,10 @@ const KIND: Record<SegmentKind, { label: string; bar: string; lane: 0 | 1 }> = {
   tts: { label: 'TTS TTFB', bar: 'bg-success', lane: 0 },
   tool: { label: 'Tool call', bar: 'bg-warning/35', lane: 1 },
   resolver: { label: 'Resolver', bar: 'bg-warning', lane: 1 },
-  jev: { label: 'JEV', bar: 'bg-ink-soft', lane: 1 },
+  model: { label: 'Disambiguator', bar: 'bg-ink-soft', lane: 1 },
 }
-const LEGEND: SegmentKind[] = ['stt', 'llm', 'tool', 'resolver', 'jev', 'tts']
-const DRAW_ORDER: SegmentKind[] = ['stt', 'llm', 'tts', 'tool', 'resolver', 'jev']
+const LEGEND: SegmentKind[] = ['stt', 'llm', 'tool', 'resolver', 'model', 'tts']
+const DRAW_ORDER: SegmentKind[] = ['stt', 'llm', 'tts', 'tool', 'resolver', 'model']
 
 const extent = (t: Turn) => Math.max(t.totalMs ?? 0, ...t.segments.map((g) => g.start + g.ms))
 

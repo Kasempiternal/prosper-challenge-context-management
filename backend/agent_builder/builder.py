@@ -48,8 +48,8 @@ class AgentBuilder:
             self.tool_context = make_context(
                 config.catalog,
                 speak_direct=config.resolver.speak_direct,
-                jev_enabled=config.resolver.jev.enabled,
-                jev_timeout_ms=config.resolver.jev.timeout_ms,
+                chooser=config.resolver.chooser,
+                timeout_ms=config.resolver.timeout_ms,
                 on_event=self._emit,
             )
 

@@ -11,5 +11,8 @@ metaphone==0.6
 # JEV decision-model client (scheduling/jev.py) and .env loading.
 httpx==0.28.1
 python-dotenv==1.2.4
+# Local embedding chooser (scheduling/embed_chooser.py): ONNX on CPU, BAAI/bge-small-en-v1.5
+# (~67 MB, downloaded once to the fastembed cache on first use).
+fastembed==0.8.1
 # Token counts for the resolver_decision event (agent_tools).
 tiktoken==0.14.0

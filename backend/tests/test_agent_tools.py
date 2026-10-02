@@ -49,8 +49,8 @@ def make_ctx(monkeypatch, events):
         events.append(event)
 
     def make(speak_direct=True):
-        return make_context("data/catalog.json", speak_direct=speak_direct, jev_enabled=True,
-                            jev_timeout_ms=2500, on_event=on_event)
+        return make_context("data/catalog.json", speak_direct=speak_direct, chooser="jev",
+                            timeout_ms=2500, on_event=on_event)
 
     return make
 
@@ -86,7 +86,7 @@ def test_new_patient_gets_only_emily_chen_spoken_direct(make_ctx, events):
     assert event["status"] == "offer"
     assert event["say"] == spoken
     assert event["offers"] == result["offers"]
-    assert event["jev"] == {"used": False}
+    assert event["model"] == {"used": False}
     assert event["notes"] == ["policy removed 4 rows: prov_000:new_patient_provider"]
     assert 0 < event["tokens"]["result"] < 160
 
@@ -359,6 +359,8 @@ class SlowTypes:
 
 
 class FakeJevClient:
+    provider = "jev"
+
     def __init__(self):
         self.turns = 0
         self.calls = []
@@ -381,7 +383,7 @@ class ConsultingTypes:
 
 def _jev_ctx(make_ctx, types):
     ctx = make_ctx()
-    ctx.jev_client = FakeJevClient()
+    ctx.model_client = FakeJevClient()
     ctx.disambiguator = RecordingDisambiguator(types, NoDisambiguator())
     return ctx
 
@@ -391,7 +393,7 @@ def test_filler_is_spoken_while_a_slow_model_call_runs(make_ctx):
     call(ctx, fm, "update_request", {"service_phrase": "my zorbly thing"})
     assert fm.worker.frames[0].text == "One moment."
     assert len(fm.worker.frames) == 2
-    assert ctx.jev_client.turns == 1
+    assert ctx.model_client.turns == 1
 
 
 def test_no_filler_when_the_model_is_not_consulted(make_ctx):
@@ -465,7 +467,7 @@ def test_sf_keyterms_are_unchanged(make_ctx):
 
 def test_national_keyterms_keep_the_lay_terms(monkeypatch):
     monkeypatch.delenv("CMD_API_KEY", raising=False)
-    index = make_context("data/national/catalog.json", speak_direct=True, jev_enabled=False, jev_timeout_ms=1200).index
+    index = make_context("data/national/catalog.json", speak_direct=True).index
     terms = stt_keyterms(index)
     assert len(terms) == 50
     assert set(LAY_TERMS) <= set(terms)
@@ -473,10 +475,10 @@ def test_national_keyterms_keep_the_lay_terms(monkeypatch):
 
 
 
-def test_each_jev_request_is_reported_for_the_dev_view(make_ctx):
+def test_each_model_request_is_reported_for_the_dev_view(make_ctx):
     ctx, fm = make_ctx(), FakeFlowManager()
-    ctx.jev_client = FakeJevClient()
-    ctx.disambiguator = RecordingDisambiguator(ConsultingTypes(ctx.jev_client), NoDisambiguator())
+    ctx.model_client = FakeJevClient()
+    ctx.disambiguator = RecordingDisambiguator(ConsultingTypes(ctx.model_client), NoDisambiguator())
     events = []
 
     async def on_event(event):
@@ -484,8 +486,9 @@ def test_each_jev_request_is_reported_for_the_dev_view(make_ctx):
 
     ctx.on_event = on_event
     call(ctx, fm, "update_request", {"service_phrase": "my zorbly thing"})
-    jev = [e for e in events if e["type"] == "jev_call"]
-    assert jev == [{"type": "jev_call", "purpose": "type", "ms": 540, "input_tokens": 900,
-                    "usd": 900 * 0.04 / 1_000_000, "ok": True, "source": "live", "p": 0.79}]
+    calls = [e for e in events if e["type"] == "model_call"]
+    assert calls == [{"type": "model_call", "provider": "jev", "purpose": "type", "ms": 540, "input_tokens": 900,
+                      "usd": 900 * 0.04 / 1_000_000, "ok": True, "source": "live", "p": 0.79}]
     decision = next(e for e in events if e["type"] == "resolver_decision")
     assert isinstance(decision["ms"], int)
+    assert decision["model"] == {"used": True, "provider": "jev", "p": 0.79, "ms": decision["ms"]}

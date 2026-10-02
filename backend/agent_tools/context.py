@@ -2,13 +2,15 @@
 
 The catalog index is immutable and loaded once per process. Bookings (holds) are process-wide,
 so two concurrent calls cannot book the same slot; the request (flow_manager.state["req"]) is
-per call. JEV is used only when the agent enables it and CMD_API_KEY is set; otherwise the
-resolver runs with its no-op disambiguator.
+per call. The agent's resolver.chooser picks the model behind the resolver's hooks: JEV (needs
+CMD_API_KEY), OpenAI (OPENAI_API_KEY), local embeddings (fastembed installed) or none. A chooser
+whose key or package is missing falls back to none, the resolver's no-op disambiguator.
 """
 
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import os
 import threading
@@ -23,14 +25,13 @@ from loguru import logger
 from scheduling.availability import Availability, Hold, MockAvailability, Slot
 from scheduling.catalog_index import CatalogIndex
 from scheduling.decision import Verdict
+from scheduling.embed_chooser import EmbedChooser, EmbedClient, shared_embedder, warm_catalog
+from scheduling.jev import JevClient, JevProviderChooser, JevSiteChooser, JevTypeDisambiguator, type_criteria
 from scheduling.lexicon import SHORTLIST_SIZE, type_shortlist
+from scheduling.openai_chooser import OpenAIChoiceClient
 from scheduling.resolver import NoDisambiguator
 
-try:
-    from scheduling.jev import (USD_PER_INPUT_TOKEN, JevClient, JevProviderChooser, JevSiteChooser,
-                                JevTypeDisambiguator, type_criteria)
-except ImportError:  # the JEV module is optional; without it the resolver never consults a model
-    JevClient = None
+EMBEDDINGS_AVAILABLE = importlib.util.find_spec("fastembed") is not None
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -64,9 +65,11 @@ def resolve_catalog_path(catalog: str) -> Path:
     return (BACKEND_DIR / catalog).resolve()
 
 
-def preload_catalogs(agents_dir: Path) -> threading.Thread:
+def preload_catalogs(agents_dir: Path, embeddings: bool = EMBEDDINGS_AVAILABLE) -> threading.Thread:
     """Build, in a background thread, the index of every catalog an agent in agents_dir names, so the
-    first call on a large catalog does not wait for its build."""
+    first call on a large catalog does not wait for its build. With embeddings, also load the
+    embedding model and embed each catalog's types and sites: any agent can be switched to the
+    embeddings chooser right before a call."""
     catalogs: set[str] = set()
     for path in sorted(Path(agents_dir).glob("*.json")):
         try:
@@ -78,11 +81,22 @@ def preload_catalogs(agents_dir: Path) -> threading.Thread:
             catalogs.add(catalog)
 
     def run() -> None:
+        indexes = []
         for catalog in sorted(catalogs):
             try:
-                load_index(resolve_catalog_path(catalog))
+                indexes.append(load_index(resolve_catalog_path(catalog)))
             except (OSError, ValueError) as e:
                 logger.warning(f"Catalog preload failed for {catalog}: {e}")
+        if embeddings:
+            for index in indexes:
+                started = time.perf_counter()
+                try:
+                    warm_catalog(shared_embedder(), index)
+                except Exception as e:  # noqa: BLE001 - the chooser then fails per call and asks instead
+                    logger.warning(f"Embedding preload failed: {e!r}")
+                    return
+                logger.info(f"Embedded {len(index.types)} types and {len(index.locations)} sites in "
+                            f"{(time.perf_counter() - started) * 1000:.0f} ms")
 
     thread = threading.Thread(target=run, name="catalog-preload", daemon=True)
     thread.start()
@@ -132,7 +146,7 @@ class CallAvailability:
 
 class RecordingDisambiguator:
     """Wraps the resolver's model hooks and keeps the verdicts of the current turn, so the
-    resolver_decision event can show whether JEV was consulted and how sure it was."""
+    resolver_decision event can show whether the model was consulted and how sure it was."""
 
     def __init__(self, types: Any, providers: Any, sites: Any = None):
         self._types, self._providers = types, providers
@@ -168,31 +182,52 @@ class ToolContext:
     speak_direct: bool = True
     disambiguator: RecordingDisambiguator = field(
         default_factory=lambda: RecordingDisambiguator(NoDisambiguator(), NoDisambiguator()))
-    jev_client: Optional[Any] = None
+    # JevClient | OpenAIChoiceClient | EmbedClient: provider, calls, begin_turn(), close().
+    model_client: Optional[Any] = None
+    chooser: str = "none"  # what the agent asked for; model_client.provider is what runs
     on_event: Optional[EventCallback] = None
 
     async def emit(self, event: dict) -> None:
         if self.on_event:
             await self.on_event(event)
 
+    @property
+    def provider(self) -> str:
+        return self.model_client.provider if self.model_client else "none"
 
-def make_context(catalog: str, *, speak_direct: bool, jev_enabled: bool, jev_timeout_ms: int,
+
+def make_context(catalog: str, *, speak_direct: bool, chooser: str = "none", timeout_ms: int = 2500,
                  on_event: Optional[EventCallback] = None) -> ToolContext:
     catalog_path = resolve_catalog_path(catalog)
     index = load_index(catalog_path)
-    api_key = os.environ.get("CMD_API_KEY")
-    client = None
-    if jev_enabled and api_key and JevClient is not None:
-        # Per call, not shared: the client carries this call's per-turn budget (begin_turn).
-        timeout_s = jev_timeout_ms / 1000
-        client = JevClient(api_key, mode="auto", timeout_s=timeout_s, retries=0, turn_budget_s=timeout_s)
+    client = make_model_client(chooser, timeout_ms / 1000)
+    if client is None:
+        dis = RecordingDisambiguator(NoDisambiguator(), NoDisambiguator())
+    elif client.provider == "embed":
+        hook = EmbedChooser(index, client)
+        dis = RecordingDisambiguator(hook, hook, hook)
+    else:
+        # The OpenAI client answers the same choice questions the JEV hooks ask.
         dis = RecordingDisambiguator(JevTypeDisambiguator(index, client), JevProviderChooser(index, client),
                                      JevSiteChooser(index, client))
-    else:
-        dis = RecordingDisambiguator(NoDisambiguator(), NoDisambiguator())
     return ToolContext(index=index, availability=CallAvailability(*shared_availability(catalog_path)),
-                       speak_direct=speak_direct,
-                       disambiguator=dis, jev_client=client, on_event=on_event)
+                       speak_direct=speak_direct, disambiguator=dis, model_client=client, chooser=chooser,
+                       on_event=on_event)
+
+
+def make_model_client(chooser: str, timeout_s: float) -> Any:
+    """Per call, not shared: a networked client carries this call's per-turn budget (begin_turn)."""
+    if chooser == "jev" and os.environ.get("CMD_API_KEY"):
+        return JevClient(os.environ["CMD_API_KEY"], mode="auto", timeout_s=timeout_s, retries=0,
+                         turn_budget_s=timeout_s)
+    if chooser == "openai" and os.environ.get("OPENAI_API_KEY"):
+        return OpenAIChoiceClient(os.environ["OPENAI_API_KEY"], mode="auto", timeout_s=timeout_s,
+                                  turn_budget_s=timeout_s)
+    if chooser == "embed" and EMBEDDINGS_AVAILABLE:
+        return EmbedClient(shared_embedder())
+    if chooser != "none":
+        logger.warning(f"Chooser {chooser!r} is not available (missing key or package); resolving without a model")
+    return None
 
 
 def warm_up_criteria(index: CatalogIndex) -> dict[str, str]:
@@ -201,23 +236,35 @@ def warm_up_criteria(index: CatalogIndex) -> dict[str, str]:
     return type_criteria(index, type_shortlist(index, "an appointment", None)[:SHORTLIST_SIZE])
 
 
-async def warm_up_jev(ctx: ToolContext) -> None:
-    """Pay JEV's cold start while the caller is still listening to the greeting."""
-    if ctx.jev_client is None:
+async def warm_up_model(ctx: ToolContext) -> None:
+    """While the caller is still listening to the greeting: pay JEV's cold start, open the OpenAI
+    connection, or make sure the embedding model and this catalog's vectors are loaded."""
+    client = ctx.model_client
+    if client is None:
         return
     started = time.perf_counter()
-    call = await asyncio.to_thread(ctx.jev_client.warm_up, warm_up_criteria(ctx.index))
+    if client.provider == "jev":
+        call = await asyncio.to_thread(client.warm_up, warm_up_criteria(ctx.index))
+    elif client.provider == "embed":
+        call = await asyncio.to_thread(client.warm_up, ctx.index)
+    else:
+        call = await asyncio.to_thread(client.warm_up)
     ms = (time.perf_counter() - started) * 1000
     if call is None:
-        logger.warning(f"JEV warm-up failed after {ms:.0f} ms")
+        logger.warning(f"{client.provider} warm-up failed after {ms:.0f} ms")
     else:
-        logger.info(f"JEV warm-up {call.source} in {ms:.0f} ms (server {call.latency_ms:.0f} ms)")
-    await ctx.emit(jev_call_event("warmup", call, ms))
+        logger.info(f"{client.provider} warm-up {call.source} in {ms:.0f} ms (measured {call.latency_ms:.0f} ms)")
+    await ctx.emit(model_call_event(client.provider, "warmup", call, ms))
 
 
-def jev_call_event(purpose: str, call: Any, ms: float, p: float | None = None) -> dict:
-    """Telemetry for the UI's Dev view: one JEV request, its latency, size and cost."""
-    tokens = call.input_tokens if call else 0
-    return {"type": "jev_call", "purpose": purpose, "ms": round(ms), "input_tokens": tokens,
-            "usd": tokens * USD_PER_INPUT_TOKEN, "ok": bool(call) and call.source != "failed",
-            "source": call.source if call else "failed", "p": p}
+def resolver_mode_event(ctx: ToolContext) -> dict:
+    """Which chooser this call runs, for the Dev view: `active` differs from `requested` when the
+    requested one is unavailable."""
+    return {"type": "resolver_mode", "requested": ctx.chooser, "active": ctx.provider}
+
+
+def model_call_event(provider: str, purpose: str, call: Any, ms: float, p: float | None = None) -> dict:
+    """Telemetry for the UI's Dev view: one model request, its latency, size and cost."""
+    return {"type": "model_call", "provider": provider, "purpose": purpose, "ms": round(ms),
+            "input_tokens": call.input_tokens if call else 0, "usd": call.usd if call else 0.0,
+            "ok": bool(call) and call.source != "failed", "source": call.source if call else "failed", "p": p}

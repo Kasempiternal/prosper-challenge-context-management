@@ -12,7 +12,7 @@ from typing import Any
 
 from agent_tools import ACTION_NAMES, EDGE_ACTIONS, GUARD_NAMES, TOOL_NAMES
 
-from .schema import CONTEXT_STRATEGIES
+from .schema import CHOOSERS, CONTEXT_STRATEGIES
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 FUNCTION_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]{0,63}$")
@@ -106,6 +106,10 @@ def _validate_resolver(resolver: Any, err) -> None:
         return
     if "speak_direct" in resolver and not isinstance(resolver["speak_direct"], bool):
         err("resolver.speak_direct", "speak_direct must be true or false.")
+    if "chooser" in resolver and resolver["chooser"] not in CHOOSERS:
+        err("resolver.chooser", f"chooser must be one of {', '.join(CHOOSERS)}.")
+    if "timeout_ms" in resolver:
+        _validate_timeout(resolver["timeout_ms"], "resolver.timeout_ms", err)
     jev = resolver.get("jev")
     if jev is None:
         return
@@ -114,9 +118,12 @@ def _validate_resolver(resolver: Any, err) -> None:
         return
     if "enabled" in jev and not isinstance(jev["enabled"], bool):
         err("resolver.jev.enabled", "enabled must be true or false.")
-    timeout = jev.get("timeout_ms", 2500)
+    _validate_timeout(jev.get("timeout_ms", 2500), "resolver.jev.timeout_ms", err)
+
+
+def _validate_timeout(timeout: Any, path: str, err) -> None:
     if not isinstance(timeout, int) or isinstance(timeout, bool) or not 1 <= timeout <= 30000:
-        err("resolver.jev.timeout_ms", "timeout_ms must be an integer between 1 and 30000.")
+        err(path, "timeout_ms must be an integer between 1 and 30000.")
 
 
 def _validate_node(node: dict, path: str, node_names: set[str], err) -> None:

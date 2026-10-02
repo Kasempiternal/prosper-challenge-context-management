@@ -9,7 +9,7 @@ import { useTelemetry, type Bubble } from '../../store/telemetry'
 
 const TTL_MS = 4500
 const MAX_VISIBLE = 3
-const ICON = { tool: Wrench, jev: Scale, warn: AlertTriangle } as const
+const ICON = { tool: Wrench, model: Scale, warn: AlertTriangle } as const
 
 /** Tool results floating above the live node: they rise in, linger, and fade. */
 export function ToolBubbles({ node }: { node: string }) {
@@ -58,7 +58,7 @@ function BubbleChip({ bubble }: { bubble: Bubble }) {
       <span
         className={cn(
           'flex size-[18px] items-center justify-center rounded-full',
-          bubble.tone === 'tool' ? 'bg-warning-soft text-warning' : bubble.tone === 'jev' ? 'bg-raised text-ink-soft' : 'bg-danger-soft text-danger',
+          bubble.tone === 'tool' ? 'bg-warning-soft text-warning' : bubble.tone === 'model' ? 'bg-raised text-ink-soft' : 'bg-danger-soft text-danger',
         )}
       >
         <Icon className="size-3" aria-hidden />

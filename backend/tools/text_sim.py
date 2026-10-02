@@ -200,7 +200,7 @@ async def run_beat(key: str) -> tuple["SimFlowManager", list[str]]:
         result, next_node = await fm.function(name).handler(dict(args), fm)
         for event in events:
             if event["type"] == "resolver_decision":
-                print(f"  [resolver] status={event['status']} jev={event['jev']} tokens={event['tokens']} "
+                print(f"  [resolver] status={event['status']} model={event['model']} tokens={event['tokens']} "
                       f"notes={event['notes']}")
         while fm.heard:
             heard.append(fm.heard.pop(0))

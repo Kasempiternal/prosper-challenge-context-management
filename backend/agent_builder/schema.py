@@ -85,17 +85,27 @@ class JevConfig:
         return cls(enabled=d.get("enabled", True), timeout_ms=d.get("timeout_ms", 2500))
 
 
+CHOOSERS = ("jev", "openai", "embed", "none")
+
+
 @dataclass
 class ResolverConfig:
     """How the scheduling tools behave. speak_direct: templated offers/questions go straight
-    to TTS and skip the LLM's second round trip."""
+    to TTS and skip the LLM's second round trip. chooser: the model that answers the resolver's
+    ambiguous cases; absent, it is "jev" when jev.enabled (the default) and "none" otherwise.
+    timeout_ms: the per-turn budget of a networked chooser; absent, jev.timeout_ms."""
 
     speak_direct: bool = True
     jev: JevConfig = field(default_factory=JevConfig)
+    chooser: str = "jev"
+    timeout_ms: int = 2500
 
     @classmethod
     def from_dict(cls, d: dict) -> "ResolverConfig":
-        return cls(speak_direct=d.get("speak_direct", True), jev=JevConfig.from_dict(d.get("jev") or {}))
+        jev = JevConfig.from_dict(d.get("jev") or {})
+        return cls(speak_direct=d.get("speak_direct", True), jev=jev,
+                   chooser=d.get("chooser") or ("jev" if jev.enabled else "none"),
+                   timeout_ms=d.get("timeout_ms", jev.timeout_ms))
 
 
 @dataclass

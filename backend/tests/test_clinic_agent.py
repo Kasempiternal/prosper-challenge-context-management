@@ -114,7 +114,7 @@ def test_builds_and_every_tool_resolves(clinic):
     assert schedule["context_strategy"].strategy is ContextStrategy.RESET
     booked = builder._make_node(builder._nodes_by_name["booked"])
     assert [f.name for f in booked["functions"]] == ["lookup", "finish", "book_another", "transfer_to_staff"]
-    assert builder.tool_context.jev_client is None
+    assert builder.tool_context.model_client is None
     assert builder.tool_context.speak_direct is True
 
 

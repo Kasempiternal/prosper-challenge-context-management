@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { chooserLabel, type Chooser } from '../lib/chooser'
 import type { Stage, TelemetryEvent } from '../lib/telemetry'
 
 export const STAGES: readonly Stage[] = ['mic', 'stt', 'llm', 'tools', 'tts', 'speaker']
@@ -14,7 +15,7 @@ export interface StageState {
   source: 'ttfb' | 'processing' | 'event' | null
 }
 
-export type SegmentKind = 'stt' | 'llm' | 'tool' | 'resolver' | 'jev' | 'tts'
+export type SegmentKind = 'stt' | 'llm' | 'tool' | 'resolver' | 'model' | 'tts'
 
 /** One span of a turn, in ms relative to the turn start (user stopped speaking). */
 export interface Segment {
@@ -49,7 +50,7 @@ export interface Bubble {
   node: string | null
   label: string
   detail: string
-  tone: 'tool' | 'jev' | 'warn'
+  tone: 'tool' | 'model' | 'warn'
   at: number
 }
 
@@ -59,8 +60,10 @@ export interface Usage {
   ttsChars: number
   /** Null until the STT service reports usage; callers fall back to the call duration. */
   sttSeconds: number | null
-  jevTokens: number
-  jevCalls: number
+  /** Disambiguator requests (JEV, OpenAI or embeddings), priced by the backend per request. */
+  modelTokens: number
+  modelCalls: number
+  modelUsd: number
   /** Prompt tokens of each LLM call, oldest first. */
   promptPerCall: number[]
 }
@@ -77,6 +80,8 @@ export interface Telemetry {
   lines: Line[]
   bubbles: Bubble[]
   usage: Usage
+  /** The disambiguator this call runs; `active` differs from `requested` when that one is unavailable. */
+  mode: { requested: Chooser; active: Chooser } | null
 }
 
 const idleStage: StageState = { active: false, ms: null, source: null }
@@ -97,10 +102,12 @@ export const initialTelemetry: Telemetry = {
     completionTokens: 0,
     ttsChars: 0,
     sttSeconds: null,
-    jevTokens: 0,
-    jevCalls: 0,
+    modelTokens: 0,
+    modelCalls: 0,
+    modelUsd: 0,
     promptPerCall: [],
   },
+  mode: null,
 }
 
 const keepLast = <T>(items: T[], n: number) => (items.length > n ? items.slice(items.length - n) : items)
@@ -225,16 +232,20 @@ export function reduce(s: Telemetry, e: TelemetryEvent): Telemetry {
         tone: 'tool',
       })
     }
-    case 'jev': {
-      const usage = { ...s.usage, jevTokens: s.usage.jevTokens + e.inputTokens, jevCalls: s.usage.jevCalls + 1 }
+    case 'resolver_mode':
+      return { ...s, mode: { requested: e.requested, active: e.active } }
+    case 'model': {
+      const usage = {
+        ...s.usage,
+        modelTokens: s.usage.modelTokens + e.inputTokens,
+        modelCalls: s.usage.modelCalls + 1,
+        modelUsd: s.usage.modelUsd + e.usd,
+      }
       if (e.purpose === 'warmup') return { ...s, usage }
-      const timed = addSegment(setStage({ ...s, usage }, 'tools', { ms: e.ms, source: 'event' }), e.at, 'jev', `JEV ${e.purpose}`, e.ms)
+      const label = `${chooserLabel(e.provider)} ${e.purpose}`
+      const timed = addSegment(setStage({ ...s, usage }, 'tools', { ms: e.ms, source: 'event' }), e.at, 'model', label, e.ms)
       const detail = e.ok ? `${e.p === null ? '' : `p=${e.p.toFixed(2)} · `}${e.ms} ms` : `failed · ${e.ms} ms`
-      return addBubble(timed, e.at, {
-        label: `JEV ${e.purpose}`,
-        detail,
-        tone: e.ok ? 'jev' : 'warn',
-      })
+      return addBubble(timed, e.at, { label, detail, tone: e.ok ? 'model' : 'warn' })
     }
     case 'tts_started':
       return setStage(s, 'tts', { active: true })

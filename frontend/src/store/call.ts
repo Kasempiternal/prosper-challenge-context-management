@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { api } from '../lib/api'
+import { isChooser, type Chooser } from '../lib/chooser'
 import type { GradeResult, GradeTurn } from '../types/grade'
 
 export type CallStatus = 'idle' | 'connecting' | 'live' | 'ended'
@@ -25,8 +26,8 @@ export interface Decision {
   /** What the resolver asked about; options are empty when it asked an open question. */
   ask: { field: string; options: string[] } | null
   reason: string | null
-  /** Present only when the JEV disambiguator was actually called this turn. */
-  jev: { p: number | null; ms: number } | null
+  /** Present only when a disambiguator (JEV, OpenAI, embeddings) was actually called this turn. */
+  model: { provider: Chooser | null; p: number | null; ms: number } | null
   /** Tokens in the tool result the LLM saw. */
   tokens: number | null
 }
@@ -185,14 +186,18 @@ function parseDecision(raw: Record<string, unknown>): Decision | null {
       : isRecord(c) && typeof c.field === 'string'
         ? { field: c.field, options: strings(c.options) }
         : null
-  const jev = isRecord(raw.jev) && raw.jev.used === true ? { p: num(raw.jev.p), ms: num(raw.jev.ms) ?? 0 } : null
+  const m = raw.model
+  const model =
+    isRecord(m) && m.used === true
+      ? { provider: isChooser(m.provider) ? m.provider : null, p: num(m.p), ms: num(m.ms) ?? 0 }
+      : null
   return {
     status: raw.status,
     say: typeof raw.say === 'string' ? raw.say : '',
     offers: strings(raw.offers),
     ask,
     reason: typeof raw.reason === 'string' ? raw.reason : null,
-    jev,
+    model,
     tokens: isRecord(raw.tokens) ? num(raw.tokens.result) : null,
   }
 }

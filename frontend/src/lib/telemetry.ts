@@ -1,4 +1,5 @@
 import { RTVIEvent, type RTVIEventHandler } from '@pipecat-ai/client-js'
+import { isChooser, type Chooser } from './chooser'
 
 export type Stage = 'mic' | 'stt' | 'llm' | 'tools' | 'tts' | 'speaker'
 export type MetricStage = 'stt' | 'llm' | 'tts'
@@ -23,7 +24,8 @@ export type TelemetrySignal =
   | { kind: 'tts_usage'; chars: number }
   | { kind: 'stt_usage'; seconds: number }
   | { kind: 'resolver'; status: string; ms: number | null }
-  | { kind: 'jev'; purpose: string; ms: number; inputTokens: number; usd: number; ok: boolean; p: number | null }
+  | { kind: 'model'; provider: Chooser; purpose: string; ms: number; inputTokens: number; usd: number; ok: boolean; p: number | null }
+  | { kind: 'resolver_mode'; requested: Chooser; active: Chooser }
   | { kind: 'node_entered'; node: string }
   | { kind: 'edge_taken'; fn: string; from: string; to: string }
   | { kind: 'call_live' }
@@ -94,12 +96,17 @@ export function serverSignals(data: unknown): TelemetrySignal[] {
       const status = str(data.status)
       return status === null ? [] : [{ kind: 'resolver', status, ms: num(data.ms) }]
     }
-    case 'jev_call': {
+    case 'resolver_mode':
+      return isChooser(data.requested) && isChooser(data.active)
+        ? [{ kind: 'resolver_mode', requested: data.requested, active: data.active }]
+        : []
+    case 'model_call': {
       const ms = num(data.ms)
-      if (ms === null) return []
+      if (ms === null || !isChooser(data.provider)) return []
       return [
         {
-          kind: 'jev',
+          kind: 'model',
+          provider: data.provider,
           purpose: str(data.purpose) ?? 'call',
           ms,
           inputTokens: num(data.input_tokens) ?? 0,

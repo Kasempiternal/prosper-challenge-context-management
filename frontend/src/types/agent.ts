@@ -63,9 +63,14 @@ export interface AgentConfig {
   [key: string]: unknown
 }
 
-/** Absent keys mean the backend default (speak_direct true, jev.enabled true, jev.timeout_ms 2500). */
+/**
+ * Absent keys mean the backend default (speak_direct true; chooser "jev" unless jev.enabled is false;
+ * timeout_ms falls back to jev.timeout_ms, then 2500). See lib/chooser.ts.
+ */
 export interface ResolverConfig {
   speak_direct?: boolean
+  chooser?: 'jev' | 'openai' | 'embed' | 'none'
+  timeout_ms?: number
   jev?: { enabled?: boolean; timeout_ms?: number; [key: string]: unknown }
   [key: string]: unknown
 }

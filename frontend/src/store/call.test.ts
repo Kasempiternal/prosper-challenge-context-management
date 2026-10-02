@@ -16,7 +16,7 @@ const OFFER = {
   notes: [],
   valid_rows: 6,
   offers: ['1 Tue 09:00 Downtown Dr. Emily Chen', '2 Wed 14:00 Downtown Dr. Emily Chen'],
-  jev: { used: true, p: 0.92, ms: 540 },
+  model: { used: true, provider: 'openai', p: 0.92, ms: 540 },
   tokens: { result: 77 },
 }
 const ASK = {
@@ -24,7 +24,7 @@ const ASK = {
   status: 'ask',
   say: 'Do you mean Dr. David Chen or Dr. Emily Chen?',
   candidates: { field: 'provider', options: ['Dr. David Chen', 'Dr. Emily Chen'] },
-  jev: { used: false },
+  model: { used: false },
   tokens: { result: 54 },
 }
 
@@ -35,7 +35,7 @@ describe('resolver_decision', () => {
     useCall.getState().begin()
     ingestRaw(OFFER)
     ingestRaw(ASK)
-    ingestRaw({ type: 'resolver_decision', status: 'ask', say: 'Are you a new patient?', candidates: 'is_new', jev: { used: false } })
+    ingestRaw({ type: 'resolver_decision', status: 'ask', say: 'Are you a new patient?', candidates: 'is_new', model: { used: false } })
 
     const decisions = useCall.getState().decisions.map(({ at: _at, ...d }) => d)
     expect(decisions).toEqual([
@@ -45,7 +45,7 @@ describe('resolver_decision', () => {
         offers: OFFER.offers,
         ask: null,
         reason: null,
-        jev: { p: 0.92, ms: 540 },
+        model: { provider: 'openai', p: 0.92, ms: 540 },
         tokens: 77,
       },
       {
@@ -54,7 +54,7 @@ describe('resolver_decision', () => {
         offers: [],
         ask: { field: 'provider', options: ['Dr. David Chen', 'Dr. Emily Chen'] },
         reason: null,
-        jev: null,
+        model: null,
         tokens: 54,
       },
       {
@@ -63,17 +63,17 @@ describe('resolver_decision', () => {
         offers: [],
         ask: { field: 'is_new', options: [] },
         reason: null,
-        jev: null,
+        model: null,
         tokens: null,
       },
     ])
   })
 
-  it('keeps the refusal reason and a JEV call with no probability', () => {
-    ingestRaw({ type: 'resolver_decision', status: 'refuse', say: 'No.', reason: 'needs_referral', jev: { used: true, p: null, ms: 1200 } })
+  it('keeps the refusal reason and a model call with no probability or known provider', () => {
+    ingestRaw({ type: 'resolver_decision', status: 'refuse', say: 'No.', reason: 'needs_referral', model: { used: true, provider: 'gpt5', p: null, ms: 1200 } })
     const [d] = useCall.getState().decisions
     expect(d.reason).toBe('needs_referral')
-    expect(d.jev).toEqual({ p: null, ms: 1200 })
+    expect(d.model).toEqual({ provider: null, p: null, ms: 1200 })
   })
 
   it('a new call starts with no decisions', () => {

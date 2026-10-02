@@ -1,0 +1,60 @@
+Chooser comparison on held-out sets. Gate act_p 0.8 / margin 0.6 / pair_p 0.85 (tuned on cases_tune.jsonl). OpenAI gpt-4o-mini; embeddings BAAI/bge-small-en-v1.5, T=0.0125 (tuned on cases_tune + cases_national).
+Latency: per model request, as measured when fetched (JEV and OpenAI: network round trip recorded in the cache; embeddings: local CPU).
+
+== held-out national2: 48 cases ==
+mode        wrong-commit      top-1             q/booking         model rate        p50/p95 ms        $/1k turns        failed            
+JEV         1/37 (2.7%)       50/54 (92.6%)     0.21              31% (17)          533/720           $0.0167           0                 
+OpenAI      1/35 (2.9%)       48/54 (88.9%)     0.23              31% (17)          504/771           $0.0271           0                 
+embeddings  2/33 (6.1%)       45/54 (83.3%)     0.31              31% (17)          8/11              $0.0000           0                 
+no model    1/24 (4.2%)       37/54 (68.5%)     0.54              0% (0)            -                 $0.0000           0                 
+
+== held-out SF (heldout2): 49 cases ==
+mode        wrong-commit      top-1             q/booking         model rate        p50/p95 ms        $/1k turns        failed            
+JEV         2/33 (6.1%)       37/49 (75.5%)     0.20              61% (30)          525/684           $0.0419           0                 
+OpenAI      8/38 (21.1%)      33/49 (67.3%)     0.12              61% (30)          508/652           $0.0705           0                 
+embeddings  6/32 (18.8%)      29/49 (59.2%)     0.28              61% (30)          6/22              $0.0000           0                 
+no model    3/17 (17.6%)      18/49 (36.7%)     0.57              0% (0)            -                 $0.0000           0                 
+
+Wrong commits (every mode):
+  held-out national2 / JEV: nat2-new-05 turn 1: status offer != refuse; refusal None != new_patient_type; WRONG COMMIT: offered when it should not
+  held-out national2 / OpenAI: nat2-new-05 turn 1: status offer != refuse; refusal None != new_patient_type; WRONG COMMIT: offered when it should not
+  held-out national2 / embeddings: nat2-sym-05 turn 1: types ['appt_038'] not within ['appt_036', 'appt_050', 'appt_155', 'appt_178']
+      type disambiguator: act appt_038 [appt_038=0.98 appt_003=0.01 appt_036=0.00]
+  held-out national2 / embeddings: nat2-new-05 turn 1: status offer != refuse; refusal None != new_patient_type; WRONG COMMIT: offered when it should not
+  held-out national2 / no model: nat2-new-05 turn 1: status offer != refuse; refusal None != new_patient_type; WRONG COMMIT: offered when it should not
+  held-out SF (heldout2) / JEV: h2-10 turn 1: types ['appt_010'] != appt_013
+  held-out SF (heldout2) / JEV: h2-p07 turn 1: status offer != ask; ask None != provider; ask options None != ['prov_023', 'prov_024']; WRONG COMMIT: offered when it should not
+      provider chooser on ['lady']: act prov_023 [prov_023=0.86 prov_024=0.13 prov_028=0.01]
+  held-out SF (heldout2) / OpenAI: h2-01 turn 1: types ['appt_007'] != appt_053
+      type disambiguator: act appt_007 [appt_007=0.96 appt_008=0.04 appt_000=0.00]
+  held-out SF (heldout2) / OpenAI: h2-10 turn 1: types ['appt_010'] != appt_013
+  held-out SF (heldout2) / OpenAI: h2-11 turn 1: types ['appt_015'] != appt_016
+      type disambiguator: act appt_015 [appt_015=0.85 appt_016=0.15 appt_013=0.00]
+  held-out SF (heldout2) / OpenAI: h2-31 turn 1: types ['appt_032'] != appt_035
+      type disambiguator: act appt_032 [appt_032=1.00 appt_002=0.00 appt_033=0.00]
+  held-out SF (heldout2) / OpenAI: h2-p02 turn 1: status offer != ask; ask None != provider; ask options None != ['prov_004', 'prov_047']; WRONG COMMIT: offered when it should not
+      provider chooser on ['works', 'mission', 'bay']: act prov_047 [prov_047=1.00 prov_004=0.00 prov_012=0.00]
+  held-out SF (heldout2) / OpenAI: h2-p06 turn 1: status offer != ask; ask None != provider; ask options None != ['prov_024', 'prov_028']; WRONG COMMIT: offered when it should not
+      provider chooser on ['richmond']: act prov_024 [prov_024=1.00 prov_028=0.00 prov_023=0.00]
+  held-out SF (heldout2) / OpenAI: h2-p07 turn 1: status offer != ask; ask None != provider; ask options None != ['prov_023', 'prov_024']; WRONG COMMIT: offered when it should not
+      provider chooser on ['lady']: act prov_023 [prov_023=1.00 prov_024=0.00 prov_028=0.00]
+  held-out SF (heldout2) / OpenAI: h2-p08 turn 1: providers ['prov_023'] not within ['prov_028']
+      provider chooser on ['he', 'speaks', 'spanish']: act prov_023 [prov_023=1.00 prov_028=0.00 prov_024=0.00]
+  held-out SF (heldout2) / embeddings: h2-03 turn 1: types ['appt_022'] != appt_020
+      type disambiguator: act appt_022 [appt_022=0.97 appt_023=0.01 appt_021=0.01]
+  held-out SF (heldout2) / embeddings: h2-07 turn 1: types ['appt_065'] != appt_032
+      type disambiguator: act appt_065 [appt_065=0.97 appt_034=0.02 appt_033=0.01]
+  held-out SF (heldout2) / embeddings: h2-10 turn 1: types ['appt_010'] != appt_013
+  held-out SF (heldout2) / embeddings: h2-p06 turn 1: status offer != ask; ask None != provider; ask options None != ['prov_024', 'prov_028']; WRONG COMMIT: offered when it should not
+      provider chooser on ['richmond']: act prov_024 [prov_024=0.83 prov_028=0.17 prov_023=0.00]
+  held-out SF (heldout2) / embeddings: h2-p07 turn 1: status offer != ask; ask None != provider; ask options None != ['prov_023', 'prov_024']; WRONG COMMIT: offered when it should not
+      provider chooser on ['lady']: act prov_024 [prov_024=0.80 prov_028=0.20 prov_023=0.00]
+  held-out SF (heldout2) / embeddings: h2-p12 turn 1: status offer != ask; ask None != provider; ask options None != ['prov_026', 'prov_032', 'prov_040']; WRONG COMMIT: offered when it should not
+      provider chooser on ['saw', 'last', 'time']: act prov_026 [prov_026=0.91 prov_040=0.08 prov_032=0.02]
+  held-out SF (heldout2) / no model: h2-10 turn 1: types ['appt_010'] != appt_013
+  held-out SF (heldout2) / no model: h2-15 turn 1: types ['appt_075'] != appt_076
+      type disambiguator: open (no call)
+  held-out SF (heldout2) / no model: h2-31 turn 1: types ['appt_032'] != appt_035
+      type disambiguator: open (no call)
+
+OpenAI requests sent this run: 47 (32583 input + 47 output tokens, $0.00492)

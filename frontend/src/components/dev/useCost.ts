@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { chooserLabel } from '../../lib/chooser'
 import { costLines, usePricing, type CostLine } from '../../lib/pricing'
 import { useTelemetry } from '../../store/telemetry'
 
@@ -20,7 +21,9 @@ function useCallSeconds(): number {
 export function useCost(): { lines: CostLine[]; total: number } {
   const usage = useTelemetry((s) => s.usage)
   const prices = usePricing((s) => s.prices)
+  const mode = useTelemetry((s) => s.mode)
   const callSeconds = useCallSeconds()
-  const lines = costLines(usage, usage.sttSeconds ?? callSeconds, prices)
+  const model = mode && mode.active !== 'none' ? chooserLabel(mode.active) : undefined
+  const lines = costLines(usage, usage.sttSeconds ?? callSeconds, prices, model)
   return { lines, total: lines.reduce((sum, l) => sum + l.usd, 0) }
 }

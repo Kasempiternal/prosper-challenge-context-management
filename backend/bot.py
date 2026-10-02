@@ -47,7 +47,7 @@ from pipecat.workers.runner import WorkerRunner
 from pipecat.flows import FlowManager
 
 from agent_builder import AgentBuilder, AgentConfig, validate_agent
-from agent_tools import stt_keyterms, warm_up_jev
+from agent_tools import resolver_mode_event, stt_keyterms, warm_up_model
 from agent_tools.context import preload_catalogs
 from agents_api import ID_RE, agents_dir_from_env, create_router
 
@@ -178,8 +178,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Client connected — starting flow at initial node")
-        if builder.tool_context and builder.tool_context.jev_client:
-            task = asyncio.create_task(warm_up_jev(builder.tool_context))
+        if builder.tool_context:
+            await send_event(resolver_mode_event(builder.tool_context))
+        if builder.tool_context and builder.tool_context.model_client:
+            task = asyncio.create_task(warm_up_model(builder.tool_context))
             background.add(task)
             task.add_done_callback(background.discard)
         await builder.start(flow_manager)
@@ -189,8 +191,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
         logger.info("Client disconnected")
         for task in list(background):
             task.cancel()
-        if builder.tool_context and builder.tool_context.jev_client:
-            builder.tool_context.jev_client.close()
+        if builder.tool_context and builder.tool_context.model_client:
+            builder.tool_context.model_client.close()
         await worker.cancel()
 
     runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
