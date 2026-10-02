@@ -1,0 +1,322 @@
+@import 'tailwindcss';
+@import '@xyflow/react/dist/style.css';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Semantic tokens. Components only use these names; `.dark` swaps the values.
+ * Both the theme class and these variables live on <html>, so tokens composed
+ * from other tokens (color-mix, shadows) resolve against the active theme.
+ */
+@theme static {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Instrument Serif', ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'Cascadia Code', Menlo, monospace;
+
+  --color-bg: #f9f4ec;
+  --color-surface: #fef9f1;
+  --color-card: #ffffff;
+  --color-raised: #f5f0e8;
+  --color-border: #e3ded6;
+  --color-border-subtle: #ecebeb;
+  --color-border-strong: #d4cec4;
+  --color-ink: #141414;
+  --color-ink-soft: #332e29;
+  --color-muted: #676059;
+  --color-faint: #766e65;
+  --color-hover: rgb(20 20 20 / 0.045);
+  --color-press: rgb(20 20 20 / 0.07);
+  --color-overlay: rgb(20 20 20 / 0.25);
+
+  --color-accent: #ff421c;
+  --color-accent-hover: #e8360f;
+  --color-accent-pressed: #d42f0b;
+  --color-accent-ink: #ffffff;
+  --color-accent-soft: #fff0eb;
+  --color-info: #095580;
+  --color-info-soft: #e7f0f5;
+  --color-success: #136f6d;
+  --color-success-soft: #e5f1f0;
+  --color-warning: #8a5300;
+  --color-warning-soft: #fcf1dc;
+  --color-danger: #d92d20;
+  --color-danger-hover: #b42318;
+  --color-danger-soft: #fdecea;
+  --color-danger-ink: #ffffff;
+  --color-focus: #ff421c;
+
+  --color-edge: #b9b1a6;
+  --color-dots: #d9d2c6;
+  --color-minimap-node: rgb(20 20 20 / 0.16);
+  --color-skeleton: #efe9df;
+  --color-skeleton-shine: #f7f2ea;
+
+  --radius-card: 12px;
+  --radius-panel: 20px;
+
+  --ease-out-soft: cubic-bezier(0.215, 0.61, 0.355, 1);
+
+  --shadow-card: 0 1px 2px rgb(20 20 20 / 0.04), 0 1px 3px rgb(20 20 20 / 0.04);
+  --shadow-lift: 0 2px 4px rgb(20 20 20 / 0.04), 0 8px 24px -6px rgb(20 20 20 / 0.12);
+  --shadow-panel: 0 1px 2px rgb(20 20 20 / 0.04), 0 16px 48px -12px rgb(51 46 41 / 0.18);
+  --shadow-focus: 0 0 0 3px color-mix(in srgb, var(--color-accent) 16%, transparent);
+  --shadow-accent: 0 8px 24px -6px color-mix(in srgb, var(--color-accent) 55%, transparent);
+  --shadow-knob: 0 1px 2px rgb(0 0 0 / 0.2);
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-live-glow: live-glow 2.2s var(--ease-out-soft) infinite;
+  --animate-dash: dash 0.9s linear infinite;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --color-bg: #12100e;
+  --color-surface: #181613;
+  --color-card: #211e1a;
+  --color-raised: #2a2621;
+  --color-border: #34302a;
+  --color-border-subtle: #2a2621;
+  --color-border-strong: #463f37;
+  --color-ink: #f4efe7;
+  --color-ink-soft: #d6cfc5;
+  --color-muted: #a8a097;
+  /* #7d756b from the palette is 3.7:1 on card; lifted to pass AA (5.1:1). */
+  --color-faint: #958d83;
+  --color-hover: rgb(255 255 255 / 0.05);
+  --color-press: rgb(255 255 255 / 0.08);
+  --color-overlay: rgb(0 0 0 / 0.55);
+
+  --color-accent: #ff5a36;
+  --color-accent-hover: #ff6e4d;
+  --color-accent-pressed: #e8401c;
+  --color-accent-ink: #ffffff;
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 16%, var(--color-card));
+  --color-info: #5fa8d3;
+  --color-info-soft: color-mix(in srgb, var(--color-info) 16%, var(--color-card));
+  --color-success: #3fb5a0;
+  --color-success-soft: color-mix(in srgb, var(--color-success) 16%, var(--color-card));
+  --color-warning: #e3b04f;
+  --color-warning-soft: color-mix(in srgb, var(--color-warning) 15%, var(--color-card));
+  --color-danger: #f97066;
+  --color-danger-hover: #fb8a81;
+  --color-danger-ink: #1f0c0a;
+  --color-danger-soft: color-mix(in srgb, var(--color-danger) 14%, var(--color-card));
+  --color-focus: #ff6e4d;
+
+  --color-edge: #5c554c;
+  --color-dots: #2c2823;
+  --color-minimap-node: rgb(244 239 231 / 0.22);
+  --color-skeleton: #24201c;
+  --color-skeleton-shine: #2e2924;
+
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.03), 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-lift: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 8px 24px -8px rgb(0 0 0 / 0.55);
+  --shadow-panel: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 16px 48px -12px rgb(0 0 0 / 0.6);
+  --shadow-accent: 0 8px 24px -8px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  --shadow-knob: 0 1px 2px rgb(0 0 0 / 0.45);
+}
+
+/* Present only for ~250ms after the user switches theme, so first paint never animates. */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition:
+    background-color 200ms var(--ease-out-soft),
+    border-color 200ms var(--ease-out-soft),
+    color 200ms var(--ease-out-soft),
+    fill 200ms var(--ease-out-soft),
+    stroke 200ms var(--ease-out-soft),
+    box-shadow 200ms var(--ease-out-soft) !important;
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@keyframes live-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px var(--color-accent),
+      0 0 0 6px color-mix(in srgb, var(--color-accent) 18%, transparent),
+      0 10px 32px -8px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--color-accent),
+      0 0 0 10px color-mix(in srgb, var(--color-accent) 8%, transparent),
+      0 10px 32px -8px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+}
+
+@keyframes dash {
+  to { stroke-dashoffset: -16; }
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  html {
+    color-scheme: light;
+  }
+  body {
+    @apply bg-bg font-sans text-ink antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    font-size: 14px;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  }
+}
+
+@utility skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-skeleton) 0%,
+    var(--color-skeleton-shine) 40%,
+    var(--color-skeleton) 80%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+/* React Flow theming: the non-default --xy-* variables win over both of its built-in palettes. */
+.react-flow {
+  --xy-background-color: transparent;
+  --xy-edge-stroke: var(--color-edge);
+  --xy-edge-stroke-width: 1.5;
+  --xy-edge-stroke-selected: var(--color-accent);
+  --xy-connectionline-stroke: var(--color-accent);
+  --xy-connectionline-stroke-width: 1.5;
+  --xy-handle-background-color: var(--color-card);
+  --xy-handle-border-color: var(--color-edge);
+  --xy-minimap-background-color: var(--color-surface);
+  --xy-minimap-mask-background-color: color-mix(in srgb, var(--color-bg) 70%, transparent);
+  --xy-minimap-mask-stroke-color: var(--color-border);
+  --xy-minimap-node-background-color: var(--color-minimap-node);
+  --xy-controls-button-background-color: var(--color-card);
+  --xy-controls-button-background-color-hover: var(--color-raised);
+  --xy-controls-button-border-color: var(--color-border-subtle);
+  --xy-controls-button-color: var(--color-ink-soft);
+  --xy-controls-button-color-hover: var(--color-ink);
+  --xy-controls-box-shadow: var(--shadow-card);
+  --xy-edge-label-background-color: var(--color-card);
+  --xy-edge-label-color: var(--color-ink-soft);
+  --xy-selection-background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  --xy-selection-border: 1px dashed color-mix(in srgb, var(--color-accent) 60%, transparent);
+  --xy-attribution-background-color: transparent;
+}
+
+.react-flow__node-agent {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 14px;
+}
+
+.react-flow__node-agent.selected,
+.react-flow__node-agent:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.react-flow__node-agent:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+  transition:
+    transform 160ms var(--ease-out-soft),
+    border-color 160ms var(--ease-out-soft),
+    background-color 160ms var(--ease-out-soft);
+}
+
+.react-flow__handle:hover,
+.react-flow__handle.connectingto,
+.react-flow__handle.connectingfrom {
+  transform: translate(var(--handle-shift, 0), -50%) scale(1.35);
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.react-flow__handle-left { --handle-shift: -50%; }
+.react-flow__handle-right { --handle-shift: 50%; }
+
+.react-flow__controls {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.react-flow__controls-button {
+  width: 30px;
+  height: 30px;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: 0;
+}
+
+.react-flow__minimap {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-card);
+}
+
+/* Bottom-right of the visible canvas: left of the right panel when it is open. */
+.react-flow__attribution {
+  margin: 0 calc(var(--panel-inset, 0px) + 10px) 6px 0;
+  padding: 0;
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+  transition: margin-right 300ms var(--ease-out-soft);
+}
+
+.react-flow__attribution a {
+  color: var(--color-faint);
+  opacity: 0.7;
+  transition: opacity 160ms var(--ease-out-soft);
+}
+
+.react-flow__attribution a:hover,
+.react-flow__attribution a:focus-visible {
+  opacity: 1;
+}
+
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:focus .react-flow__edge-path {
+  stroke: var(--color-accent);
+}
+
+.react-flow__edge-path {
+  transition: stroke 200ms var(--ease-out-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
