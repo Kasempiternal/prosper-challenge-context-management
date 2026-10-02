@@ -173,3 +173,72 @@ warm-up. So the penalty measured here is connection/first-request setup, not tie
 criteria set. `warm_up()` (15 s timeout) at call start, on the same keep-alive client, moves that
 cost off the first caller turn: after it, the next requests ran 488-922 ms across both batches.
 A multi-hour idle was not tested.
+
+## National scale
+
+`cases_national.jsonl` (48 cases) runs against `backend/data/national/catalog.json` (40 metros,
+299 sites, 5,000 providers, 314 types). Every case pins `catalog_sha256`. `--set national` refuses
+to run if the catalog's sha256 differs, and `--set all` stays the four SF sets.
+
+```
+backend/.venv/Scripts/python eval/run_resolver_eval.py --set national [--jev on]       # national catalog by default
+backend/.venv/Scripts/python eval/naive_baseline_tokens.py --catalog backend/data/national/catalog.json
+backend/.venv/Scripts/python eval/national/build_cases.py scenarios|phrase|merge     # how the cases were made
+```
+
+### How the cases were authored
+
+- **Independence.** The cases were written by a worker who did not read `resolver.py`, `lexicon.py`,
+  `templates.py`, `decision.py` or `national/aliases.json`, and who did not run the resolver on any
+  national case. That worker wrote them while another worker was changing the resolver, and they
+  were frozen before the resolver was scored on them.
+- **Ground truth from catalog queries.** `eval/national/build_cases.py scenarios` is a seeded sampler
+  (seed 20261002) over `catalog.json`. It applies the six policies as set queries (type in the
+  provider's types, site in the provider's sites, required capability at the site, referral,
+  new-patient type and provider) and uses haversine distance. The results go to
+  `eval/national/scenarios.json`, which keeps the facts behind each answer under `truth`.
+- **DeepSeek writes the caller's words, nothing else.** `phrase` sends batches of scenario facts in
+  plain language ("existing patient who twisted their knee playing soccer; they are in Seattle") to
+  `deepseek/deepseek-v4.1-flash` through `cmdc -p` (text only, no tools). It asks for one phrase per
+  field: service, place, doctor, and the follow-up answer to "which city?". DeepSeek never sees alias
+  lists, code or expected answers. The raw prompts and responses are kept in
+  `eval/national/deepseek_raw/` for audit.
+- **Leak checks.** `merge` drops a phrasing when a required token is missing (the ZIP, neighborhood,
+  doctor's first and last name, the city or one of its catalog aliases), when a forbidden one appears
+  (a state in an either/or town, a specialty word in a symptom, a place inside the service phrase),
+  or when the phrasing came from a prompt that no longer matches the scenario. The drops and
+  repairs are listed below. The two misspelled cities are hand-written STT errors, not DeepSeek's.
+
+Expectation keys added for these cases:
+
+| key | meaning |
+|---|---|
+| `ask_field: "metro"` | the turn must ask which city (state only, an ambiguous town, or no place at all) |
+| `types_any` | every offered type is in this set (the acceptable types for a symptom or service) |
+| `location_ids_subset` | every offered site is in this set. On a refusal there must be at least one suggested alternative, and every alternative's site must be in this set |
+| `max_miles` + `anchor` | every offered site is within `max_miles` of `anchor` [lat, lon] |
+| `refuse_reason` | the refusal code (`none_nearby`, `location_type`, `new_patient_provider`, `new_patient_type`, `not_offered`) |
+
+Categories: geo 18 (city 2, "I'm in" 2, suburb 1, ZIP 2, ZIP3-only 1, neighborhood 2, "near"
+neighborhood 2, state only 1, either/or town 2, Portland Maine 1, misspelled city 2), symptom to
+specialty 8, duplicate doctor names across metros 6 (3 with a city, 3 answered after a city question),
+capability by metro 5, new-patient rules 5, no location 3, unoffered 2, ring expansion 1. A
+multi-turn case checks its first turn's `expect` and its last turn's `expected`.
+
+Choices made where the spec could not be met literally:
+
+- **Portland OR vs ME.** The catalog has no Portland, Maine, and there is no geocoder, so the resolver
+  cannot know "Portland" is ambiguous. The either/or cases therefore use towns that the catalog
+  itself holds in two metros (Lakewood CO/OH, Glendale CA/AZ; Pasadena and Arlington also qualify).
+  "Portland, Maine" expects `none_nearby` with the nearest Boston site as the alternative. Boston is
+  the nearest metro with that service from both Portland ME and the Maine centroid.
+- **Ring expansion.** Albuquerque has no eye care within 60 miles. The nearest metro with it is
+  Houston, by both nearest site (729 mi) and metro center, and the second-nearest metro is at least
+  25% farther away.
+- Washington DC is always written "Washington, DC" so that it cannot be read as the state.
+
+Authoring log: 4 batch calls plus 1 repair call (3 scenarios re-asked after I reworded them: DC
+naming, and swapping "Therapy Session" for "Botox Treatment" because "therapy session" also fits
+"Individual Therapy", which new patients may book). There was 1 failed call (cmdc exit 8, rerun) and
+2 smoke tests, so 8 calls in all at roughly $0.01. After repair, the automatic checks dropped
+0 cases.

@@ -1,8 +1,11 @@
 """Offline resolver eval: replays case files through merge + resolve.
 
 Usage:
-  backend/.venv/Scripts/python eval/run_resolver_eval.py [--set main|heldout|heldout2|tune|all]
-                                                        [--jev off|on] [--live] [--verbose]
+  backend/.venv/Scripts/python eval/run_resolver_eval.py [--set main|heldout|heldout2|tune|all|national]
+                                                        [--catalog PATH] [--jev off|on] [--live] [--verbose]
+
+--set national  eval/cases_national.jsonl against the national catalog. Refuses to run unless the
+           catalog's sha256 equals the one pinned in every case. `all` stays the SF sets.
 
 --jev off  no model; no network.
 --jev on   JEV answers come from eval/.jev_cache.json (offline, deterministic). The no-JEV run is
@@ -14,7 +17,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import math
 import statistics
 import sys
 import time
@@ -36,13 +41,16 @@ from scheduling.resolver import Plan, plan_json, resolve  # noqa: E402
 EVAL = ROOT / "eval"
 CACHE = EVAL / ".jev_cache.json"
 SETS = ("main", "heldout", "heldout2", "tune")
+SF_CATALOG = ROOT / "backend" / "data" / "catalog.json"
+NATIONAL_CATALOG = ROOT / "backend" / "data" / "national" / "catalog.json"
 LATENCY_REPEATS = 20
 ENC = tiktoken.get_encoding("o200k_base")  # gpt-4o / gpt-4.1 tokenizer
 COMMIT = {"offer", "confirm"}
 
 
 def load_set(name: str) -> list[dict]:
-    path = {"heldout2": EVAL / "cases_heldout2.jsonl", "tune": EVAL / "cases_tune.jsonl"}.get(name, EVAL / "cases.jsonl")
+    path = {"heldout2": EVAL / "cases_heldout2.jsonl", "tune": EVAL / "cases_tune.jsonl",
+            "national": EVAL / "cases_national.jsonl"}.get(name, EVAL / "cases.jsonl")
     cases = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     if name == "main":
         return [c for c in cases if c["category"] != "heldout"]
@@ -55,8 +63,18 @@ def tokens(text: str) -> int:
     return len(ENC.encode(text))
 
 
-def check_plan(plan: Plan, exp: dict) -> list[str]:
-    """Return mismatch descriptions; empty means the turn is correct."""
+def miles(a: tuple[float, float], b: tuple[float, float]) -> float:
+    lat1, lon1, lat2, lon2 = map(math.radians, (*a, *b))
+    h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
+    return 3958.8 * 2 * math.asin(math.sqrt(h))
+
+
+def check_plan(plan: Plan, exp: dict, index=None) -> list[str]:
+    """Return mismatch descriptions; empty means the turn is correct.
+
+    National keys: `types_any` and `location_ids_subset` bound every offer (and, on a refusal, every
+    suggested alternative, of which there must be one); `max_miles` from `anchor` [lat, lon];
+    `refuse_reason` is the refusal code."""
     errs = []
     if plan.status != exp["status"]:
         errs.append(f"status {plan.status} != {exp['status']}")
@@ -81,6 +99,23 @@ def check_plan(plan: Plan, exp: dict) -> list[str]:
         got = {tuple(a) for a in plan.refusal.alternatives} if plan.refusal else set()
         if got != {tuple(a) for a in exp["alternatives"]}:
             errs.append(f"alternatives {sorted(got)} != {exp['alternatives']}")
+    if "types_any" in exp and any(o.type_id not in exp["types_any"] for o in picks):
+        errs.append(f"types {sorted({o.type_id for o in picks})} not within {exp['types_any']}")
+    if "location_ids_subset" in exp:
+        if plan.status == "refuse":
+            alt_locs = {a[2] for a in plan.refusal.alternatives} if plan.refusal else set()
+            if not alt_locs or not alt_locs <= set(exp["location_ids_subset"]):
+                errs.append(f"alternative locations {sorted(alt_locs, key=str)} not within {exp['location_ids_subset']}")
+        elif any(o.location_id not in exp["location_ids_subset"] for o in picks):
+            errs.append(f"locations {sorted({o.location_id for o in picks})} not within {exp['location_ids_subset']}")
+    if "max_miles" in exp:
+        far = sorted({o.location_id for o in picks
+                      if miles(tuple(exp["anchor"]), (index.locations[o.location_id].lat,
+                                                      index.locations[o.location_id].lon)) > exp["max_miles"]})
+        if far:
+            errs.append(f"locations {far} farther than {exp['max_miles']} mi")
+    if "refuse_reason" in exp and (plan.refusal is None or plan.refusal.code != exp["refuse_reason"]):
+        errs.append(f"refusal {plan.refusal.code if plan.refusal else None} != {exp['refuse_reason']}")
     if exp["status"] not in COMMIT and plan.status in COMMIT:
         errs.append("WRONG COMMIT: offered when it should not")
     return errs
@@ -112,7 +147,7 @@ def run_case(index, case: dict, hooks: dict, timings: list[float] | None = None)
         if timings is not None:
             timings.append((time.perf_counter() - t0) * 1000)
         req = plan.req
-        turns.append({"kind": "resolve", "plan": plan, "exp": exp, "errs": check_plan(plan, exp) if exp else None})
+        turns.append({"kind": "resolve", "plan": plan, "exp": exp, "errs": check_plan(plan, exp, index) if exp else None})
     return turns
 
 
@@ -276,7 +311,7 @@ def print_headline(results: dict) -> None:
     """Per set, with the held-out sets (never used to write rules or tune thresholds) on their own."""
     groups = [("main (rules written against)", ("main",)), ("tune (thresholds chosen on)", ("tune",)),
               ("HELD-OUT heldout", ("heldout",)), ("HELD-OUT heldout2", ("heldout2",)),
-              ("HELD-OUT combined", ("heldout", "heldout2"))]
+              ("HELD-OUT combined", ("heldout", "heldout2")), ("national (catalog-pinned)", ("national",))]
     with_jev = any(on for _, on in results.values())
 
     def merged(names, which):
@@ -318,7 +353,8 @@ def print_comparison(name: str, off: dict, on: dict) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--set", default="all", choices=(*SETS, "all"))
+    ap.add_argument("--set", default="all", choices=(*SETS, "all", "national"))
+    ap.add_argument("--catalog", type=Path, help="catalog.json (default: SF, or national for --set national)")
     ap.add_argument("--jev", default="off", choices=("off", "on"))
     ap.add_argument("--live", action="store_true")
     ap.add_argument("--verbose", action="store_true")
@@ -326,7 +362,13 @@ def main() -> None:
     if args.live and args.jev != "on":
         ap.error("--live needs --jev on")
 
-    index = CatalogIndex.load(ROOT / "backend" / "data" / "catalog.json")
+    catalog = args.catalog or (NATIONAL_CATALOG if args.set == "national" else SF_CATALOG)
+    if args.set == "national":
+        actual = hashlib.sha256(catalog.read_bytes()).hexdigest()
+        pinned = {c.get("catalog_sha256") for c in load_set("national")}
+        if pinned != {actual}:
+            ap.error(f"{catalog} has sha256 {actual}; cases_national.jsonl is pinned to {sorted(map(str, pinned))}")
+    index = CatalogIndex.load(catalog)
     names = SETS if args.set == "all" else (args.set,)
     # Offline settings: patient timeout and one connect retry so the cache gets filled. The live
     # call path uses JevClient defaults (1.2 s per turn, no retry); see "over the live budget".

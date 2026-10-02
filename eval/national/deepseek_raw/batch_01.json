@@ -1,0 +1,67 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat-geo-01: Existing patient who needs a routine screening mammogram. They are in Chicago, Illinois. Fields: service_phrase = how the caller asks for a routine screening mammogram; location_phrase = where they are: the caller names the city only (Chicago)\n- id nat-geo-02: Existing patient who needs an X-ray of their knee that their doctor ordered. They are in Minneapolis, Minnesota. Fields: service_phrase = how the caller asks for an X-ray of their knee that their doctor ordered; location_phrase = where they are: the caller names the city only (Minneapolis)\n- id nat-geo-03: Existing patient who needs a physical therapy evaluation (they have a referral). They are in Orlando, Florida. Fields: service_phrase = how the caller asks for a physical therapy evaluation (they have a referral); location_phrase = where they are: the caller says they are in / live in the city (Orlando)\n- id nat-geo-04: Existing patient who needs routine blood work their doctor ordered. They are in San Antonio, Texas. Fields: service_phrase = how the caller asks for routine blood work their doctor ordered; location_phrase = where they are: the caller says they are in / live in the city (San Antonio)\n- id nat-geo-05: Existing patient who needs a flu shot. They live in Naperville, Illinois (a suburb; do not mention the bigger nearby city). Fields: service_phrase = how the caller asks for a flu shot; location_phrase = where they are: the town name Naperville\n- id nat-geo-06: Existing patient who needs a flu shot. Their ZIP code is 90027. Fields: service_phrase = how the caller asks for a flu shot; location_phrase = where they are: the caller gives the ZIP code 90027\n- id nat-geo-07: Existing patient who needs a flu shot. Their ZIP code is 28129. Fields: service_phrase = how the caller asks for a flu shot; location_phrase = where they are: the caller gives the ZIP code 28129\n- id nat-geo-08: Existing patient who needs a physical therapy evaluation (they have a referral). Their ZIP code is 37001. Fields: service_phrase = how the caller asks for a physical therapy evaluation (they have a referral); location_phrase = where they are: the caller gives the ZIP code 37001\n- id nat-geo-09: Existing patient who needs a physical therapy evaluation (they have a referral). They are near the Lowertown neighborhood of St. Paul (any clinic close by is fine). Fields: service_phrase = how the caller asks for a physical therapy evaluation (they have a referral); location_phrase = where they are: that they are near / around Lowertown (do not name the city)\n- id nat-geo-10: Existing patient who needs a teeth cleaning. They are near the Little Havana neighborhood of Miami (any clinic close by is fine). Fields: service_phrase = how the caller asks for a teeth cleaning; location_phrase = where they are: that they are near / around Little Havana (do not name the city)\n- id nat-geo-11: Existing patient who needs a flu shot. They live in the Arcadia neighborhood of Phoenix. Fields: service_phrase = how the caller asks for a flu shot; location_phrase = where they are: the neighborhood they are in: Arcadia (do not name the city)\n- id nat-geo-12: Existing patient who needs routine blood work their doctor ordered. They live in the Fountain Square neighborhood of Indianapolis. Fields: service_phrase = how the caller asks for routine blood work their doctor ordered; location_phrase = where they are: the neighborhood they are in: Fountain Square (do not name the city)",
+ "response": "```json\n[\n  {\"id\": \"nat-geo-01\", \"service_phrase\": \"I'm due for a routine screening mammogram\", \"location_phrase\": \"I'm in Chicago\"},\n  {\"id\": \"nat-geo-02\", \"service_phrase\": \"my doctor ordered a knee X-ray\", \"location_phrase\": \"Minneapolis\"},\n  {\"id\": \"nat-geo-03\", \"service_phrase\": \"I have a referral for a physical therapy evaluation\", \"location_phrase\": \"I live in Orlando\"},\n  {\"id\": \"nat-geo-04\", \"service_phrase\": \"my doctor ordered routine blood work\", \"location_phrase\": \"I'm in San Antonio\"},\n  {\"id\": \"nat-geo-05\", \"service_phrase\": \"I just need to get a flu shot\", \"location_phrase\": \"I'm over in Naperville\"},\n  {\"id\": \"nat-geo-06\", \"service_phrase\": \"flu shot\", \"location_phrase\": \"90027\"},\n  {\"id\": \"nat-geo-07\", \"service_phrase\": \"I need to get a flu shot\", \"location_phrase\": \"my ZIP is 28129\"},\n  {\"id\": \"nat-geo-08\", \"service_phrase\": \"I have a referral for a physical therapy evaluation\", \"location_phrase\": \"the ZIP code is 37001\"},\n  {\"id\": \"nat-geo-09\", \"service_phrase\": \"I have referral for physical therapy evaluation\", \"location_phrase\": \"I'm near Lowertown\"},\n  {\"id\": \"nat-geo-10\", \"service_phrase\": \"I need a teeth cleaning\", \"location_phrase\": \"I'm over by Little Havana\"},\n  {\"id\": \"nat-geo-11\", \"service_phrase\": \"need a flu shot\", \"location_phrase\": \"Arcadia\"},\n  {\"id\": \"nat-geo-12\", \"service_phrase\": \"my doctor ordered routine blood work\", \"location_phrase\": \"I'm in Fountain Square\"}\n]\n```\n",
+ "parsed": [
+  {
+   "id": "nat-geo-01",
+   "service_phrase": "I'm due for a routine screening mammogram",
+   "location_phrase": "I'm in Chicago"
+  },
+  {
+   "id": "nat-geo-02",
+   "service_phrase": "my doctor ordered a knee X-ray",
+   "location_phrase": "Minneapolis"
+  },
+  {
+   "id": "nat-geo-03",
+   "service_phrase": "I have a referral for a physical therapy evaluation",
+   "location_phrase": "I live in Orlando"
+  },
+  {
+   "id": "nat-geo-04",
+   "service_phrase": "my doctor ordered routine blood work",
+   "location_phrase": "I'm in San Antonio"
+  },
+  {
+   "id": "nat-geo-05",
+   "service_phrase": "I just need to get a flu shot",
+   "location_phrase": "I'm over in Naperville"
+  },
+  {
+   "id": "nat-geo-06",
+   "service_phrase": "flu shot",
+   "location_phrase": "90027"
+  },
+  {
+   "id": "nat-geo-07",
+   "service_phrase": "I need to get a flu shot",
+   "location_phrase": "my ZIP is 28129"
+  },
+  {
+   "id": "nat-geo-08",
+   "service_phrase": "I have a referral for a physical therapy evaluation",
+   "location_phrase": "the ZIP code is 37001"
+  },
+  {
+   "id": "nat-geo-09",
+   "service_phrase": "I have referral for physical therapy evaluation",
+   "location_phrase": "I'm near Lowertown"
+  },
+  {
+   "id": "nat-geo-10",
+   "service_phrase": "I need a teeth cleaning",
+   "location_phrase": "I'm over by Little Havana"
+  },
+  {
+   "id": "nat-geo-11",
+   "service_phrase": "need a flu shot",
+   "location_phrase": "Arcadia"
+  },
+  {
+   "id": "nat-geo-12",
+   "service_phrase": "my doctor ordered routine blood work",
+   "location_phrase": "I'm in Fountain Square"
+  }
+ ]
+}

@@ -1,0 +1,23 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat-sym-05: Existing patient (has any referral needed) who keeps getting bad headaches with nausea and sensitivity to light. They do not know which kind of doctor they need. They are in Washington, DC. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Washington, DC\n- id nat-dup-03: Existing patient who wants Annual Physical with Dr. Michael Williams. They do not say where at first; asked which city, they answer Washington, DC. Fields: service_phrase = the visit they want: Annual Physical (said naturally); provider_phrase = the doctor's full name: Dr. Michael Williams; followup_location_phrase = their answer to 'which city?': Washington, DC\n- id nat-new-05: A brand-new patient who has never been seen here wants Botox Treatment. They are in Portland. Fields: service_phrase = the service: Botox Treatment (said naturally); location_phrase = the city: Portland",
+ "response": "[{\"id\": \"nat-sym-05\", \"service_phrase\": \"I keep getting these bad headaches, and they come with nausea, and the light really bothers me\", \"location_phrase\": \"I'm over here in Washington, DC\"},\n{\"id\": \"nat-dup-03\", \"service_phrase\": \"I'd like to book my annual physical\", \"provider_phrase\": \"with Dr. Michael Williams\", \"followup_location_phrase\": \"well, I'm in Washington, DC\"},\n{\"id\": \"nat-new-05\", \"service_phrase\": \"I want Botox treatment\", \"location_phrase\": \"Portland\"}]\n",
+ "parsed": [
+  {
+   "id": "nat-sym-05",
+   "service_phrase": "I keep getting these bad headaches, and they come with nausea, and the light really bothers me",
+   "location_phrase": "I'm over here in Washington, DC"
+  },
+  {
+   "id": "nat-dup-03",
+   "service_phrase": "I'd like to book my annual physical",
+   "provider_phrase": "with Dr. Michael Williams",
+   "followup_location_phrase": "well, I'm in Washington, DC"
+  },
+  {
+   "id": "nat-new-05",
+   "service_phrase": "I want Botox treatment",
+   "location_phrase": "Portland"
+  }
+ ]
+}

@@ -1,0 +1,73 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat-sym-07: Existing patient (has any referral needed) who has trouble hearing people in noisy rooms and keeps turning the TV up. They do not know which kind of doctor they need. They are in Phoenix. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Phoenix\n- id nat-sym-08: Existing patient (has any referral needed) who has swollen, stiff, painful finger joints every morning for weeks. They do not know which kind of doctor they need. They are in San Jose. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: San Jose\n- id nat-dup-01: Existing patient who wants Annual Well-Woman Exam with Dr. James Caskey. They do not say where at first; asked which city, they answer New York. Fields: service_phrase = the visit they want: Annual Well-Woman Exam (said naturally); provider_phrase = the doctor's full name: Dr. James Caskey; followup_location_phrase = their answer to 'which city?': New York\n- id nat-dup-02: Existing patient who wants Annual Physical with Dr. Chioma Getachew. They do not say where at first; asked which city, they answer Baltimore. Fields: service_phrase = the visit they want: Annual Physical (said naturally); provider_phrase = the doctor's full name: Dr. Chioma Getachew; followup_location_phrase = their answer to 'which city?': Baltimore\n- id nat-dup-03: Existing patient who wants Annual Physical with Dr. Michael Williams. They do not say where at first; asked which city, they answer Washington. Fields: service_phrase = the visit they want: Annual Physical (said naturally); provider_phrase = the doctor's full name: Dr. Michael Williams; followup_location_phrase = their answer to 'which city?': Washington\n- id nat-dup-04: Existing patient who wants TB Skin Test with Dr. Craig Thomas, their doctor in St. Paul. Fields: service_phrase = the visit they want: TB Skin Test (said naturally); provider_phrase = the doctor's full name: Dr. Craig Thomas; location_phrase = the city: St. Paul\n- id nat-dup-05: Existing patient who wants Shingles Vaccine with Dr. Melissa Davis, their doctor in New York. Fields: service_phrase = the visit they want: Shingles Vaccine (said naturally); provider_phrase = the doctor's full name: Dr. Melissa Davis; location_phrase = the city: New York\n- id nat-dup-06: Existing patient who wants EKG / Electrocardiogram with Dr. Omar Sabbagh, their doctor in Boston. Fields: service_phrase = the visit they want: EKG / Electrocardiogram (said naturally); provider_phrase = the doctor's full name: Dr. Omar Sabbagh; location_phrase = the city: Boston\n- id nat-cap-01: Existing patient (with a referral) who needs Dental Cleaning. They are in Denver. Fields: service_phrase = the service: Dental Cleaning (said naturally); location_phrase = the city: Denver\n- id nat-cap-02: Existing patient (with a referral) who needs Colonoscopy. They are in Fort Worth. Fields: service_phrase = the service: Colonoscopy (said naturally); location_phrase = the city: Fort Worth\n- id nat-cap-03: Existing patient (with a referral) who needs MRI - Brain. They are in Houston. Fields: service_phrase = the service: MRI - Brain (said naturally); location_phrase = the city: Houston\n- id nat-cap-04: Existing patient who needs a routine eye exam. They are in Houston. Fields: service_phrase = how the caller asks for a routine eye exam; location_phrase = the city: Houston",
+ "response": "[\n  {\"id\": \"nat-sym-07\", \"service_phrase\": \"I can't hardly hear folks when it's noisy, and I keep turning the TV up\", \"location_phrase\": \"I'm in Phoenix\"},\n  {\"id\": \"nat-sym-08\", \"service_phrase\": \"my fingers, they get swollen and stiff and painful, every morning for weeks now\", \"location_phrase\": \"San Jose\"},\n  {\"id\": \"nat-dup-01\", \"service_phrase\": \"I'd like to book my annual well-woman exam\", \"provider_phrase\": \"Dr. James Caskey\", \"followup_location_phrase\": \"New York\"},\n  {\"id\": \"nat-dup-02\", \"service_phrase\": \"annual physical please\", \"provider_phrase\": \"Dr. Chioma Getachew\", \"followup_location_phrase\": \"Baltimore\"},\n  {\"id\": \"nat-dup-03\", \"service_phrase\": \"I need my yearly checkup, the annual physical thing\", \"provider_phrase\": \"Dr. Michael Williams\", \"followup_location_phrase\": \"Washington\"},\n  {\"id\": \"nat-dup-04\", \"service_phrase\": \"I need a TB skin test\", \"provider_phrase\": \"Dr. Craig Thomas\", \"location_phrase\": \"St. Paul\"},\n  {\"id\": \"nat-dup-05\", \"service_phrase\": \"I'd like the shingles shot, over by my doctor\", \"provider_phrase\": \"Dr. Melissa Davis\", \"location_phrase\": \"I'm in New York\"},\n  {\"id\": \"nat-dup-06\", \"service_phrase\": \"I need an EKG, the electrocardiogram\", \"provider_phrase\": \"Dr. Omar Sabbagh\", \"location_phrase\": \"Boston\"},\n  {\"id\": \"nat-cap-01\", \"service_phrase\": \"dental cleaning\", \"location_phrase\": \"near Denver\"},\n  {\"id\": \"nat-cap-02\", \"service_phrase\": \"I need to get a colonoscopy\", \"location_phrase\": \"Fort Worth\"},\n  {\"id\": \"nat-cap-03\", \"service_phrase\": \"an MRI, the brain one\", \"location_phrase\": \"Houston\"},\n  {\"id\": \"nat-cap-04\", \"service_phrase\": \"I just need my eyes checked, a routine eye exam\", \"location_phrase\": \"I'm in Houston\"}\n]\n",
+ "parsed": [
+  {
+   "id": "nat-sym-07",
+   "service_phrase": "I can't hardly hear folks when it's noisy, and I keep turning the TV up",
+   "location_phrase": "I'm in Phoenix"
+  },
+  {
+   "id": "nat-sym-08",
+   "service_phrase": "my fingers, they get swollen and stiff and painful, every morning for weeks now",
+   "location_phrase": "San Jose"
+  },
+  {
+   "id": "nat-dup-01",
+   "service_phrase": "I'd like to book my annual well-woman exam",
+   "provider_phrase": "Dr. James Caskey",
+   "followup_location_phrase": "New York"
+  },
+  {
+   "id": "nat-dup-02",
+   "service_phrase": "annual physical please",
+   "provider_phrase": "Dr. Chioma Getachew",
+   "followup_location_phrase": "Baltimore"
+  },
+  {
+   "id": "nat-dup-03",
+   "service_phrase": "I need my yearly checkup, the annual physical thing",
+   "provider_phrase": "Dr. Michael Williams",
+   "followup_location_phrase": "Washington"
+  },
+  {
+   "id": "nat-dup-04",
+   "service_phrase": "I need a TB skin test",
+   "provider_phrase": "Dr. Craig Thomas",
+   "location_phrase": "St. Paul"
+  },
+  {
+   "id": "nat-dup-05",
+   "service_phrase": "I'd like the shingles shot, over by my doctor",
+   "provider_phrase": "Dr. Melissa Davis",
+   "location_phrase": "I'm in New York"
+  },
+  {
+   "id": "nat-dup-06",
+   "service_phrase": "I need an EKG, the electrocardiogram",
+   "provider_phrase": "Dr. Omar Sabbagh",
+   "location_phrase": "Boston"
+  },
+  {
+   "id": "nat-cap-01",
+   "service_phrase": "dental cleaning",
+   "location_phrase": "near Denver"
+  },
+  {
+   "id": "nat-cap-02",
+   "service_phrase": "I need to get a colonoscopy",
+   "location_phrase": "Fort Worth"
+  },
+  {
+   "id": "nat-cap-03",
+   "service_phrase": "an MRI, the brain one",
+   "location_phrase": "Houston"
+  },
+  {
+   "id": "nat-cap-04",
+   "service_phrase": "I just need my eyes checked, a routine eye exam",
+   "location_phrase": "I'm in Houston"
+  }
+ ]
+}

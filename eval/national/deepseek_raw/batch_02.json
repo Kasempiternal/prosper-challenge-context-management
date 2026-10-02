@@ -1,0 +1,67 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat-geo-13: Existing patient who needs an X-ray of their knee that their doctor ordered. They only say which state they live in: Ohio. Fields: service_phrase = how the caller asks for an X-ray of their knee that their doctor ordered; location_phrase = the state only: Ohio (no city)\n- id nat-geo-14: Existing patient who needs an X-ray of their knee that their doctor ordered. They live in Lakewood, Colorado. In the first sentence they only say the town name; when asked which one, they say the state. Fields: service_phrase = how the caller asks for an X-ray of their knee that their doctor ordered; location_phrase = the town name Lakewood only (no state, no bigger city); followup_location_phrase = their answer to 'which Lakewood?': the state Colorado\n- id nat-geo-15: Existing patient who needs an X-ray of their knee that their doctor ordered. They live in Glendale, California. In the first sentence they only say the town name; when asked which one, they say the state. Fields: service_phrase = how the caller asks for an X-ray of their knee that their doctor ordered; location_phrase = the town name Glendale only (no state, no bigger city); followup_location_phrase = their answer to 'which Glendale?': the state California\n- id nat-geo-16: Existing patient who needs a teeth cleaning. They live in Portland, Maine. Fields: service_phrase = how the caller asks for a teeth cleaning; location_phrase = where they are: Portland, Maine (say both words)\n- id nat-geo-17: Existing patient who needs a routine screening mammogram. They are in Cleveland. Fields: service_phrase = how the caller asks for a routine screening mammogram\n- id nat-geo-18: Existing patient who needs a physical therapy evaluation (they have a referral). They are in Philadelphia. Fields: service_phrase = how the caller asks for a physical therapy evaluation (they have a referral)\n- id nat-sym-01: Existing patient (has any referral needed) who twisted their knee playing soccer last weekend; it is swollen. They do not know which kind of doctor they need. They are in Seattle. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Seattle\n- id nat-sym-02: Existing patient (has any referral needed) who has had lower back pain for a few months that will not go away. They do not know which kind of doctor they need. They are in Tampa. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Tampa\n- id nat-sym-03: Existing patient (has any referral needed) who has an itchy red rash spreading on both arms. They do not know which kind of doctor they need. They are in Dallas. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Dallas\n- id nat-sym-04: Existing patient (has any referral needed) who gets a burning feeling in the throat after meals, like acid coming back up, most nights. They do not know which kind of doctor they need. They are in Miami. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Miami\n- id nat-sym-05: Existing patient (has any referral needed) who keeps getting bad headaches with nausea and sensitivity to light. They do not know which kind of doctor they need. They are in Washington. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Washington\n- id nat-sym-06: Existing patient (has any referral needed) who has sharp heel pain with the first steps every morning. They do not know which kind of doctor they need. They are in Oakland. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Oakland",
+ "response": "```json\n[\n  {\n    \"id\": \"nat-geo-13\",\n    \"service_phrase\": \"my doctor ordered an x-ray of my knee\",\n    \"location_phrase\": \"Ohio\"\n  },\n  {\n    \"id\": \"nat-geo-14\",\n    \"service_phrase\": \"I'm supposed to get an x-ray on my knee, doctor ordered it\",\n    \"location_phrase\": \"Lakewood\",\n    \"followup_location_phrase\": \"Colorado\"\n  },\n  {\n    \"id\": \"nat-geo-15\",\n    \"service_phrase\": \"I need an x-ray of my knee, my doctor ordered it\",\n    \"location_phrase\": \"Glendale\",\n    \"followup_location_phrase\": \"California\"\n  },\n  {\n    \"id\": \"nat-geo-16\",\n    \"service_phrase\": \"I need a teeth cleaning\",\n    \"location_phrase\": \"Portland, Maine\"\n  },\n  {\n    \"id\": \"nat-geo-17\",\n    \"service_phrase\": \"I'd like a routine screening mammogram\"\n  },\n  {\n    \"id\": \"nat-geo-18\",\n    \"service_phrase\": \"I have a referral for a physical therapy evaluation\"\n  },\n  {\n    \"id\": \"nat-sym-01\",\n    \"service_phrase\": \"I twisted my knee playing soccer last weekend and it's swollen\",\n    \"location_phrase\": \"Seattle\"\n  },\n  {\n    \"id\": \"nat-sym-02\",\n    \"service_phrase\": \"lower back pain for a few months now, just won't go away\",\n    \"location_phrase\": \"Tampa\"\n  },\n  {\n    \"id\": \"nat-sym-03\",\n    \"service_phrase\": \"I've got this itchy red rash spreading on both my arms\",\n    \"location_phrase\": \"Dallas\"\n  },\n  {\n    \"id\": \"nat-sym-04\",\n    \"service_phrase\": \"burning in my throat after meals, like acid coming back up, most nights\",\n    \"location_phrase\": \"Miami\"\n  },\n  {\n    \"id\": \"nat-sym-05\",\n    \"service_phrase\": \"I keep getting bad headaches with nausea and the light bothers me\",\n    \"location_phrase\": \"Washington\"\n  },\n  {\n    \"id\": \"nat-sym-06\",\n    \"service_phrase\": \"sharp pain in my heel, worst with the first steps every morning\",\n    \"location_phrase\": \"Oakland\"\n  }\n]\n```\n",
+ "parsed": [
+  {
+   "id": "nat-geo-13",
+   "service_phrase": "my doctor ordered an x-ray of my knee",
+   "location_phrase": "Ohio"
+  },
+  {
+   "id": "nat-geo-14",
+   "service_phrase": "I'm supposed to get an x-ray on my knee, doctor ordered it",
+   "location_phrase": "Lakewood",
+   "followup_location_phrase": "Colorado"
+  },
+  {
+   "id": "nat-geo-15",
+   "service_phrase": "I need an x-ray of my knee, my doctor ordered it",
+   "location_phrase": "Glendale",
+   "followup_location_phrase": "California"
+  },
+  {
+   "id": "nat-geo-16",
+   "service_phrase": "I need a teeth cleaning",
+   "location_phrase": "Portland, Maine"
+  },
+  {
+   "id": "nat-geo-17",
+   "service_phrase": "I'd like a routine screening mammogram"
+  },
+  {
+   "id": "nat-geo-18",
+   "service_phrase": "I have a referral for a physical therapy evaluation"
+  },
+  {
+   "id": "nat-sym-01",
+   "service_phrase": "I twisted my knee playing soccer last weekend and it's swollen",
+   "location_phrase": "Seattle"
+  },
+  {
+   "id": "nat-sym-02",
+   "service_phrase": "lower back pain for a few months now, just won't go away",
+   "location_phrase": "Tampa"
+  },
+  {
+   "id": "nat-sym-03",
+   "service_phrase": "I've got this itchy red rash spreading on both my arms",
+   "location_phrase": "Dallas"
+  },
+  {
+   "id": "nat-sym-04",
+   "service_phrase": "burning in my throat after meals, like acid coming back up, most nights",
+   "location_phrase": "Miami"
+  },
+  {
+   "id": "nat-sym-05",
+   "service_phrase": "I keep getting bad headaches with nausea and the light bothers me",
+   "location_phrase": "Washington"
+  },
+  {
+   "id": "nat-sym-06",
+   "service_phrase": "sharp pain in my heel, worst with the first steps every morning",
+   "location_phrase": "Oakland"
+  }
+ ]
+}

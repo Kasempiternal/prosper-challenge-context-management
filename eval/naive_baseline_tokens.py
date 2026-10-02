@@ -5,10 +5,15 @@ Spoken conversation history is the same for both approaches and is left out of b
 is NOT shared is our tool traffic: every update_request call and its result stay in the LLM
 context, so our prompt grows each turn. That growth is measured per exchange over the eval cases
 and added on our side at turn 1, 5 and 15 (15 = the design doc's calls-per-call estimate).
+
+--catalog PATH (another catalog, e.g. backend/data/national/catalog.json): prints the naive side and
+our fixed prompt parts against a 128k context window. The per-exchange rows need that catalog's eval
+cases run through the resolver, so they are left to run_resolver_eval.py --set national.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import statistics
 import sys
@@ -27,6 +32,8 @@ from scheduling.resolver import plan_json  # noqa: E402
 ENC = tiktoken.get_encoding("o200k_base")
 LLM_CALLS_PER_CALL = 15  # estimate from the design doc, not measured
 GPT4O_INPUT_PER_M = 2.50  # USD, list price used in the design doc (estimate)
+CONTEXT_WINDOW = 128_000  # gpt-4o / gpt-4.1-mini class context
+SF_CATALOG = ROOT / "backend" / "data" / "catalog.json"
 
 PERSONA_TASK = """You are Sam, the scheduling assistant for Bayview Health's clinics in San Francisco.
 Speak naturally and briefly; this is a phone call. Help the caller book an appointment or answer
@@ -84,9 +91,45 @@ def exchange_tokens(args: dict, plan) -> int:
     return tok(call) + tok({**plan.tool_result(speak_direct=True), "spoken": plan.say})
 
 
+def other_catalog(path: Path) -> None:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    index = CatalogIndex.load(path)
+    persona, catalog = tok(PERSONA_TASK), tok(raw)
+    naive = persona + catalog
+    tools_lean = tok([update_request_schema(index, False), LOOKUP_SCHEMA, CONFIRM_SCHEMA])
+    tools_enum = tok([update_request_schema(index, True), LOOKUP_SCHEMA, CONFIRM_SCHEMA])
+    rows = [
+        ("catalog alone (compact JSON)", catalog),
+        ("persona + task prompt (draft)", persona),
+        ("NAIVE per turn = persona + catalog", naive),
+        ("context window (128k model)", CONTEXT_WINDOW),
+        ("", None),
+        ("tool schemas: update_request (no type enum) + lookup + confirm", tools_lean),
+        (f"tool schemas: with {len(index.types)}-name service_name enum (not shipped)", tools_enum),
+        ("OURS fixed part = persona + lean schemas (summary/exchanges not included)", persona + tools_lean),
+    ]
+    width = max(len(k) for k, _ in rows)
+    print(f"Per-turn input tokens for {path.relative_to(ROOT)} (o200k_base)")
+    print("-" * (width + 12))
+    for k, v in rows:
+        print(f"{k:<{width}}  {v:>8,}" if v is not None else "")
+    print("-" * (width + 12))
+    print(f"naive prompt / 128k context: {naive / CONTEXT_WINDOW:.1f}x "
+          f"({'does not fit' if naive > CONTEXT_WINDOW else 'fits'}); "
+          f"{len(raw['providers'])} providers, {len(raw['locations'])} locations, {len(raw['appointment_types'])} types")
+    print(f"naive, {LLM_CALLS_PER_CALL} LLM calls/call if it fit: {naive * LLM_CALLS_PER_CALL:,} tok  "
+          f"~${naive * LLM_CALLS_PER_CALL * GPT4O_INPUT_PER_M / 1e6:.2f} on gpt-4o input")
+
+
 def main() -> None:
-    raw = json.loads((ROOT / "backend" / "data" / "catalog.json").read_text(encoding="utf-8"))
-    index = CatalogIndex.load(ROOT / "backend" / "data" / "catalog.json")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--catalog", type=Path, default=SF_CATALOG)
+    path = ap.parse_args().catalog.resolve()
+    if path != SF_CATALOG.resolve():
+        other_catalog(path)
+        return
+    raw = json.loads(SF_CATALOG.read_text(encoding="utf-8"))
+    index = CatalogIndex.load(SF_CATALOG)
 
     summaries, results, exchanges = [], [], []
     for line in (ROOT / "eval" / "cases.jsonl").read_text(encoding="utf-8").splitlines():

@@ -1,0 +1,69 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat-cap-05: Existing patient (with a referral) who needs Dental Cleaning and insists on going to the clinic called University District Specialty Center in Seattle, which they always use. Fields: service_phrase = the service: Dental Cleaning (said naturally); location_phrase = that specific clinic by name: University District Specialty Center (not 'near' it)\n- id nat-new-01: A brand-new patient who has never been seen at these clinics needs Sports Physical. They are in Austin. Fields: service_phrase = the service: Sports Physical (said naturally); location_phrase = the city: Austin\n- id nat-new-02: A brand-new patient who has never been seen at these clinics needs Skin Cancer Screening. They are in Los Angeles. Fields: service_phrase = the service: Skin Cancer Screening (said naturally); location_phrase = the city: Los Angeles\n- id nat-new-03: A brand-new patient wants Annual Well-Woman Exam with Dr. Rosanna McPherson in Columbus (a friend recommended this doctor). Fields: service_phrase = the service: Annual Well-Woman Exam (said naturally); provider_phrase = the doctor's full name: Dr. Rosanna McPherson; location_phrase = the city: Columbus\n- id nat-new-04: A brand-new patient wants Memory Evaluation with Dr. Alyson Schiff in Miami (a friend recommended this doctor). Fields: service_phrase = the service: Memory Evaluation (said naturally); provider_phrase = the doctor's full name: Dr. Alyson Schiff; location_phrase = the city: Miami\n- id nat-new-05: A brand-new patient who has never been seen here wants Therapy Session. They are in New York. Fields: service_phrase = the service: Therapy Session (said naturally); location_phrase = the city: New York\n- id nat-noloc-01: Existing patient who needs a flu shot. They do not say where they are at first; asked which city, they answer Cleveland. Fields: service_phrase = how the caller asks for a flu shot; followup_location_phrase = their answer to 'which city?': Cleveland\n- id nat-noloc-02: Existing patient who needs a teeth cleaning. They do not say where they are at first; asked which city, they answer Boston. Fields: service_phrase = how the caller asks for a teeth cleaning; followup_location_phrase = their answer to 'which city?': Boston\n- id nat-noloc-03: Existing patient who needs routine blood work their doctor ordered. They do not say where they are at first; asked which city, they answer Salt Lake City. Fields: service_phrase = how the caller asks for routine blood work their doctor ordered; followup_location_phrase = their answer to 'which city?': Salt Lake City\n- id nat-unoff-01: Existing patient who wants massage therapy. They are in Sacramento. Fields: service_phrase = the service: massage therapy (said naturally); location_phrase = the city: Sacramento\n- id nat-unoff-02: Existing patient who wants acupuncture session. They are in Kansas City. Fields: service_phrase = the service: acupuncture session (said naturally); location_phrase = the city: Kansas City\n- id nat-ring-01: Existing patient who needs eye exam (has any referral needed). They are in Albuquerque. Fields: service_phrase = the service: eye exam (said naturally); location_phrase = the city: Albuquerque",
+ "response": "[\n  {\"id\": \"nat-cap-05\", \"service_phrase\": \"I'm needing a dental cleaning\", \"location_phrase\": \"over at University District Specialty Center in Seattle, my usual spot\"},\n  {\"id\": \"nat-new-01\", \"service_phrase\": \"sports physical\", \"location_phrase\": \"I'm in Austin\"},\n  {\"id\": \"nat-new-02\", \"service_phrase\": \"skin cancer screening\", \"location_phrase\": \"I am in Los Angeles\"},\n  {\"id\": \"nat-new-03\", \"service_phrase\": \"annual well-woman exam\", \"provider_phrase\": \"Dr. Rosanna McPherson\", \"location_phrase\": \"Columbus\"},\n  {\"id\": \"nat-new-04\", \"service_phrase\": \"memory evaluation\", \"provider_phrase\": \"Dr. Alyson Schiff\", \"location_phrase\": \"Miami\"},\n  {\"id\": \"nat-new-05\", \"service_phrase\": \"therapy session\", \"location_phrase\": \"New York\"},\n  {\"id\": \"nat-noloc-01\", \"service_phrase\": \"I'm in for a flu shot\", \"followup_location_phrase\": \"Cleveland\"},\n  {\"id\": \"nat-noloc-02\", \"service_phrase\": \"I need my teeth cleaned\", \"followup_location_phrase\": \"Boston\"},\n  {\"id\": \"nat-noloc-03\", \"service_phrase\": \"routine blood work my doctor ordered\", \"followup_location_phrase\": \"Salt Lake City\"},\n  {\"id\": \"nat-unoff-01\", \"service_phrase\": \"massage therapy\", \"location_phrase\": \"Sacramento\"},\n  {\"id\": \"nat-unoff-02\", \"service_phrase\": \"acupuncture session\", \"location_phrase\": \"Kansas City\"},\n  {\"id\": \"nat-ring-01\", \"service_phrase\": \"eye exam\", \"location_phrase\": \"Albuquerque\"}\n]\n",
+ "parsed": [
+  {
+   "id": "nat-cap-05",
+   "service_phrase": "I'm needing a dental cleaning",
+   "location_phrase": "over at University District Specialty Center in Seattle, my usual spot"
+  },
+  {
+   "id": "nat-new-01",
+   "service_phrase": "sports physical",
+   "location_phrase": "I'm in Austin"
+  },
+  {
+   "id": "nat-new-02",
+   "service_phrase": "skin cancer screening",
+   "location_phrase": "I am in Los Angeles"
+  },
+  {
+   "id": "nat-new-03",
+   "service_phrase": "annual well-woman exam",
+   "provider_phrase": "Dr. Rosanna McPherson",
+   "location_phrase": "Columbus"
+  },
+  {
+   "id": "nat-new-04",
+   "service_phrase": "memory evaluation",
+   "provider_phrase": "Dr. Alyson Schiff",
+   "location_phrase": "Miami"
+  },
+  {
+   "id": "nat-new-05",
+   "service_phrase": "therapy session",
+   "location_phrase": "New York"
+  },
+  {
+   "id": "nat-noloc-01",
+   "service_phrase": "I'm in for a flu shot",
+   "followup_location_phrase": "Cleveland"
+  },
+  {
+   "id": "nat-noloc-02",
+   "service_phrase": "I need my teeth cleaned",
+   "followup_location_phrase": "Boston"
+  },
+  {
+   "id": "nat-noloc-03",
+   "service_phrase": "routine blood work my doctor ordered",
+   "followup_location_phrase": "Salt Lake City"
+  },
+  {
+   "id": "nat-unoff-01",
+   "service_phrase": "massage therapy",
+   "location_phrase": "Sacramento"
+  },
+  {
+   "id": "nat-unoff-02",
+   "service_phrase": "acupuncture session",
+   "location_phrase": "Kansas City"
+  },
+  {
+   "id": "nat-ring-01",
+   "service_phrase": "eye exam",
+   "location_phrase": "Albuquerque"
+  }
+ ]
+}
