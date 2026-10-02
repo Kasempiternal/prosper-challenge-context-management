@@ -22,7 +22,7 @@ from .catalog_index import BookableRow, CatalogIndex
 from .decision import DECLINE, Verdict
 from .geo import RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, resolve_place
 from .lexicon import SHORTLIST_ABOVE, TypeCandidate, match_types, type_shortlist, types_named, unexplained_words
-from .names import clue_words, match_locations, match_providers
+from .names import STREET_TYPES, clue_words, match_locations, match_providers
 from .policy import IssueKind, Rule, Violation, check, has_violation
 from .request import WEEKDAY_NAMES, AltRef, OfferRef, PendingAsk, Request, Slot, TimePref
 from .text import phonetic_keys, tokens
@@ -314,7 +314,7 @@ class _Resolution:
                     rows_p = rows if provider_ids is None else [r for r in rows if r.provider.id in provider_ids]
                     rows_pl = [r for r in rows_p if r.location.id in location_ids]
             else:
-                return self._refuse_location(rows_p, provider_ids, location_ids)
+                return self._refuse_location(rows_p, provider_ids, location_ids, type_ids, svc is not None)
 
         if svc is None and self.geo:
             # No visit named yet: two live types already mean "What's the visit for?", so a
@@ -670,11 +670,13 @@ class _Resolution:
         for p in place.anchors:
             names.update(tokens(p.label))
         for c in place.sites:
-            names.update(tokens(self.ix.locations[c.id].name))
+            loc = self.ix.locations[c.id]
+            names.update(tokens(f"{loc.name} {loc.address}"))
         for mid in place.metro_ids(self.ix):
             m = self.ix.metros[mid]
             names.update(tokens(" ".join([m.name, m.state, T.state_name(m.state), *m.aliases])))
         names -= _PLACE_FILLER
+        names |= STREET_TYPES
 
         def is_name(w: str) -> bool:
             keys = phonetic_keys(w)
@@ -818,16 +820,25 @@ class _Resolution:
                 break
         return tuple(out)
 
-    def _refuse_location(self, rows_p, provider_ids, location_ids) -> Plan:
-        type_id = self._best_type(rows_p)
+    def _refuse_location(self, rows_p, provider_ids, location_ids, type_ids, has_service) -> Plan:
+        type_id = self._best_type(rows_p) or (type_ids[0] if has_service and len(type_ids) == 1 else None)
         alts = self._alternatives(rows_p, None)
-        loc = location_ids[0] if len(location_ids) == 1 else None
+        named = {"at": tuple(location_ids), "on_street": self._named_by_street()}
         if provider_ids is not None and not any(set(self.ix.providers[p].location_ids) & set(location_ids)
                                                 for p in provider_ids):
             single = provider_ids[0] if len(provider_ids) == 1 else None
             return self._refuse("provider_location", type_id=type_id, who=self._who(provider_ids),
-                                provider_id=single, location_id=loc, alternatives=alts)
-        return self._refuse("location_type", type_id=type_id, location_id=loc, alternatives=alts)
+                                provider_id=single, alternatives=alts, **named)
+        anchors = tuple(self.ix.gazetteer.sites[l] for l in location_ids if l in self.ix.gazetteer.sites)
+        if not rows_p and provider_ids is None and anchors:
+            # Not even the widest ring around the clinic has the visit: name the nearest that does.
+            self.preface += T.say_refuse(self.ix, "location_type", type_id=type_id, **named) + " "
+            return self._none_nearby(anchors, FINAL_RING_MI, type_ids, None, None, has_service)
+        return self._refuse("location_type", type_id=type_id, alternatives=alts, **named)
+
+    def _named_by_street(self) -> bool:
+        sites = self.place_memo.sites if self.place_memo else ()
+        return bool(sites) and all(c.via in ("street", "address") for c in sites)
 
     def _refuse_policy(self, bad, issues, rows_all, location_ids) -> Plan:
         rules_per_row = [{v.rule for v in issues[r.key] if v.kind is IssueKind.VIOLATION} for r in bad]

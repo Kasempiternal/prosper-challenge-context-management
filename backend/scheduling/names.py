@@ -16,8 +16,11 @@ if TYPE_CHECKING:
 
 _TITLE_WORDS = {"dr", "doctor", "doc", "the", "with", "md", "np", "pa", "do", "nurse", "practitioner"}
 _LOCATION_GENERIC = {"health", "center", "centre", "clinic", "family", "specialty", "medical", "group",
-                     "community", "care", "the", "one", "office", "location", "in", "at", "on", "st", "street",
-                     "blvd", "boulevard", "ave"}
+                     "community", "care", "the", "one", "office", "location", "in", "at", "on"}
+# Never evidence for a site: "Lincoln Avenue" names Lincoln, and "avenue" must not reach The Avenues.
+STREET_TYPES = frozenset({"st", "street", "ave", "av", "avenue", "blvd", "boulevard", "rd", "road", "dr", "drive",
+                          "ln", "lane", "way", "pl", "place", "ct", "court", "pkwy", "parkway", "hwy", "highway",
+                          "ter", "terrace", "cir", "circle"})
 MIN_PROVIDER_SCORE = 0.78
 MIN_LOCATION_SCORE = 0.4
 TIE_GAP = 0.08
@@ -27,7 +30,7 @@ TIE_GAP = 0.08
 class NameCandidate:
     id: str
     score: float
-    via: str  # "exact" | "fuzzy" | "phonetic" | "first"
+    via: str  # "exact" | "fuzzy" | "phonetic" | "first"; locations: "exact" | "street" | "address"
 
 
 # eq=False: identity hash, so the per-index word cache below can key on the index.
@@ -212,40 +215,152 @@ def clue_words(index: CatalogIndex, phrase: str | None, candidate_ids: Iterable[
 # Cached: every turn would otherwise re-tokenize every site's name and address.
 @lru_cache(maxsize=8192)
 def _location_words(loc: Location) -> frozenset[str]:
-    return frozenset(w for w in tokens(loc.name) if w not in _LOCATION_GENERIC)
+    return frozenset(w for w in tokens(loc.name) if w not in _LOCATION_GENERIC and w not in STREET_TYPES)
+
+
+@dataclass(frozen=True, slots=True)
+class Street:
+    number: int | None
+    words: tuple[str, ...]  # the street's name: ("market",), ("medical", "center"), ("2nd",)
 
 
 @lru_cache(maxsize=8192)
-def _street_words(loc: Location) -> frozenset[str]:
-    return frozenset(w for w in tokens(loc.address) if w not in _LOCATION_GENERIC and not w.isdigit())
+def street_of(loc: Location) -> Street:
+    """"3330 Market St" -> Street(3330, ("market",))."""
+    words = tokens(loc.address)
+    number = int(words.pop(0)) if words and words[0].isdigit() else None
+    return Street(number, tuple(w for w in words if w not in STREET_TYPES))
+
+
+@dataclass(frozen=True, slots=True)
+class HeardPlace:
+    words: tuple[str, ...]         # distinctive words, matched against site names and streets
+    street_words: frozenset[str]   # words the caller put before a street type: streets only
+    number: int | None             # a house number, from digits or spoken words
+
+
+_ORDINALS = {"first": "1st", "second": "2nd", "third": "3rd", "fourth": "4th", "fifth": "5th", "sixth": "6th",
+             "seventh": "7th", "eighth": "8th", "ninth": "9th", "tenth": "10th"}
+_UNITS = {w: i for i, w in enumerate(("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                                      "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+                                      "seventeen", "eighteen", "nineteen"))} | {"oh": 0}
+_TENS = {w: 10 * i for i, w in enumerate(("twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty",
+                                          "ninety"), start=2)}
+# Words that end a street name read backwards from its type: "the clinic on | Market Street".
+_STREET_STOP = _LOCATION_GENERIC - {"health", "center", "centre", "family", "medical", "community", "care"} | {
+    "near", "by", "off", "of", "to", "from", "and", "over", "is", "it", "s", "that", "my"}
+
+
+def _is_number_word(w: str) -> bool:
+    return w.isdigit() or w in _UNITS or w in _TENS or w == "hundred"
+
+
+def _spoken_number(run: list[str]) -> int | None:
+    """STT house numbers: "3330", "33 30", "thirty three thirty", "eighteen twelve", "five oh five",
+    "forty eight hundred". Each spoken group of up to two digits is written out in turn."""
+    out, cur = "", None
+    for w in run:
+        if w.isdigit():
+            out, cur = out + ("" if cur is None else str(cur)) + w, None
+        elif w == "hundred":
+            cur = (1 if cur is None else cur) * 100
+        elif w in _TENS:
+            if cur is not None and cur >= 100 and cur % 100 == 0:
+                cur += _TENS[w]
+            else:
+                out, cur = out + ("" if cur is None else str(cur)), _TENS[w]
+        else:
+            v = _UNITS[w]
+            if cur is not None and ((cur >= 20 and cur % 10 == 0 and v < 10) or (cur >= 100 and cur % 100 == 0)):
+                cur += v
+            else:
+                out, cur = out + ("" if cur is None else str(cur)), v
+    out += "" if cur is None else str(cur)
+    return int(out) if out else None
+
+
+def hear_place(phrase: str | None) -> HeardPlace:
+    raw = tokens(phrase or "")
+    explicit: set[str] = set()
+    for i, w in enumerate(raw):
+        if w not in STREET_TYPES:
+            continue
+        if i and raw[i - 1] in _ORDINALS:
+            raw[i - 1] = _ORDINALS[raw[i - 1]]  # "second street" -> "2nd"
+        # The street's own name is the one or two words before its type.
+        for j in range(i - 1, max(i - 3, -1), -1):
+            if raw[j] in _STREET_STOP or raw[j] in STREET_TYPES or _is_number_word(raw[j]):
+                break
+            explicit.add(raw[j])
+    number = None
+    for i, w in enumerate(raw):
+        if not _is_number_word(w):
+            continue
+        j = i
+        while j < len(raw) and _is_number_word(raw[j]):
+            j += 1
+        # "the one on Lincoln": a lone "one" or "oh" is never a house number.
+        if raw[i:j] not in (["one"], ["oh"], ["hundred"]):
+            number = _spoken_number(raw[i:j])
+            raw = raw[:i] + raw[j:]
+            break
+    words = tuple(w for w in raw if w in explicit or (w not in _LOCATION_GENERIC and w not in STREET_TYPES))
+    return HeardPlace(words, frozenset(explicit), number)
 
 
 def match_locations(index: CatalogIndex, phrase: str | None, within: Iterable[str] | None = None) -> list[NameCandidate]:
     """Distinctive-word overlap: "Mission Bay" -> loc_000 only; "Mission" -> both Missions;
-    "North Beach" never matches "North Gate" because "beach" is the deciding word."""
-    words = [w for w in tokens(phrase or "") if w not in _LOCATION_GENERIC]
+    "North Beach" never matches "North Gate" because "beach" is the deciding word. Street words
+    count too, fully when the caller said the street type ("Market Street"); a house number then
+    picks the site on that street ("3330 Market" -> via "address")."""
+    heard = hear_place(phrase)
+    words = list(heard.words)
     if not words:
-        return []
+        if heard.number is None or not within:
+            return []
+        # "The 3330 one", answering "Downtown at 1812 Market or Willow Glen at 3330 Market?"
+        return [NameCandidate(i, 1.0, "address") for i in within
+                if street_of(index.locations[i]).number == heard.number]
     if len(words) > 1 and any("".join(words) in _location_words(loc) for loc in index.locations.values()):
         words = ["".join(words)]  # "down town" -> "downtown"
     pool = [index.locations[i] for i in within] if within else list(index.locations.values())
-    scored = []
+    scored, on_street = [], []
     for loc in pool:
         name_words = _location_words(loc)
-        street = _street_words(loc)
-        hits, street_hits = 0, 0
+        street = street_of(loc).words
+        hits, street_hits, said_street = 0, 0.0, set()
         for w in words:
-            if any(_same_word(w, nw) for nw in name_words):
+            if w not in heard.street_words and any(_same_word(w, nw) for nw in name_words):
                 hits += 1
             elif any(_same_word(w, sw) for sw in street):
-                street_hits += 1
+                street_hits += 1.0 if w in heard.street_words else 0.6
+                if w in heard.street_words:
+                    said_street.update(sw for sw in street if _same_word(w, sw))
         if not hits and not street_hits:
             continue
-        phrase_cov = (hits + 0.6 * street_hits) / len(words)
-        name_cov = hits / len(name_words) if name_words else 0.0
+        if street_hits:
+            on_street.append(loc)
+        phrase_cov = (hits + street_hits) / len(words)
+        # "Center Street" covers Center St whole, but only half of Medical Center Dr.
+        name_cov = hits / len(name_words) if hits else len(said_street) / len(street) if said_street else 0.0
         scored.append(NameCandidate(loc.id, round(0.7 * phrase_cov + 0.3 * name_cov, 3),
                                     "exact" if hits else "street"))
-    tier = _top_tier(scored, MIN_LOCATION_SCORE)
+    pinned = _by_house_number(on_street, heard.number) if heard.number is not None else []
+    tier = [NameCandidate(l, 1.0, "address") for l in pinned] or _top_tier(scored, MIN_LOCATION_SCORE)
     if within and not tier:
         return match_locations(index, phrase)
     return tier
+
+
+def _by_house_number(on_street: list[Location], number: int) -> list[str]:
+    """Sites on the named street at that number. A number nobody has picks the site whose number
+    is clearly nearest, within one city only: STT garbles digits ("3300" for "3330") far more
+    often than a caller invents an address, and the offer names the site, so a wrong pick is
+    heard and corrected. Close calls pick nothing and the street's sites stay to be asked about."""
+    exact = [l.id for l in on_street if street_of(l).number == number]
+    if exact or len({l.metro_id for l in on_street}) != 1:
+        return exact
+    ranked = sorted((abs(street_of(l).number - number), l.id) for l in on_street if street_of(l).number is not None)
+    if len(ranked) == 1 or (ranked and 2 * ranked[0][0] < ranked[1][0]):
+        return [ranked[0][1]]
+    return []

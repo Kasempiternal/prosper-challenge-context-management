@@ -8,6 +8,7 @@ from datetime import datetime
 
 from .catalog_index import AppointmentType, CatalogIndex
 from .geo import US_STATES
+from .names import STREET_TYPES
 from .text import normalize
 
 _STATE_NAMES = {abbrev: name for abbrev, name, _, _ in US_STATES}
@@ -59,13 +60,47 @@ def site_label(index: CatalogIndex, location_id: str) -> str:
     return loc.short_name
 
 
+_STREET_TYPE_NAMES = {"st": "Street", "ave": "Avenue", "av": "Avenue", "blvd": "Boulevard", "rd": "Road",
+                      "dr": "Drive", "ln": "Lane", "pl": "Place", "ct": "Court", "pkwy": "Parkway", "hwy": "Highway",
+                      "ter": "Terrace", "cir": "Circle"}
+
+
+def _address_parts(address: str) -> tuple[str, str, str]:
+    """"3330 Market St" -> ("3330", "Market", "Street"); "7095 Broadway" -> ("7095", "Broadway", "")."""
+    words = address.split()
+    number = words.pop(0) if words and words[0].isdigit() else ""
+    kind = words[-1].rstrip(".") if len(words) > 1 and words[-1].rstrip(".").lower() in STREET_TYPES else ""
+    if kind:
+        words.pop()
+    return number, " ".join(words), _STREET_TYPE_NAMES.get(kind.lower(), kind)
+
+
+def street_label(index: CatalogIndex, location_id: str) -> str:
+    """"Market Street", as said aloud."""
+    _, name, kind = _address_parts(index.locations[location_id].address)
+    return f"{name} {kind}".strip()
+
+
 def _distinct_site_labels(index: CatalogIndex, ids: list[str]) -> list[str]:
+    parts = [_address_parts(index.locations[i].address) for i in ids]
+    if len(ids) > 1 and len({p[1] for p in parts}) == 1 and len({p[0] for p in parts} - {""}) == len(ids):
+        # Sites on one street are told apart by number: "Downtown at 1812 Market".
+        return [f"{index.locations[i].short_name} at {num} {name}" for i, (num, name, _) in zip(ids, parts)]
     labels = [index.locations[i].short_name for i in ids]
     if len(set(labels)) < len(labels):
         labels = [site_label(index, i) for i in ids]
     if len(set(labels)) < len(labels):
         labels = [f"{lab} on {index.locations[i].address.split(' ', 1)[-1]}" for lab, i in zip(labels, ids)]
     return labels
+
+
+def named_sites(index: CatalogIndex, ids: tuple[str, ...], on_street: bool = False) -> str:
+    """The clinics the caller named, as said back to them: "Willow Glen on Market Street"."""
+    labels = [index.locations[i].short_name for i in ids]
+    if len(set(labels)) < len(labels):
+        labels = [site_label(index, i) for i in ids]
+    streets = {street_label(index, i) for i in ids}
+    return join_or(labels) + (f" on {streets.pop()}" if on_street and len(streets) == 1 else "")
 
 
 def state_name(abbrev: str) -> str:
@@ -203,14 +238,17 @@ def _distinct_provider_labels(index: CatalogIndex, ids: list[str]) -> list[str]:
 
 
 def say_refuse(index: CatalogIndex, code: str, *, type_id: str | None = None, who: str | None = None,
-               provider_id: str | None = None, location_id: str | None = None, specialty: str | None = None,
+               provider_id: str | None = None, at: tuple[str, ...] = (), on_street: bool = False,
+               location_id: str | None = None, specialty: str | None = None,
                alternatives: tuple[tuple[str, str, str], ...] = (), alt_type_id: str | None = None,
                needs_referral: bool = False, near: str | None = None, near_kind: str | None = None,
                radius_mi: float | None = None, nearest_mi: float | None = None) -> str:
+    """`at`: the clinics the caller named (location_type, provider_location); `location_id`: the
+    nearest clinic that has the visit (none_nearby)."""
     what = with_article(type_label(index.types[type_id])) if type_id else "that"
     What = what[0].upper() + what[1:]
-    loc = index.locations[location_id].short_name if location_id else None
-    alt = _alternatives_sentence(index, alternatives) if code != "none_nearby" else ""
+    loc = named_sites(index, at, on_street)
+    alt = _alternatives_sentence(index, alternatives, at) if code != "none_nearby" else ""
 
     if code == "not_offered":
         return f"Sorry, we don't offer {index.specialty_spoken.get(specialty, 'that')} at our clinics."
@@ -255,9 +293,17 @@ def say_refuse(index: CatalogIndex, code: str, *, type_id: str | None = None, wh
     raise ValueError(f"no template for refusal {code!r}")
 
 
-def _alternatives_sentence(index: CatalogIndex, alternatives: tuple[tuple[str, str, str], ...]) -> str:
+def _alternatives_sentence(index: CatalogIndex, alternatives: tuple[tuple[str, str, str], ...],
+                           at: tuple[str, ...] = ()) -> str:
+    """A suggestion in another of our cities than the clinics named says which: "Downtown in Oakland"."""
     if not alternatives:
         return ""
-    parts = [f"{index.providers[p].name} at {site_label(index, l)}" for _, p, l in alternatives]
+    home = {index.locations[l].metro_id for l in at}
+
+    def where(l: str) -> str:
+        metro = index.metros.get(index.locations[l].metro_id)
+        away = home and metro and metro.name and metro.id not in home
+        return f"{site_label(index, l)} in {metro.name}" if away else site_label(index, l)
+    parts = [f"{index.providers[p].name} at {where(l)}" for _, p, l in alternatives]
     question = "Would that work?" if len(parts) == 1 else "Would either of those work?"
     return f" I can book {join_or(parts)}. {question}"

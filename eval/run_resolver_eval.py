@@ -1,12 +1,13 @@
 """Offline resolver eval: replays case files through merge + resolve.
 
 Usage:
-  backend/.venv/Scripts/python eval/run_resolver_eval.py [--set main|heldout|heldout2|tune|all|national|national2]
+  backend/.venv/Scripts/python eval/run_resolver_eval.py [--set main|heldout|heldout2|tune|all|national|national2|street]
                                                         [--catalog PATH] [--jev off|on] [--live] [--verbose]
 
 --set national  eval/cases_national.jsonl against the national catalog. Refuses to run unless the
            catalog's sha256 equals the one pinned in every case. `all` stays the SF sets.
 --set national2 the same for eval/cases_national2.jsonl, a second held-out national draw.
+--set street    the same for eval/cases_street.jsonl: street names, house numbers and addresses (dev set).
 
 --jev off  no model; no network.
 --jev on   JEV answers come from eval/.jev_cache.json (offline, deterministic). The no-JEV run is
@@ -42,7 +43,7 @@ from scheduling.resolver import Plan, plan_json, resolve  # noqa: E402
 EVAL = ROOT / "eval"
 CACHE = EVAL / ".jev_cache.json"
 SETS = ("main", "heldout", "heldout2", "tune")
-NATIONAL_SETS = ("national", "national2")
+NATIONAL_SETS = ("national", "national2", "street")
 SF_CATALOG = ROOT / "backend" / "data" / "catalog.json"
 NATIONAL_CATALOG = ROOT / "backend" / "data" / "national" / "catalog.json"
 LATENCY_REPEATS = 20
@@ -53,7 +54,7 @@ COMMIT = {"offer", "confirm"}
 def load_set(name: str) -> list[dict]:
     path = {"heldout2": EVAL / "cases_heldout2.jsonl", "tune": EVAL / "cases_tune.jsonl",
             "national": EVAL / "cases_national.jsonl",
-            "national2": EVAL / "cases_national2.jsonl"}.get(name, EVAL / "cases.jsonl")
+            "national2": EVAL / "cases_national2.jsonl", "street": EVAL / "cases_street.jsonl"}.get(name, EVAL / "cases.jsonl")
     cases = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     if name == "main":
         return [c for c in cases if c["category"] != "heldout"]
@@ -79,6 +80,8 @@ def check_plan(plan: Plan, exp: dict, index=None) -> list[str]:
     suggested alternative, of which there must be one); `max_miles` from `anchor` [lat, lon];
     `refuse_reason` is the refusal code."""
     errs = []
+    if "None" in plan.say:
+        errs.append("spoke a Python None")
     if plan.status != exp["status"]:
         errs.append(f"status {plan.status} != {exp['status']}")
     picks = list(plan.offers) + ([plan.confirm] if plan.confirm else [])
@@ -316,7 +319,7 @@ def print_headline(results: dict) -> None:
     groups = [("main (rules written against)", ("main",)), ("tune (thresholds chosen on)", ("tune",)),
               ("HELD-OUT heldout", ("heldout",)), ("HELD-OUT heldout2", ("heldout2",)),
               ("HELD-OUT combined", ("heldout", "heldout2")), ("national (catalog-pinned)", ("national",)),
-              ("HELD-OUT national2 (pinned)", ("national2",))]
+              ("HELD-OUT national2 (pinned)", ("national2",)), ("street (catalog-pinned dev)", ("street",))]
     with_jev = any(on for _, on in results.values())
 
     def merged(names, which):

@@ -188,7 +188,8 @@ def resolve_place(ix: CatalogIndex, phrase: str | None) -> PlaceMatch:
         region = _region(gz, tokens(qual_raw))
         if not region:
             words += tokens(qual_raw)
-    if words and " ".join(words) not in gz.areas and words[-1] in _TRAILING_FILLER:
+    # "Austin area" drops "area", but "... in Kansas City" keeps "city".
+    if words and words[-1] in _TRAILING_FILLER and not any(" ".join(words[-n:]) in gz.areas for n in (1, 2, 3)):
         words = words[:-1]
     if not region:
         words, region = _split_region(gz, words)
@@ -298,12 +299,15 @@ def _resolve_head(ix: CatalogIndex, words: list[str], near: bool, within: frozen
         return PlaceMatch(anchors=_prefer_metros(regions))
 
     sites = _sites(ix, text, within)
-    if not any(set(words) & _location_words(ix.locations[c.id]) for c in sites):
+    # A clinic's name, "Market Street" or "3330 Market" named the site outright.
+    strong = bool(sites) and sites[0].via in ("exact", "street", "address") and sites[0].score >= STRONG_SITE_SCORE
+    by_street = strong and sites[0].via != "exact"
+    if not by_street and not any(set(words) & _location_words(ix.locations[c.id]) for c in sites):
         # "Philedelphia": a misheard city name is the city, not the clinics with the city in their name.
         misheard = _fuzzy_areas(gz, text, keep)
         if misheard and all(p.kind in ("metro", "state") for p in misheard):
             return PlaceMatch(anchors=_prefer_metros(misheard))
-    if sites and sites[0].via == "exact" and sites[0].score >= STRONG_SITE_SCORE:
+    if strong:
         return _site_anchors(gz, sites) if near else PlaceMatch(sites=sites)
     neighborhoods = [p for p in exact if p.kind == "neighborhood"]
     if neighborhoods:
