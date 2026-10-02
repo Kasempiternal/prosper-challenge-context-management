@@ -16,14 +16,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
+from loguru import logger
 
 from .catalog_index import CatalogIndex
 from .decision import DECLINE, Gate, Verdict
+from .lexicon import ranked_types
 
 URL = "https://api.commandcode.ai/provider/v1/systemone"
 MODEL = "typesafe/jev"
 USD_PER_INPUT_TOKEN = 0.04 / 1_000_000
 _QUESTION = "pick"
+MAX_CHOICE_OPTIONS = 255  # JEV answers HTTP 400 "TypeSafe Choice questions support at most 255 options"
 
 
 @dataclass(frozen=True)
@@ -82,18 +85,18 @@ class JevClient:
         """Start the per-turn JEV budget. Call once before each resolve()."""
         self._deadline = time.perf_counter() + self.turn_budget_s if self.turn_budget_s is not None else None
 
-    def choice(self, state: str, instructions: str, criteria: dict[str, str]) -> JevAnswer | None:
-        body = {"model": MODEL, "state": state,
-                "questions": {_QUESTION: {"type": "choice", "instructions": instructions, "criteria": criteria}}}
-        entry = self._fetch(body)
+    def choice(self, state: str, instructions: str, criteria: dict[str, str],
+               ranking: list[str] = ()) -> JevAnswer | None:
+        """ranking: option ids best first; decides which options survive the MAX_CHOICE_OPTIONS cap."""
+        criteria = cap_options(criteria, ranking)
+        entry = self._fetch(_choice_body(state, instructions, criteria))
         return _parse(entry["answer"], criteria) if entry else None
 
     def warm_up(self, criteria: dict[str, str]) -> JevCall | None:
-        """Pays the server-side cold path with the same large option set the caller will need.
+        """Pays the server-side cold path with a request shaped like the ones the caller will need.
         Always goes to the network and is never cached, so it measures and warms the real path."""
-        body = {"model": MODEL, "state": "A patient calling a multi-specialty clinic said they want: 'an appointment'",
-                "questions": {_QUESTION: {"type": "choice", "instructions": "Which appointment type is the caller asking for?",
-                                          "criteria": criteria}}}
+        body = _choice_body("A patient calling a multi-specialty clinic said they want: 'an appointment'",
+                            "Which appointment type is the caller asking for?", cap_options(criteria))
         entry, call = self._post(body, _key(body), timeout_s=self.warmup_timeout_s, use_budget=False)
         self.calls.append(call)
         return call if entry else None
@@ -167,6 +170,21 @@ class JevClient:
         return entry, JevCall(key, "live", ms, tokens)
 
 
+def _choice_body(state: str, instructions: str, criteria: dict[str, str]) -> dict:
+    return {"model": MODEL, "state": state,
+            "questions": {_QUESTION: {"type": "choice", "instructions": instructions, "criteria": criteria}}}
+
+
+def cap_options(criteria: dict[str, str], ranking: list[str] = ()) -> dict[str, str]:
+    """At most MAX_CHOICE_OPTIONS options: the ranked ones first, then in the given order. Kept
+    options stay in the given order, so a request under the cap is unchanged."""
+    if len(criteria) <= MAX_CHOICE_OPTIONS:
+        return criteria
+    keep = set(list(dict.fromkeys([k for k in ranking if k in criteria] + list(criteria)))[:MAX_CHOICE_OPTIONS])
+    logger.warning(f"JEV choice has {len(criteria)} options; keeping the {MAX_CHOICE_OPTIONS} best ranked")
+    return {k: v for k, v in criteria.items() if k in keep}
+
+
 def _key(body: dict) -> str:
     return hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
@@ -211,7 +229,7 @@ class JevTypeDisambiguator:
         if hint:
             said += f" (specialty mentioned: {hint})"
         ans = self.client.choice(said, "Which appointment type is the caller asking for?",
-                                 type_criteria(self.ix, candidate_ids))
+                                 type_criteria(self.ix, candidate_ids), ranking=ranked_types(self.ix, phrase, hint))
         return self.gate.decide(ans.probabilities) if ans else DECLINE
 
 

@@ -32,21 +32,20 @@ NATIONAL_AGENT = BACKEND_DIR / "agents" / "national-scheduler.json"
 BEATS: dict[str, list[tuple]] = {
     "1": [
         ("caller", "Hi, I'm a new patient and I have a referral. I need a cardiology consultation with Dr. Chen, soonest you have."),
-        ("call", "start", {"summary": "New patient with a referral; cardiology consultation with Dr. Chen, as soon as possible."}),
+        ("call", "start", {"request": "I'm a new patient and I have a referral. I need a cardiology consultation with Dr. Chen, soonest you have."}),
         ("call", "update_request", {"service_phrase": "cardiology consultation", "specialty_hint": "Cardiology",
                                     "provider_phrase": "Dr. Chen", "is_new": True, "has_referral": True,
                                     "time_pref": {"soonest": True}}),
         ("caller", "The first one works."),
         ("call", "update_request", {"pick_offer": 1}),
         ("caller", "Yes, please."),
-        ("call", "hold_slot", {}),
-        ("call", "book_offer", {}),
+        ("call", "confirm_booking", {}),
         ("caller", "No, that's all. Thanks!"),
         ("call", "finish", {}),
     ],
     "2": [
         ("caller", "Hi, I have been a patient there for years and I have a referral. Cardiology consultation with Dr. Chen, soonest."),
-        ("call", "start", {"summary": "Established patient with a referral; cardiology consultation with Dr. Chen, soonest."}),
+        ("call", "start", {"request": "I have been a patient there for years and I have a referral. Cardiology consultation with Dr. Chen, soonest."}),
         ("call", "update_request", {"service_phrase": "cardiology consultation", "specialty_hint": "Cardiology",
                                     "provider_phrase": "Dr. Chen", "is_new": False, "has_referral": True,
                                     "time_pref": {"soonest": True}}),
@@ -55,39 +54,37 @@ BEATS: dict[str, list[tuple]] = {
     ],
     "3": [
         ("caller", "I'm a new patient, I need an MRI of my knee with Dr. Nwin."),
-        ("call", "start", {"summary": "New patient; MRI of the knee with Dr. Nwin."}),
+        ("call", "start", {"request": "I'm a new patient, I need an MRI of my knee with Dr. Nwin."}),
         ("call", "update_request", {"service_phrase": "MRI of my knee", "provider_phrase": "Dr. Nwin", "is_new": True}),
         ("caller", "Oh. Do you do eye exams?"),
         ("call", "lookup", {"kind": "do_you_offer", "phrase": "eye exam"}),
     ],
     "4": [
         ("caller", "I'm a new patient with a referral. Cardiology consultation with Dr. Chen, as soon as possible."),
-        ("call", "start", {"summary": "New patient with a referral; cardiology consultation with Dr. Chen, soonest."}),
+        ("call", "start", {"request": "I'm a new patient with a referral. Cardiology consultation with Dr. Chen, as soon as possible."}),
         ("call", "update_request", {"service_phrase": "cardiology consultation", "specialty_hint": "Cardiology",
                                     "provider_phrase": "Dr. Chen", "is_new": True, "has_referral": True,
                                     "time_pref": {"soonest": True}}),
         ("caller", "Sure, book it."),
-        ("call", "hold_slot", {}),
+        ("call", "confirm_booking", {}),
         ("caller", "The second one."),
         ("call", "update_request", {"pick_offer": 2}),
         ("caller", "Yes."),
-        ("call", "hold_slot", {}),
-        ("call", "book_offer", {}),
+        ("call", "confirm_booking", {}),
         ("caller", "I also need a dermatology appointment."),
-        ("call", "book_another", {}),
+        ("call", "book_another", {"request": "I also need a dermatology appointment."}),
         ("call", "update_request", {"service_phrase": "dermatology appointment", "specialty_hint": "Dermatology"}),
     ],
     "5": [
         ("caller", "New patient with a referral, cardiology consultation with Dr. Chen, soonest."),
-        ("call", "start", {"summary": "New patient with a referral; cardiology consultation with Dr. Chen, soonest."}),
+        ("call", "start", {"request": "New patient with a referral, cardiology consultation with Dr. Chen, soonest."}),
         ("call", "update_request", {"service_phrase": "cardiology consultation", "specialty_hint": "Cardiology",
                                     "provider_phrase": "Dr. Chen", "is_new": True, "has_referral": True,
                                     "time_pref": {"soonest": True}}),
         ("caller", "The first one."),
         ("call", "update_request", {"pick_offer": 1}),
         ("caller", "Yes."),
-        ("call", "hold_slot", {}),
-        ("call", "book_offer", {}),
+        ("call", "confirm_booking", {}),
         ("caller", "And do you do eye exams?"),
         ("call", "lookup", {"kind": "do_you_offer", "phrase": "eye exams"}),
         ("caller", "Okay, that's all, bye."),
@@ -95,7 +92,7 @@ BEATS: dict[str, list[tuple]] = {
     ],
     "N1": [
         ("caller", "Hi, I hurt my knee playing football. I'm in Austin, soonest you have please."),
-        ("llm", "start", {"summary": "Hurt knee playing football; in Austin; soonest."}),
+        ("llm", "start", {"request": "I hurt my knee playing football. I'm in Austin, soonest you have please."}),
         ("llm", "update_request", {"service_phrase": "hurt my knee playing football", "location_phrase": "I'm in Austin",
                                    "time_pref": {"soonest": True}}),
         ("caller", "Sports injury. And I'm a new patient, no referral."),
@@ -103,13 +100,40 @@ BEATS: dict[str, list[tuple]] = {
         ("caller", "The first one."),
         ("llm", "update_request", {"pick_offer": 1}),
         ("caller", "Yes, book it."),
-        ("llm", "hold_slot", {}),
-        ("llm", "book_offer", {}),
+        ("llm", "confirm_booking", {}),
     ],
     "N2": [
         ("caller", "I need a dental cleaning, I live in Maine."),
-        ("llm", "start", {"summary": "Dental cleaning; lives in Maine."}),
+        ("llm", "start", {"request": "I need a dental cleaning, I live in Maine."}),
         ("llm", "update_request", {"service_phrase": "dental cleaning", "location_phrase": "I live in Maine"}),
+    ],
+    # The second live national call (STT mangled the greeting), replayed through the new tools.
+    "N3": [
+        ("caller", "Hello, Michael. My name is playing football."),
+        ("caller", "I'm in Austin."),
+        ("llm", "start", {"request": "My name is playing football. I'm in Austin."}),
+        ("llm", "update_request", {"service_phrase": "playing football", "location_phrase": "I'm in Austin"}),
+        ("caller", "As soon as possible, please. It's a knee injury. I'm a new patient, so no referral."),
+        ("llm", "update_request", {"service_phrase": "knee injury", "is_new": True, "has_referral": False,
+                                   "time_pref": {"soonest": True}}),
+        ("caller", "Sports senior evaluation."),
+        ("llm", "update_request", {"service_phrase": "Sports senior evaluation"}),
+        ("caller", "The first one, please."),
+        ("llm", "update_request", {"pick_offer": 1}),
+        ("caller", "Yes, please. Also, I need a dental cleaning."),
+        ("llm", "confirm_booking", {}),
+        ("caller", "In Maine for tomorrow."),
+        ("llm", "book_another", {"request": "I need a dental cleaning. In Maine for tomorrow."}),
+        ("llm", "update_request", {"service_phrase": "dental cleaning", "location_phrase": "In Maine",
+                                   "time_pref": {"day": "tomorrow"}}),
+        ("caller", "Okay, Boston then."),
+        ("llm", "update_request", {"pick_offer": 1}),
+        ("caller", "The first one."),
+        ("llm", "update_request", {"pick_offer": 1}),
+        ("caller", "Yes."),
+        ("llm", "confirm_booking", {}),
+        ("caller", "That's all, thanks."),
+        ("llm", "finish", {}),
     ],
 }
 
@@ -154,9 +178,11 @@ def _compact(result: dict) -> str:
     return json.dumps(result, separators=(",", ":"), ensure_ascii=False)
 
 
-async def run_beat(key: str) -> None:
+async def run_beat(key: str) -> tuple["SimFlowManager", list[str]]:
+    """Returns the flow (its state) and everything the caller heard from speak-direct, in order."""
     print(f"\n######## Demo beat {key} ########")
     events: list[dict] = []
+    heard: list[str] = []
 
     async def on_event(event: dict) -> None:
         events.append(event)
@@ -177,7 +203,8 @@ async def run_beat(key: str) -> None:
                 print(f"  [resolver] status={event['status']} jev={event['jev']} tokens={event['tokens']} "
                       f"notes={event['notes']}")
         while fm.heard:
-            print(f"AGENT (speak-direct): {fm.heard.pop(0)}")
+            heard.append(fm.heard.pop(0))
+            print(f"AGENT (speak-direct): {heard[-1]}")
         if next_node is NO_RESPONSE:
             print(f"  tool result (LLM stays silent): {_compact(result)}")
         elif next_node:
@@ -187,6 +214,8 @@ async def run_beat(key: str) -> None:
         else:
             print(f"  tool result (LLM phrases the reply): {_compact(result)}")
     print(f"\n  final summary: {fm.state.get('summary')!r}")
+    print(f"  bookings: {fm.state.get('bookings', [])}")
+    return fm, heard
 
 
 async def main(keys: list[str]) -> None:

@@ -19,6 +19,7 @@ from typing import Awaitable, Callable, Optional, Union
 
 from loguru import logger
 from pipecat.flows import (
+    NO_RESPONSE,
     ContextStrategy,
     ContextStrategyConfig,
     FlowManager,
@@ -26,7 +27,7 @@ from pipecat.flows import (
     NodeConfig,
 )
 
-from agent_tools import EDGE_GUARDS, Reenter, ToolContext, build_tool, make_context
+from agent_tools import EDGE_ACTIONS, EDGE_GUARDS, ToolContext, build_tool, make_context, today_phrase
 
 from .schema import AgentConfig, Edge, Node
 from .validation import AgentValidationError, validate_agent
@@ -78,8 +79,10 @@ class AgentBuilder:
     # ---- running -----------------------------------------------------------
     async def start(self, flow_manager: FlowManager) -> None:
         """Enter the initial node and report it."""
-        # Prompts may use {{ summary }}; Flows raises on a placeholder missing from state.
+        # Prompts may use {{ summary }} and {{ today }}; Flows raises on a placeholder missing from state.
         flow_manager.state.setdefault("summary", "")
+        if self.tool_context:
+            flow_manager.state.setdefault("today", today_phrase(self.tool_context.availability.now))
         await flow_manager.initialize(self.build_initial_node())
         await self._emit(
             {
@@ -103,7 +106,7 @@ class AgentBuilder:
             "name": node.name,
             "role_message": node.role_message or self.config.persona,
             "task_messages": node.task_messages,
-            "functions": [self._make_tool(node, name) for name in node.tools]
+            "functions": [build_tool(name, self.tool_context) for name in node.tools]
             + [self._make_edge_function(node, edge) for edge in node.edges],
         }
         if node.context_strategy == "reset":
@@ -124,35 +127,31 @@ class AgentBuilder:
             node_config["post_actions"] = post_actions
         return node_config
 
-    def _make_tool(self, node: Node, name: str) -> FlowsFunctionSchema:
-        tool = build_tool(name, self.tool_context)
-        inner = tool.handler
-
-        async def handler(args: dict, flow_manager: FlowManager):
-            result, next_node = await inner(args, flow_manager)
-            if isinstance(next_node, Reenter):
-                next_node = {**self._make_node(node), "respond_immediately": next_node.respond}
-                await self._emit({"type": "node_entered", "node": node.name, "state": dict(flow_manager.state)})
-            return result, next_node
-
-        tool.handler = handler
-        return tool
-
     async def _on_call_ended(self, action: dict, flow_manager: FlowManager) -> None:
         await self._emit({"type": "call_ended", "reason": "end_node"})
 
     def _make_edge_function(self, node: Node, edge: Edge) -> FlowsFunctionSchema:
         guard = EDGE_GUARDS[edge.precondition] if edge.precondition else None
+        action = EDGE_ACTIONS[edge.action] if edge.action else None
 
         async def handler(args: dict, flow_manager: FlowManager):
             refusal = guard(flow_manager.state) if guard else None
             if refusal:
                 logger.info(f"[{edge.function}] refused by precondition {edge.precondition}: {refusal}")
                 return {"status": "error", "error": refusal}, None
-            # Persist what the caller gave us so later nodes can use it.
-            flow_manager.state.update(args)
-            logger.info(f"[{edge.function}] -> {edge.target} | collected: {args}")
             next_node = self._make_node(self._nodes_by_name[edge.target])
+            if action:
+                outcome = await action.run(self.tool_context, args, flow_manager)
+                if not outcome.proceed:
+                    logger.info(f"[{edge.function}] stays on {node.name}: {outcome.result}")
+                    return outcome.result, None if outcome.respond else NO_RESPONSE
+                result = outcome.result
+                next_node["respond_immediately"] = outcome.respond
+            else:
+                # Persist what the caller gave us so later nodes can use it.
+                flow_manager.state.update(args)
+                result = {"status": "success", **args}
+            logger.info(f"[{edge.function}] -> {edge.target} | collected: {args}")
             await self._emit(
                 {
                     "type": "edge_taken",
@@ -165,7 +164,7 @@ class AgentBuilder:
             await self._emit(
                 {"type": "node_entered", "node": edge.target, "state": dict(flow_manager.state)}
             )
-            return {"status": "success", **args}, next_node
+            return result, next_node
 
         return FlowsFunctionSchema(
             name=edge.function,

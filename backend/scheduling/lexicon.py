@@ -252,6 +252,12 @@ def _lay_specialties(index: CatalogIndex, words: list[str]) -> list[str]:
     return list(dict.fromkeys(hits))
 
 
+def ranked_types(index: CatalogIndex, phrase: str | None, hint: str | None) -> list[str]:
+    """Types any word of the phrase or the hint reaches, best lexical score first."""
+    scored = sorted(_score_types(index, phrase, hint).values(), key=lambda c: (-c.score, c.type_id))
+    return [c.type_id for c in scored]
+
+
 def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
                    metros: frozenset[str] | None = None) -> list[str]:
     """Offered types (offered in `metros`, when given) for a model to choose among: at most
@@ -262,8 +268,7 @@ def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
         return tid in index.types and tid not in index.unoffered_types and (
             metros is None or bool(index.metros_by_type[tid] & metros))
 
-    scored = sorted(_score_types(index, phrase, hint).values(), key=lambda c: (-c.score, c.type_id))
-    ranked = [c.type_id for c in scored]
+    ranked = ranked_types(index, phrase, hint)
     for spec in ([hint] if hint else []) + _lay_specialties(index, tokens(phrase or "")):
         default = index.specialty_default.get(spec)
         ranked += ([default] if default else []) + sorted(t.id for t in index.types.values() if t.specialty == spec)

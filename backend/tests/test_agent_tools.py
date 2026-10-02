@@ -1,14 +1,17 @@
 import asyncio
+import re
 import time
 
 import pytest
 from pipecat.flows import NO_RESPONSE
 from pipecat.frames.frames import TTSSpeakFrame
 
-from agent_tools import Reenter, build_tool, make_context, stt_keyterms
+from agent_tools import build_tool, make_context, stt_keyterms
 from agent_tools.context import BACKEND_DIR, RecordingDisambiguator, shared_availability
-from agent_tools.scheduling_tools import spoken_ref
-from scheduling.decision import DECLINE
+from agent_tools.keyterms import LAY_TERMS
+from agent_tools.scheduling_tools import (REFUSED_PREFACE, TAKEN_PREFACE, EdgeOutcome, book_confirmed, new_request,
+                                          spoken_ref)
+from scheduling.decision import DECLINE, Verdict
 from scheduling.resolver import NoDisambiguator
 
 
@@ -118,6 +121,8 @@ def test_state_carries_the_request_across_calls(make_ctx):
     {"time_pref": {"not_before": "next week"}},
     {"time_pref": {"not_before": 20261012}},
     {"time_pref": "tomorrow"},
+    {"time_pref": {"day": "someday"}},
+    {"time_pref": {"day": 3}},
     {"pick_offer": 7},
     {"is_new": "yes"},
     {"doctor": "Dr. Chen"},
@@ -164,40 +169,59 @@ def confirm_pick(ctx, fm, pick=1):
     return result
 
 
-def test_book_offer_is_idempotent(make_ctx):
+def book(ctx, fm, args=None) -> EdgeOutcome:
+    return asyncio.run(book_confirmed(ctx, args or {}, fm))
+
+
+def spoken(fm):
+    return [f.text for f in fm.worker.frames if isinstance(f, TTSSpeakFrame)]
+
+
+def test_booking_speaks_the_real_reference(make_ctx):
     ctx, fm = make_ctx(), FakeFlowManager()
     confirm_pick(ctx, fm)
+    outcome = book(ctx, fm)
 
-    first, next_node = call(ctx, fm, "book_offer", {})
-    again, again_next = call(ctx, fm, "book_offer", {})
-    assert next_node == Reenter(respond=False)
-    assert again_next is None
-    assert first == again
-    assert first == {"status": "booked", "ref": first["ref"], "visit": "cardiology consultation",
-                     "provider": "Dr. Emily Chen", "location": "Downtown", "when": "tomorrow at 8",
-                     "spoken": f"You're all booked. Your confirmation is {spoken_ref(first['ref'])}. "
-                               "Is there anything else I can help with?"}
-    assert first["ref"].startswith("H-")
-    assert fm.state["bookings"] == [{"ref": first["ref"], "visit": "cardiology consultation",
+    ref = outcome.result["ref"]
+    assert re.fullmatch(r"H-\d{4}", ref)
+    assert (outcome.proceed, outcome.respond) == (True, False)
+    assert outcome.result == {"status": "booked", "ref": ref, "visit": "cardiology consultation",
+                              "provider": "Dr. Emily Chen", "location": "Downtown", "when": "tomorrow at 8",
+                              "spoken": f"You're all booked. Your confirmation is {spoken_ref(ref)}. "
+                                        "Is there anything else I can help with?"}
+    assert spoken(fm)[-1] == outcome.result["spoken"]
+    assert fm.state["bookings"] == [{"ref": ref, "visit": "cardiology consultation",
                                      "provider": "Dr. Emily Chen", "location": "Downtown", "when": "tomorrow at 8"}]
-    assert [f.text for f in fm.worker.frames if isinstance(f, TTSSpeakFrame)][-1] == first["spoken"]
+    assert fm.state["status"] == "booked"
+    assert fm.state["summary"] == (f"Booked: cardiology consultation with Dr. Emily Chen, tomorrow at 8 at Downtown, "
+                                   f"confirmation {ref}.")
+
+
+def test_a_retried_booking_converges_on_one_booking(make_ctx):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    confirm_pick(ctx, fm)
+    before = {k: fm.state[k] for k in ("req", "status")}
+    first = book(ctx, fm)
+    fm.state.update(before)  # as if the call died after holding the slot, before the caller heard it
+    again = book(ctx, fm)
+    assert again.result == first.result
+    assert [b["ref"] for b in fm.state["bookings"]] == [first.result["ref"]]
 
 
 def test_spoken_ref_spells_one_character_at_a_time():
-    assert spoken_ref("H-60A2F034") == "H, 6, 0, A, 2, F, 0, 3, 4"
+    assert spoken_ref("H-6034") == "H, 6, 0, 3, 4"
 
 
-def test_booking_without_speak_direct_lets_the_llm_tell_the_caller(make_ctx):
+def test_booking_without_speak_direct_gives_the_llm_the_words(make_ctx):
     ctx, fm = make_ctx(speak_direct=False), FakeFlowManager()
     confirm_pick(ctx, fm)
     spoken_before = len(fm.worker.frames)
-    result, next_node = call(ctx, fm, "book_offer", {})
-    assert next_node == Reenter(respond=True)
-    assert "spoken" not in result
+    outcome = book(ctx, fm)
+    assert (outcome.proceed, outcome.respond) == (True, True)
+    assert "spoken" not in outcome.result
+    assert outcome.result["say"] == (f"You're all booked. Your confirmation is {spoken_ref(outcome.result['ref'])}. "
+                                     "Is there anything else I can help with?")
     assert len(fm.worker.frames) == spoken_before
-    assert fm.state["summary"] == (
-        f"Booked: cardiology consultation with Dr. Emily Chen, tomorrow at 8 at Downtown, confirmation "
-        f"{result['ref']}. The caller may want another appointment; ask what for.")
 
 
 def test_stt_keyterms_are_capped_deduped_and_proper_nouns_first(make_ctx):
@@ -218,31 +242,27 @@ def test_confirm_summary_names_only_the_held_offer(make_ctx):
                                    "(new patient, has a referral).")
 
 
-def test_book_offer_cannot_book_an_unconfirmed_pick(make_ctx):
+def test_booking_needs_a_read_back(make_ctx):
     ctx, fm = make_ctx(), FakeFlowManager()
     call(ctx, fm, "update_request", BEAT_1)
-    result, _ = call(ctx, fm, "book_offer", {"pick": 2})
-    assert result == {"status": "error", "error": "nothing confirmed to book: the caller must pick a time with "
-                                                  "update_request and say yes to its read-back first"}
+    outcome = book(ctx, fm, {"pick": 2})
+    assert outcome == EdgeOutcome({"status": "error", "error": "nothing confirmed to book: the caller must pick a time "
+                                                              "with update_request and say yes to its read-back first"},
+                                  proceed=False, respond=True)
     assert "bookings" not in fm.state
 
 
-def test_book_offer_books_the_read_back_offer_whatever_pick_the_llm_sends(make_ctx):
+def test_booking_books_the_read_back_offer_whatever_the_llm_sends(make_ctx):
     ctx, fm = make_ctx(), FakeFlowManager()
     confirm_pick(ctx, fm, pick=1)
-    result, _ = call(ctx, fm, "book_offer", {"pick": 2})
+    result = book(ctx, fm, {"pick": 2}).result
     assert (result["status"], result["when"], result["location"]) == ("booked", "tomorrow at 8", "Downtown")
 
 
 def test_booking_resets_the_request_but_keeps_the_patient(make_ctx):
     ctx, fm = make_ctx(), FakeFlowManager()
     confirm_pick(ctx, fm)
-    booked, _ = call(ctx, fm, "book_offer", {})
-    assert fm.state["status"] == "booked"
-    assert fm.state["summary"] == (
-        f"Booked: cardiology consultation with Dr. Emily Chen, tomorrow at 8 at Downtown, confirmation "
-        f"{booked['ref']}. The caller has heard the confirmation reference. The caller may want another "
-        "appointment; ask what for.")
+    first = book(ctx, fm).result
 
     result, _ = call(ctx, fm, "update_request", {"service_phrase": "dermatology appointment",
                                                  "specialty_hint": "Dermatology"})
@@ -252,26 +272,84 @@ def test_booking_resets_the_request_but_keeps_the_patient(make_ctx):
     assert fm.state["req"]["provider"]["heard"] is None
 
     confirm_pick(ctx, fm, pick=2)
-    second, _ = call(ctx, fm, "book_offer", {})
-    assert [b["ref"] for b in fm.state["bookings"]] == [booked["ref"], second["ref"]]
+    second = book(ctx, fm).result
+    assert [b["ref"] for b in fm.state["bookings"]] == [first["ref"], second["ref"]]
 
 
-def test_book_offer_rechecks_policy(make_ctx):
+def test_booking_rechecks_policy_and_offers_again(make_ctx):
     ctx, fm = make_ctx(), FakeFlowManager()
     confirm_pick(ctx, fm, pick=2)
     fm.state["req"]["patient"]["has_referral"] = False
-    result, _ = call(ctx, fm, "book_offer", {})
-    assert result == {"status": "refused", "reason": "referral"}
+    outcome = book(ctx, fm)
+    assert (outcome.proceed, outcome.result["booked"]) == (False, False)
+    assert outcome.result["spoken"].startswith(REFUSED_PREFACE)
+    assert spoken(fm)[-1] == outcome.result["spoken"]
+    assert "bookings" not in fm.state
+    assert fm.state["status"] != "confirm"
 
 
-def test_two_calls_cannot_book_the_same_slot(make_ctx):
+def test_a_slot_taken_by_another_call_is_re_offered_not_booked(make_ctx):
     (a, fm_a), (b, fm_b) = (make_ctx(), FakeFlowManager()), (make_ctx(), FakeFlowManager())
     confirm_pick(a, fm_a)
     confirm_pick(b, fm_b)
-    booked, _ = call(a, fm_a, "book_offer", {})
-    taken, _ = call(b, fm_b, "book_offer", {})
+    booked = book(a, fm_a).result
+    taken = book(b, fm_b)
     assert booked["status"] == "booked"
-    assert taken == {"status": "taken", "reason": "taken", "next": "call update_request to get new times"}
+    assert (taken.proceed, taken.respond) == (False, False)
+    assert taken.result["status"] == "offer" and taken.result["booked"] is False
+    assert taken.result["spoken"].startswith(TAKEN_PREFACE + "For a cardiology consultation, Dr. Emily Chen has ")
+    assert "tomorrow at 8 " not in taken.result["spoken"]
+    assert spoken(fm_b)[-1] == taken.result["spoken"]
+    assert "bookings" not in fm_b.state
+
+
+def new(ctx, fm, args):
+    return asyncio.run(new_request(ctx, args, fm))
+
+
+def test_another_appointment_starts_a_fresh_request_from_the_callers_words(make_ctx):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    confirm_pick(ctx, fm)
+    book(ctx, fm)
+    outcome = new(ctx, fm, {"request": " Yes, I need a dental cleaning. In Maine for tomorrow. "})
+    assert outcome == EdgeOutcome({"status": "success", "request": "Yes, I need a dental cleaning. In Maine for tomorrow."},
+                                  proceed=True, respond=True)
+    assert fm.state["summary"] == "Yes, I need a dental cleaning. In Maine for tomorrow."
+    assert "status" not in fm.state
+    req = fm.state["req"]
+    assert req["patient"] == {"is_new": True, "has_referral": True}
+    assert (req["service"]["heard"], req["provider"]["heard"], req["offered"], req["pick"]) == (None, None, (), None)
+    assert len(fm.state["bookings"]) == 1
+
+
+@pytest.mark.parametrize("args", [{}, {"request": "  "}, {"request": 7}])
+def test_a_new_request_needs_the_callers_words(make_ctx, args):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    outcome = new(ctx, fm, args)
+    assert (outcome.proceed, outcome.result["status"]) == (False, "error")
+    assert fm.state == {"summary": ""}
+
+
+@pytest.mark.parametrize("day, days, not_before", [
+    ("tomorrow", ["thursday"], "2026-10-08"),
+    ("Today", ["wednesday"], "2026-10-07"),
+    ("friday", ["friday"], None),
+])
+def test_day_words_become_the_requested_day(make_ctx, day, days, not_before):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    result, _ = call(ctx, fm, "update_request", {**BEAT_1, "time_pref": {"day": day}})
+    assert result["status"] == "offer"
+    assert fm.state["req"]["time_pref"] == {"days": tuple(days), "part_of_day": None, "not_before": not_before}
+
+
+def test_a_date_in_the_past_is_refused(make_ctx, events):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    result, next_node = call(ctx, fm, "update_request", {**BEAT_1, "time_pref": {"not_before": "2023-10-18"}})
+    assert next_node is None
+    assert result == {"status": "error", "error": "that date has passed: time_pref.not_before 2023-10-18 is before "
+                                                  "today, Wednesday, October 7, 2026. Pass the caller's day words in "
+                                                  "time_pref.day instead."}
+    assert fm.state == {"summary": ""} and events == []
 
 
 class SlowTypes:
@@ -283,9 +361,22 @@ class SlowTypes:
 class FakeJevClient:
     def __init__(self):
         self.turns = 0
+        self.calls = []
 
     def begin_turn(self):
         self.turns += 1
+
+
+class ConsultingTypes:
+    """A JEV type hook that makes one (fake) request and declines with probabilities."""
+
+    def __init__(self, client):
+        self.client = client
+
+    def pick_type(self, phrase, hint, candidate_ids):
+        from scheduling.jev import JevCall
+        self.client.calls.append(JevCall("k", "live", 540.0, 900))
+        return Verdict(top=(("appt_002", 0.79), ("appt_003", 0.21)), called=True)
 
 
 def _jev_ctx(make_ctx, types):
@@ -344,11 +435,12 @@ def _multi_metro_index():
     return index, sorted(surnames, key=lambda s: (-surnames[s], s))
 
 
-def test_stt_keyterms_put_metros_then_common_surnames_first_on_a_multi_metro_catalog():
+def test_stt_keyterms_put_metros_then_lay_terms_then_common_surnames_first_on_a_multi_metro_catalog():
     index, surnames_by_frequency = _multi_metro_index()
     terms = stt_keyterms(index)
     assert terms[:3] == ["Austin", "Boston", "Ann Arbor"]
-    assert terms[3:6] == surnames_by_frequency[:3]
+    assert terms[3:13] == list(LAY_TERMS)
+    assert terms[13:16] == surnames_by_frequency[:3]
     assert len(terms) == 50
     assert len({t.casefold() for t in terms}) == 50
     assert all(len(t) <= 20 for t in terms)
@@ -370,3 +462,30 @@ SF_KEYTERMS = [
 def test_sf_keyterms_are_unchanged(make_ctx):
     assert stt_keyterms(make_ctx().index) == SF_KEYTERMS
 
+
+def test_national_keyterms_keep_the_lay_terms(monkeypatch):
+    monkeypatch.delenv("CMD_API_KEY", raising=False)
+    index = make_context("data/national/catalog.json", speak_direct=True, jev_enabled=False, jev_timeout_ms=1200).index
+    terms = stt_keyterms(index)
+    assert len(terms) == 50
+    assert set(LAY_TERMS) <= set(terms)
+    assert terms.index("sports injury") < 50 and "Austin" in terms
+
+
+
+def test_each_jev_request_is_reported_for_the_dev_view(make_ctx):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    ctx.jev_client = FakeJevClient()
+    ctx.disambiguator = RecordingDisambiguator(ConsultingTypes(ctx.jev_client), NoDisambiguator())
+    events = []
+
+    async def on_event(event):
+        events.append(event)
+
+    ctx.on_event = on_event
+    call(ctx, fm, "update_request", {"service_phrase": "my zorbly thing"})
+    jev = [e for e in events if e["type"] == "jev_call"]
+    assert jev == [{"type": "jev_call", "purpose": "type", "ms": 540, "input_tokens": 900,
+                    "usd": 900 * 0.04 / 1_000_000, "ok": True, "source": "live", "p": 0.79}]
+    decision = next(e for e in events if e["type"] == "resolver_decision")
+    assert isinstance(decision["ms"], int)

@@ -26,6 +26,7 @@ class Edge:
     properties: dict = field(default_factory=dict)
     required: list = field(default_factory=list)
     precondition: Optional[str] = None  # name in agent_tools.registry.EDGE_GUARDS; refuses the edge until met
+    action: Optional[str] = None        # name in agent_tools.registry.EDGE_ACTIONS; code run before the transition
 
     @classmethod
     def from_dict(cls, d: dict) -> "Edge":
@@ -36,6 +37,7 @@ class Edge:
             properties=d.get("properties", {}),
             required=d.get("required", []),
             precondition=d.get("precondition"),
+            action=d.get("action"),
         )
 
 

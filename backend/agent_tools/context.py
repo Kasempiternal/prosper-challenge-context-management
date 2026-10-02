@@ -23,10 +23,12 @@ from loguru import logger
 from scheduling.availability import Availability, Hold, MockAvailability, Slot
 from scheduling.catalog_index import CatalogIndex
 from scheduling.decision import Verdict
+from scheduling.lexicon import SHORTLIST_SIZE, type_shortlist
 from scheduling.resolver import NoDisambiguator
 
 try:
-    from scheduling.jev import JevClient, JevProviderChooser, JevTypeDisambiguator, offered_type_criteria
+    from scheduling.jev import (USD_PER_INPUT_TOKEN, JevClient, JevProviderChooser, JevSiteChooser,
+                                JevTypeDisambiguator, type_criteria)
 except ImportError:  # the JEV module is optional; without it the resolver never consults a model
     JevClient = None
 
@@ -96,7 +98,7 @@ def shared_availability(catalog_path: Path) -> tuple[MockAvailability, threading
 class CallAvailability:
     """One call's view of the shared ledger. The resolver reads it from a worker thread while
     another call may be holding a slot, hence the lock. A slot this call already holds stays
-    bookable for it (book_offer is idempotent); one held by another call is taken."""
+    bookable for it (a retried booking converges); one held by another call is taken."""
 
     def __init__(self, shared: MockAvailability, lock: threading.Lock):
         self._shared, self._lock = shared, lock
@@ -132,9 +134,11 @@ class RecordingDisambiguator:
     """Wraps the resolver's model hooks and keeps the verdicts of the current turn, so the
     resolver_decision event can show whether JEV was consulted and how sure it was."""
 
-    def __init__(self, types: Any, providers: Any):
+    def __init__(self, types: Any, providers: Any, sites: Any = None):
         self._types, self._providers = types, providers
+        self._sites = sites or NoDisambiguator()
         self.verdicts: list[Verdict] = []
+        self.purposes: list[str] = []
         self.consulting = False  # a model hook is running right now (read from the event loop)
 
     def pick_type(self, phrase: str, hint: str | None, candidate_ids: list[str]) -> Verdict:
@@ -143,6 +147,9 @@ class RecordingDisambiguator:
     def pick_provider(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
         return self._record(self._providers.pick_provider, phrase, type_id, candidate_ids)
 
+    def pick_site(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
+        return self._record(self._sites.pick_site, phrase, type_id, candidate_ids)
+
     def _record(self, hook, *args) -> Verdict:
         self.consulting = True
         try:
@@ -150,6 +157,7 @@ class RecordingDisambiguator:
         finally:
             self.consulting = False
         self.verdicts.append(verdict)
+        self.purposes.append(hook.__name__.removeprefix("pick_"))
         return verdict
 
 
@@ -178,7 +186,8 @@ def make_context(catalog: str, *, speak_direct: bool, jev_enabled: bool, jev_tim
         # Per call, not shared: the client carries this call's per-turn budget (begin_turn).
         timeout_s = jev_timeout_ms / 1000
         client = JevClient(api_key, mode="auto", timeout_s=timeout_s, retries=0, turn_budget_s=timeout_s)
-        dis = RecordingDisambiguator(JevTypeDisambiguator(index, client), JevProviderChooser(index, client))
+        dis = RecordingDisambiguator(JevTypeDisambiguator(index, client), JevProviderChooser(index, client),
+                                     JevSiteChooser(index, client))
     else:
         dis = RecordingDisambiguator(NoDisambiguator(), NoDisambiguator())
     return ToolContext(index=index, availability=CallAvailability(*shared_availability(catalog_path)),
@@ -186,14 +195,29 @@ def make_context(catalog: str, *, speak_direct: bool, jev_enabled: bool, jev_tim
                        disambiguator=dis, jev_client=client, on_event=on_event)
 
 
+def warm_up_criteria(index: CatalogIndex) -> dict[str, str]:
+    """A shortlist-sized option set, like the requests a call makes (a national catalog offers more
+    types than one JEV choice question accepts)."""
+    return type_criteria(index, type_shortlist(index, "an appointment", None)[:SHORTLIST_SIZE])
+
+
 async def warm_up_jev(ctx: ToolContext) -> None:
     """Pay JEV's cold start while the caller is still listening to the greeting."""
     if ctx.jev_client is None:
         return
     started = time.perf_counter()
-    call = await asyncio.to_thread(ctx.jev_client.warm_up, offered_type_criteria(ctx.index))
+    call = await asyncio.to_thread(ctx.jev_client.warm_up, warm_up_criteria(ctx.index))
     ms = (time.perf_counter() - started) * 1000
     if call is None:
         logger.warning(f"JEV warm-up failed after {ms:.0f} ms")
     else:
         logger.info(f"JEV warm-up {call.source} in {ms:.0f} ms (server {call.latency_ms:.0f} ms)")
+    await ctx.emit(jev_call_event("warmup", call, ms))
+
+
+def jev_call_event(purpose: str, call: Any, ms: float, p: float | None = None) -> dict:
+    """Telemetry for the UI's Dev view: one JEV request, its latency, size and cost."""
+    tokens = call.input_tokens if call else 0
+    return {"type": "jev_call", "purpose": purpose, "ms": round(ms), "input_tokens": tokens,
+            "usd": tokens * USD_PER_INPUT_TOKEN, "ok": bool(call) and call.source != "failed",
+            "source": call.source if call else "failed", "p": p}

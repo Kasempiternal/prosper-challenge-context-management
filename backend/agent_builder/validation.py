@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from agent_tools import GUARD_NAMES, TOOL_NAMES
+from agent_tools import ACTION_NAMES, EDGE_ACTIONS, GUARD_NAMES, TOOL_NAMES
 
 from .schema import CONTEXT_STRATEGIES
 
@@ -77,7 +77,9 @@ def validate_agent(data: Any) -> list[dict]:
             _validate_node(node, f"nodes[{i}]", node_names, err)
 
     uses_tools = any(isinstance(n, dict) and isinstance(n.get("tools"), list) and n["tools"] for n in nodes)
-    if uses_tools and data.get("catalog") is None:
+    uses_actions = any(isinstance(n, dict) and isinstance(n.get("edges"), list)
+                       and any(isinstance(e, dict) and e.get("action") for e in n["edges"]) for n in nodes)
+    if (uses_tools or uses_actions) and data.get("catalog") is None:
         err("catalog", "Nodes use scheduling tools, so the agent needs a catalog.")
 
     return errors
@@ -205,6 +207,14 @@ def _validate_node(node: dict, path: str, node_names: set[str], err) -> None:
                 f"{epath}.required",
                 f"Required fields not in properties: {', '.join(map(str, missing))}.",
             )
+
+        action = edge.get("action")
+        if action is not None and action not in ACTION_NAMES:
+            err(f"{epath}.action", f"Unknown action {action!r}. Available: {', '.join(sorted(ACTION_NAMES))}.")
+        elif action is not None:
+            unread = [p for p in EDGE_ACTIONS[action].params if p not in required]
+            if unread:
+                err(f"{epath}.required", f"Action '{action}' needs required fields: {', '.join(unread)}.")
 
     tools = node.get("tools", [])
     if not isinstance(tools, list):

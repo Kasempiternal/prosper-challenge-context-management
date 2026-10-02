@@ -1,9 +1,8 @@
-// One line per tool in backend/agent_tools/registry.py (plus hold_slot, which agents wire as a guarded edge).
+// One line per tool in backend/agent_tools/registry.py (plus confirm_booking, which agents wire as a guarded edge).
 export const TOOL_DESCRIPTIONS: Record<string, string> = {
   update_request: 'Merges what the caller said into the request; returns the next offer, question or read-back.',
   lookup: 'Answers questions about locations, doctors and services from the catalog.',
-  book_offer: 'Books the appointment the caller confirmed. Takes no arguments.',
-  hold_slot: 'Holds the confirmed slot so nobody else can take it while booking.',
+  confirm_booking: 'Books the appointment the caller said yes to and speaks the confirmation number.',
 }
 
 export const CONTEXT_STRATEGIES = [

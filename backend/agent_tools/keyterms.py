@@ -4,7 +4,7 @@ ElevenLabs realtime STT accepts up to 50 keyterms of at most 20 characters each
 (https://elevenlabs.io/docs/capabilities/speech-to-text, "Keyterm prompting"). The catalog has
 far more names than that, so terms are taken in priority order: proper nouns first (they are
 what STT mangles and what the resolver matches on), then visit words. A multi-metro catalog puts
-metro names ahead of surnames.
+metro names, then the lay words callers use for common visits, ahead of surnames.
 """
 
 from __future__ import annotations
@@ -17,6 +17,11 @@ from scheduling.catalog_index import CatalogIndex
 MAX_KEYTERMS = 50
 MAX_KEYTERM_CHARS = 20
 
+# What callers say for the visits they book most. On a live call "sports injury" came out as
+# "Sports Seniority" and "sports senior".
+LAY_TERMS = ("knee", "injury", "sports injury", "back pain", "physical therapy", "dental cleaning", "x-ray",
+             "MRI", "referral", "new patient")
+
 
 def _type_head(name: str) -> str:
     """'Vaccination / Immunization' -> 'Vaccination', 'Bone Density Scan (DEXA)' -> 'Bone Density Scan'."""
@@ -25,11 +30,13 @@ def _type_head(name: str) -> str:
 
 def _multi_metro_tiers(index: CatalogIndex) -> list[list[str]]:
     """A national catalog has thousands of names, so the cap goes to what most callers say: their
-    city (metros with the most sites first), then the commonest surnames, then visit words."""
+    city (metros with the most sites first), common visit words, then the commonest surnames,
+    then visit type names."""
     metros = sorted(index.metros.values(), key=lambda m: (-len(index.locs_by_metro.get(m.id, ())), m.name))
     surnames = Counter(p.last_name for p in index.providers.values())
     return [
         [m.name for m in metros],
+        list(LAY_TERMS),
         sorted(surnames, key=lambda name: (-surnames[name], name)),
         [_type_head(t.name) for t in index.types.values() if t.id not in index.unoffered_types],
     ]

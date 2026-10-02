@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 import pytest
-from pipecat.flows import ContextStrategy, FlowManager
+from pipecat.flows import NO_RESPONSE, ContextStrategy, FlowManager
 
 from agent_tools.context import shared_availability
 
@@ -11,6 +11,8 @@ from agent_builder import AgentBuilder, validate_agent
 
 
 CLINIC = Path(__file__).resolve().parent.parent / "agents" / "clinic-scheduler.json"
+NATIONAL = CLINIC.with_name("national-scheduler.json")
+TODAY = "Wednesday, October 7, 2026"
 
 
 @pytest.fixture
@@ -23,11 +25,15 @@ def test_clinic_agent_is_valid(clinic):
     assert validate_agent(clinic) == []
 
 
+def test_national_agent_is_valid():
+    assert validate_agent(json.loads(NATIONAL.read_text(encoding="utf-8"))) == []
+
+
 def test_unknown_tool_is_a_path_error(clinic):
     clinic["nodes"][1]["tools"] = ["update_request", "teleport"]
     assert validate_agent(clinic) == [{
         "path": "nodes[1].tools[1]",
-        "message": "Unknown tool 'teleport'. Available: book_offer, lookup, update_request.",
+        "message": "Unknown tool 'teleport'. Available: lookup, update_request.",
     }]
 
 
@@ -48,6 +54,31 @@ def test_tools_need_a_catalog(clinic):
     del clinic["catalog"]
     assert validate_agent(clinic) == [
         {"path": "catalog", "message": "Nodes use scheduling tools, so the agent needs a catalog."}]
+
+
+def test_edge_actions_need_a_catalog(clinic):
+    del clinic["catalog"]
+    for node in clinic["nodes"]:
+        node.pop("tools", None)
+    assert validate_agent(clinic) == [
+        {"path": "catalog", "message": "Nodes use scheduling tools, so the agent needs a catalog."}]
+
+
+def test_unknown_action_is_a_path_error(clinic):
+    clinic["nodes"][0]["edges"][0]["action"] = "teleport"
+    assert validate_agent(clinic) == [{
+        "path": "nodes[0].edges[0].action",
+        "message": "Unknown action 'teleport'. Available: book_confirmed, new_request.",
+    }]
+
+
+def test_an_action_needs_the_fields_it_reads(clinic):
+    start = clinic["nodes"][0]["edges"][0]
+    start["required"] = []
+    assert validate_agent(clinic) == [{
+        "path": "nodes[0].edges[0].required",
+        "message": "Action 'new_request' needs required fields: request.",
+    }]
 
 
 @pytest.mark.parametrize("catalog, message", [
@@ -79,11 +110,10 @@ def test_builds_and_every_tool_resolves(clinic):
     assert "context_strategy" not in initial
 
     schedule = builder._make_node(builder._nodes_by_name["schedule"])
-    assert [f.name for f in schedule["functions"]] == ["update_request", "lookup", "hold_slot", "transfer_to_staff"]
+    assert [f.name for f in schedule["functions"]] == ["update_request", "lookup", "confirm_booking", "transfer_to_staff"]
     assert schedule["context_strategy"].strategy is ContextStrategy.RESET
-    confirm = builder._make_node(builder._nodes_by_name["confirm"])
-    assert [f.name for f in confirm["functions"]] == [
-        "book_offer", "update_request", "lookup", "finish", "book_another", "transfer_to_staff"]
+    booked = builder._make_node(builder._nodes_by_name["booked"])
+    assert [f.name for f in booked["functions"]] == ["lookup", "finish", "book_another", "transfer_to_staff"]
     assert builder.tool_context.jev_client is None
     assert builder.tool_context.speak_direct is True
 
@@ -97,11 +127,12 @@ class RenderingFlowManager:
         self.entered = FlowManager._render_node(self, node["name"], node)
 
 
-def test_summary_placeholder_renders_from_the_start(clinic):
+def test_summary_and_today_placeholders_render_from_the_start(clinic):
     builder = AgentBuilder.from_dict(clinic)
     fm = RenderingFlowManager()
     asyncio.run(builder.start(fm))
-    assert fm.state == {"summary": ""}
+    assert fm.state == {"summary": "", "today": TODAY}
+    assert fm.entered["role_message"].startswith(f"Today is {TODAY}. You are the scheduling assistant")
 
     schedule = builder._make_node(builder._nodes_by_name["schedule"])
     rendered = FlowManager._render_node(fm, "schedule", schedule)
@@ -130,29 +161,20 @@ class StateFlowManager:
 
 
 @pytest.mark.parametrize("status", [None, "offer", "ask", "refuse", "booked"])
-def test_hold_slot_is_refused_until_a_read_back(clinic, status):
+def test_confirm_booking_is_refused_until_a_read_back(clinic, status):
     builder = AgentBuilder.from_dict(clinic)
     schedule = builder._make_node(builder._nodes_by_name["schedule"])
-    hold_slot = next(f for f in schedule["functions"] if f.name == "hold_slot")
     fm = StateFlowManager({"summary": "", **({"status": status} if status else {})})
-    result, next_node = asyncio.run(hold_slot.handler({}, fm))
+    result, next_node = asyncio.run(_function(schedule, "confirm_booking").handler({}, fm))
     assert next_node is None
     assert result["status"] == "error"
     assert result["error"].startswith("The caller has not been read back an appointment yet.")
-
-
-def test_hold_slot_after_a_read_back_enters_confirm(clinic):
-    builder = AgentBuilder.from_dict(clinic)
-    schedule = builder._make_node(builder._nodes_by_name["schedule"])
-    hold_slot = next(f for f in schedule["functions"] if f.name == "hold_slot")
-    result, next_node = asyncio.run(hold_slot.handler({}, StateFlowManager({"status": "confirm"})))
-    assert result == {"status": "success"}
-    assert next_node["name"] == "confirm"
+    assert "bookings" not in fm.state
 
 
 class BookingFlowManager:
     def __init__(self):
-        self.state = {"summary": ""}
+        self.state = {"summary": "", "today": TODAY}
         self.worker = self
         self.spoken = []
 
@@ -171,7 +193,7 @@ def fresh_bookings():
     shared_availability.cache_clear()
 
 
-def test_booking_reenters_confirm_with_a_prompt_that_no_longer_says_book(clinic, fresh_bookings):
+def test_saying_yes_books_in_code_and_enters_booked(clinic, fresh_bookings):
     events = []
 
     async def on_event(event):
@@ -185,20 +207,96 @@ def test_booking_reenters_confirm_with_a_prompt_that_no_longer_says_book(clinic,
                                 "provider_phrase": "Dr. Chen", "is_new": True, "has_referral": True,
                                 "time_pref": {"soonest": True}}, fm))
     asyncio.run(update.handler({"pick_offer": 1}, fm))
-    _, confirm = asyncio.run(_function(schedule, "hold_slot").handler({}, fm))
-    before = FlowManager._render_node(fm, "confirm", confirm)["task_messages"][0]["content"]
-    assert not before.startswith("The appointment: Booked:")
 
-    result, reentered = asyncio.run(_function(confirm, "book_offer").handler({}, fm))
+    result, booked = asyncio.run(_function(schedule, "confirm_booking").handler({}, fm))
     assert result["status"] == "booked"
-    assert reentered["name"] == "confirm"
-    assert reentered["respond_immediately"] is False
-    assert reentered["context_strategy"].strategy is ContextStrategy.RESET
-    after = FlowManager._render_node(fm, "confirm", reentered)["task_messages"][0]["content"]
-    assert after.startswith(
-        f"The appointment: Booked: cardiology consultation with Dr. Emily Chen, tomorrow at 8 at Downtown, "
-        f"confirmation {result['ref']}. The caller has heard the confirmation reference.")
-    assert fm.spoken[-1] == result["spoken"]
-    assert events[-1]["type"] == "node_entered" and events[-1]["node"] == "confirm"
+    assert fm.spoken[-1] == result["spoken"] == (
+        f"You're all booked. Your confirmation is {', '.join(result['ref'].replace('-', ''))}. "
+        "Is there anything else I can help with?")
+    assert booked["name"] == "booked"
+    assert booked["respond_immediately"] is False
+    assert "context_strategy" not in booked
+    prompt = FlowManager._render_node(fm, "booked", booked)["task_messages"][0]["content"]
+    assert prompt.startswith(
+        "This appointment is booked and the caller has been told its confirmation number: Booked: cardiology "
+        f"consultation with Dr. Emily Chen, tomorrow at 8 at Downtown, confirmation {result['ref']}.")
+    assert [e["type"] for e in events[-2:]] == ["edge_taken", "node_entered"]
+    assert events[-1]["node"] == "booked"
     assert events[-1]["state"]["bookings"] == [
         {k: result[k] for k in ("ref", "visit", "provider", "location", "when")}]
+
+
+def test_a_taken_slot_stays_on_schedule_and_offers_again(clinic, fresh_bookings):
+    calls = []
+    for _ in range(2):  # one builder per call, as bot.py does
+        builder = AgentBuilder.from_dict(clinic)
+        schedule, fm = builder._make_node(builder._nodes_by_name["schedule"]), BookingFlowManager()
+        update = _function(schedule, "update_request")
+        asyncio.run(update.handler({"service_phrase": "cardiology consultation", "specialty_hint": "Cardiology",
+                                    "provider_phrase": "Dr. Chen", "is_new": True, "has_referral": True}, fm))
+        asyncio.run(update.handler({"pick_offer": 1}, fm))
+        calls.append((schedule, fm))
+    (first, first_fm), (second, second_fm) = calls
+    asyncio.run(_function(first, "confirm_booking").handler({}, first_fm))
+    result, next_node = asyncio.run(_function(second, "confirm_booking").handler({}, second_fm))
+    assert next_node is NO_RESPONSE
+    assert result["booked"] is False
+    assert second_fm.spoken[-1].startswith("I'm sorry, that time was just taken. For a cardiology consultation")
+    assert second_fm.state["status"] == "offer" and "bookings" not in second_fm.state
+
+
+def test_another_appointment_starts_fresh_from_the_callers_latest_words(fresh_bookings, monkeypatch):
+    """The second live national call: after a booking the caller said "Yes, I need a dental cleaning.
+    In Maine for tomorrow." and the old sports-injury request came back instead."""
+    monkeypatch.delenv("CMD_API_KEY", raising=False)
+    builder = AgentBuilder.from_json(NATIONAL)
+    fm = BookingFlowManager()
+    schedule = builder._make_node(builder._nodes_by_name["schedule"])
+    update = _function(schedule, "update_request")
+    asyncio.run(update.handler({"service_phrase": "sports injury evaluation", "location_phrase": "Austin",
+                                "is_new": True, "has_referral": False, "provider_phrase": "Dr. Tiffany Garcia"}, fm))
+    asyncio.run(update.handler({"pick_offer": 1}, fm))
+    _, booked = asyncio.run(_function(schedule, "confirm_booking").handler({}, fm))
+
+    words = "Yes, I need a dental cleaning. In Maine for tomorrow."
+    result, entered = asyncio.run(_function(booked, "book_another").handler({"request": words}, fm))
+    assert result == {"status": "success", "request": words}
+    assert entered["name"] == "schedule" and entered["respond_immediately"] is True
+    prompt = FlowManager._render_node(fm, "schedule", entered)["task_messages"][0]["content"]
+    assert prompt.startswith(f"You are helping the caller book an appointment. What we know so far: {words}\n\n")
+    assert "Garcia" not in prompt and "sports" not in prompt
+    assert fm.state["req"]["patient"] == {"is_new": True, "has_referral": False}
+    assert fm.state["req"]["provider"]["heard"] is None and fm.state["req"]["location"]["heard"] is None
+
+    update = _function(entered, "update_request")
+    result, _ = asyncio.run(update.handler({"service_phrase": "dental cleaning", "location_phrase": "In Maine",
+                                            "time_pref": {"day": "tomorrow"}}, fm))
+    assert (result["status"], result["reason"]) == ("refuse", "none_nearby")
+    assert result["spoken"] == ("We don't offer a dental cleaning in Maine. The nearest is Downtown in Boston, about "
+                                "230 miles away. Want me to look there?")
+    assert result["known"]["time"] == "thursday from 2026-10-08"
+
+
+def test_book_another_without_the_callers_words_is_refused(clinic):
+    builder = AgentBuilder.from_dict(clinic)
+    booked = builder._make_node(builder._nodes_by_name["booked"])
+    fm = StateFlowManager({"summary": "Booked: x", "status": "booked", "req": {}})
+    result, next_node = asyncio.run(_function(booked, "book_another").handler({}, fm))
+    assert next_node is None and result["status"] == "error"
+    assert fm.state["summary"] == "Booked: x"
+
+
+def test_text_sim_replays_the_second_live_national_call(fresh_bookings, monkeypatch, capsys):
+    monkeypatch.delenv("CMD_API_KEY", raising=False)
+    from tools import text_sim
+
+    fm, heard = asyncio.run(text_sim.run_beat("N3"))
+    refs = [b["ref"] for b in fm.state["bookings"]]
+    assert [b["visit"] for b in fm.state["bookings"]] == ["sports injury evaluation", "dental cleaning"]
+    assert [b["location"] for b in fm.state["bookings"]] == ["Downtown", "Downtown"]
+    confirmations = [h for h in heard if h.startswith("You're all booked.")]
+    assert confirmations == [f"You're all booked. Your confirmation is {', '.join(r.replace('-', ''))}. "
+                             "Is there anything else I can help with?" for r in refs]
+    assert ("We don't offer a dental cleaning in Maine. The nearest is Downtown in Boston, about 230 miles away. "
+            "Want me to look there?") in heard
+    assert heard[-1] == confirmations[-1]
