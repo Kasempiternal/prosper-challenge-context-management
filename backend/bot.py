@@ -44,6 +44,7 @@ from pipecat.flows import FlowManager
 
 from agent_builder import AgentBuilder, AgentConfig, validate_agent
 from agent_tools import stt_keyterms, warm_up_jev
+from agent_tools.context import preload_catalogs
 from agents_api import ID_RE, agents_dir_from_env, create_router
 
 # Load .env next to this file, so the bot runs the same from the repo root or backend/.
@@ -53,6 +54,7 @@ load_dotenv(Path(__file__).parent / ".env", override=True)
 AGENT_FLOW = Path(__file__).parent / "example_flow.json"
 
 app.include_router(create_router())
+preload_catalogs(agents_dir_from_env())
 
 
 transport_params = {

@@ -1,0 +1,14 @@
+{
+  "label": "National (synthetic, 40 metros)",
+  "sha256": "2146030501cec474e0af918487d4c27eecc17e35ca75287dca3637374c581c22",
+  "naive_tokens": 832891,
+  "counts": {
+    "metros": 40,
+    "locations": 299,
+    "providers": 5000,
+    "appointment_types": 314,
+    "bookable_rows": 138870
+  },
+  "seed": 20261002,
+  "scale": 1.0
+}

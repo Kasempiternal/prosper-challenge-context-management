@@ -6,7 +6,7 @@ from pipecat.flows import NO_RESPONSE
 from pipecat.frames.frames import TTSSpeakFrame
 
 from agent_tools import Reenter, build_tool, make_context, stt_keyterms
-from agent_tools.context import RecordingDisambiguator, shared_availability
+from agent_tools.context import BACKEND_DIR, RecordingDisambiguator, shared_availability
 from agent_tools.scheduling_tools import spoken_ref
 from scheduling.decision import DECLINE
 from scheduling.resolver import NoDisambiguator
@@ -319,3 +319,54 @@ def test_refusal_alternatives_are_in_the_result_and_pickable(make_ctx):
     result, _ = call(ctx, fm, "update_request", {"pick_offer": 2})
     assert result["status"] == "offer"
     assert all(o.endswith("Midtown Dr. Hannah Nguyen") for o in result["offers"])
+
+
+def _multi_metro_index():
+    """The SF catalog spread over three metros: Austin gets 4 sites, Boston 3, Ann Arbor 1."""
+    import json
+    from collections import Counter
+
+    from scheduling.catalog_index import build_index
+
+    data = BACKEND_DIR / "data"
+    raw = json.loads((data / "catalog.json").read_text(encoding="utf-8"))
+    raw_aliases = json.loads((data / "aliases.json").read_text(encoding="utf-8"))
+    raw["metros"] = [
+        {"id": "ann-arbor-mi", "name": "Ann Arbor", "state": "MI", "lat": 42.28, "lon": -83.74},
+        {"id": "austin-tx", "name": "Austin", "state": "TX", "lat": 30.27, "lon": -97.74},
+        {"id": "boston-ma", "name": "Boston", "state": "MA", "lat": 42.36, "lon": -71.06},
+    ]
+    for i, loc in enumerate(raw["locations"]):
+        metro = raw["metros"][1 if i < 4 else 2 if i < 7 else 0]
+        loc.update(metro_id=metro["id"], state=metro["state"], lat=metro["lat"], lon=metro["lon"])
+    index = build_index(raw, raw_aliases)
+    surnames = Counter(p.last_name for p in index.providers.values())
+    return index, sorted(surnames, key=lambda s: (-surnames[s], s))
+
+
+def test_stt_keyterms_put_metros_then_common_surnames_first_on_a_multi_metro_catalog():
+    index, surnames_by_frequency = _multi_metro_index()
+    terms = stt_keyterms(index)
+    assert terms[:3] == ["Austin", "Boston", "Ann Arbor"]
+    assert terms[3:6] == surnames_by_frequency[:3]
+    assert len(terms) == 50
+    assert len({t.casefold() for t in terms}) == 50
+    assert all(len(t) <= 20 for t in terms)
+    assert "Mission Bay" not in terms  # site names give way to metros and surnames
+
+
+SF_KEYTERMS = [
+    "Chen", "Garcia", "Ramirez", "Smith", "Patel", "Hernandez", "Rodriguez", "Williams", "Nguyen", "Singh",
+    "Lee", "Martinez", "Sato", "Kim", "Johnson", "Mission Bay", "Mission District", "North Beach",
+    "North Gate", "Downtown", "Midtown", "Sunset", "Richmond", "Eye Exam", "Glaucoma Screening",
+    "Contact Lens Fitting", "Cataract Evaluation", "Urology Consultation", "Allergy/Immunology",
+    "Cardiology", "Dental", "Dermatology", "ENT", "Endocrinology", "Family Medicine", "Gastroenterology",
+    "Internal Medicine", "Lab", "Neurology", "OB/GYN", "Ophthalmology", "Orthopedics", "Pediatrics",
+    "Physical Therapy", "Psychiatry", "Pulmonology", "Radiology", "Urology", "New Patient Visit",
+    "Annual Physical"
+]
+
+
+def test_sf_keyterms_are_unchanged(make_ctx):
+    assert stt_keyterms(make_ctx().index) == SF_KEYTERMS
+

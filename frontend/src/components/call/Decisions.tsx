@@ -1,13 +1,12 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { GitBranch } from 'lucide-react'
 import { useEffect, useRef } from 'react'
+import { naiveBaseline, useCatalogs } from '../../lib/catalogs'
 import { cn } from '../../lib/cn'
 import { softSpring } from '../../lib/motion'
 import { clock } from '../../lib/time'
 import { useCall, type TimedDecision } from '../../store/call'
-
-/** Measured once for the clinic catalog stuffed into a single system prompt; shown as the baseline the resolver avoids. */
-const NAIVE_PROMPT_LABEL = 'naive prompt ≈ 8.4k tok/turn'
+import { useEditor } from '../../store/editor'
 
 const STATUS_STYLE: Record<string, { pill: string; dot: string }> = {
   offer: { pill: 'bg-info-soft text-info', dot: 'bg-info' },
@@ -21,6 +20,9 @@ export function Decisions() {
   const decisions = useCall((s) => s.decisions)
   const startedAt = useCall((s) => s.startedAt)
   const reduce = useReducedMotion()
+  const catalogPath = useEditor((s) => s.doc?.agent.catalog)
+  const catalogs = useCatalogs()
+  const baseline = naiveBaseline(catalogs?.find((c) => c.path === catalogPath)?.naive_tokens)
   const end = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -39,13 +41,16 @@ export function Decisions() {
           <Stat label="Avg tokens" value={avgTokens === null ? '—' : String(avgTokens)} />
           <Stat label="JEV calls" value={String(jevCalls)} />
         </dl>
-        <p className="flex items-center gap-1.5 text-[11.5px] text-muted">
+        <p className="flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted">
           Baseline
           <span
             title="Tokens per turn if the whole catalog were pasted into the prompt instead of resolved by tools"
-            className="rounded-full border border-dashed border-border-strong px-2 py-px font-mono text-[10.5px] text-muted"
+            className={cn(
+              'rounded-full border px-2 py-px font-mono text-[10.5px] whitespace-nowrap',
+              baseline.exceedsContext ? 'border-danger/40 bg-danger-soft text-danger' : 'border-dashed border-border-strong text-muted',
+            )}
           >
-            {NAIVE_PROMPT_LABEL}
+            {baseline.label}
           </span>
         </p>
       </div>

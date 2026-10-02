@@ -1,6 +1,7 @@
 import { Settings2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
+import { catalogCounts, catalogOptions, useCatalogs } from '../../lib/catalogs'
 import { fieldErrors } from '../../lib/issues'
 import { useEditor } from '../../store/editor'
 import type { AgentConfig, ResolverConfig, Voice } from '../../types/agent'
@@ -8,30 +9,30 @@ import { Field, FieldErrors, Input, Select, Textarea } from '../ui/Field'
 import { Toggle } from '../ui/Toggle'
 import { PanelBody, PanelHeader, Section } from './Panel'
 
-interface Catalog {
+interface VoiceOptions {
   voices: Voice[]
   models: string[]
 }
 
-let catalogRequest: Promise<Catalog> | null = null
-function loadCatalog(): Promise<Catalog> {
-  catalogRequest ??= Promise.all([api.listVoices(), api.listModels()])
+let optionsRequest: Promise<VoiceOptions> | null = null
+function loadOptions(): Promise<VoiceOptions> {
+  optionsRequest ??= Promise.all([api.listVoices(), api.listModels()])
     .then(([voices, models]) => ({ voices, models }))
     .catch((err) => {
-      catalogRequest = null
+      optionsRequest = null
       throw err
     })
-  return catalogRequest
+  return optionsRequest
 }
 
 export function AgentSettings() {
   const agent = useEditor((s) => s.doc?.agent)
   const issues = useEditor((s) => s.issues)
   const { apply, select } = useEditor.getState()
-  const [catalog, setCatalog] = useState<Catalog | null>(null)
+  const [options, setOptions] = useState<VoiceOptions | null>(null)
 
   useEffect(() => {
-    loadCatalog().then(setCatalog, () => setCatalog({ voices: [], models: [] }))
+    loadOptions().then(setOptions, () => setOptions({ voices: [], models: [] }))
   }, [])
 
   if (!agent) return null
@@ -39,8 +40,8 @@ export function AgentSettings() {
   const edit = (patch: Partial<AgentConfig>, coalesce?: string) =>
     apply((d) => ({ ...d, agent: { ...d.agent, ...patch } }), { coalesce: coalesce && `agent:${coalesce}` })
 
-  const voices = catalog?.voices ?? []
-  const models = catalog?.models ?? []
+  const voices = options?.voices ?? []
+  const models = options?.models ?? []
 
   return (
     <>
@@ -83,7 +84,7 @@ export function AgentSettings() {
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Voice" htmlFor="agent-voice" errors={errs('voice_id')}>
-              <Select id="agent-voice" value={agent.voice_id} onChange={(e) => edit({ voice_id: e.target.value })} disabled={!catalog}>
+              <Select id="agent-voice" value={agent.voice_id} onChange={(e) => edit({ voice_id: e.target.value })} disabled={!options}>
                 {!voices.some((v) => v.id === agent.voice_id) && <option value={agent.voice_id}>{agent.voice_id || '—'}</option>}
                 {voices.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -93,7 +94,7 @@ export function AgentSettings() {
               </Select>
             </Field>
             <Field label="Model" htmlFor="agent-model" errors={errs('model')}>
-              <Select id="agent-model" value={agent.model} onChange={(e) => edit({ model: e.target.value })} disabled={!catalog}>
+              <Select id="agent-model" value={agent.model} onChange={(e) => edit({ model: e.target.value })} disabled={!options}>
                 {!models.includes(agent.model) && <option value={agent.model}>{agent.model || '—'}</option>}
                 {models.map((m) => (
                   <option key={m} value={m}>
@@ -112,6 +113,7 @@ export function AgentSettings() {
               catalog={agent.catalog}
               resolver={agent.resolver ?? {}}
               errs={errs}
+              onCatalogChange={(path) => edit({ catalog: path })}
               onChange={(resolver, coalesce) => edit({ resolver }, coalesce)}
             />
           )}
@@ -127,11 +129,14 @@ interface SchedulingProps {
   catalog: string
   resolver: ResolverConfig
   errs: (field: string) => string[]
+  onCatalogChange: (path: string) => void
   onChange: (resolver: ResolverConfig, coalesce?: string) => void
 }
 
 /** Only the key being edited is written; untouched resolver keys stay absent so backend defaults apply. */
-function Scheduling({ catalog, resolver, errs, onChange }: SchedulingProps) {
+function Scheduling({ catalog, resolver, errs, onCatalogChange, onChange }: SchedulingProps) {
+  const catalogs = useCatalogs()
+  const selected = catalogs?.find((c) => c.path === catalog)
   const jev = resolver.jev ?? {}
   const speakDirect = resolver.speak_direct ?? true
   const jevEnabled = jev.enabled ?? true
@@ -142,7 +147,25 @@ function Scheduling({ catalog, resolver, errs, onChange }: SchedulingProps) {
     <div className="mt-2 border-t border-border-subtle pt-5">
       <Section title="Scheduling">
         <Field label="Catalog" htmlFor="agent-catalog" errors={errs('catalog')} hint="Doctors, locations and visit types the tools resolve against.">
-          <Input id="agent-catalog" className="bg-surface font-mono text-muted" value={catalog} readOnly />
+          <Select
+            id="agent-catalog"
+            value={catalog}
+            invalid={errs('catalog').length > 0}
+            disabled={!catalogs}
+            onChange={(e) => onCatalogChange(e.target.value)}
+          >
+            {catalogOptions(catalogs ?? [], catalog).map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+          <p className="flex items-baseline justify-between gap-3 text-[12px]">
+            <span className="shrink-0 text-ink-soft tabular-nums">{selected ? catalogCounts(selected) : 'Not in the catalog list'}</span>
+            <span className="min-w-0 truncate font-mono text-[11px] text-faint" title={catalog}>
+              {catalog}
+            </span>
+          </p>
         </Field>
 
         <div className="flex flex-col divide-y divide-border-subtle rounded-[12px] border border-border-subtle">

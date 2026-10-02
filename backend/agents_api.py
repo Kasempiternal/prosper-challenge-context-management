@@ -82,10 +82,63 @@ def agents_dir_from_env() -> Path:
     return Path(os.environ.get("AGENTS_DIR") or DEFAULT_AGENTS_DIR)
 
 
-def create_router(agents_dir: Optional[Path] = None, jev: Optional[JevClient] = None) -> APIRouter:
+COUNT_KEYS = ("locations", "providers", "appointment_types")
+
+
+def _catalog_summary(path: Path, backend_dir: Path) -> dict:
+    """Counts and labels come from the catalog.meta.json sidecar when present, so listing never parses
+    a large catalog; without one they are counted from the catalog JSON and naive_tokens is unknown."""
+    rel = path.relative_to(backend_dir).as_posix()
+    meta_path = path.with_name("catalog.meta.json")
+    meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.is_file() else {}
+    counts = meta.get("counts")
+    if not isinstance(counts, dict):
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        counts = {k: len(raw.get(k) or []) for k in (*COUNT_KEYS, "metros")}
+    naive = meta.get("naive_tokens")
+    return {
+        "path": rel,
+        "label": meta.get("label") if isinstance(meta.get("label"), str) else rel,
+        **{k: int(counts.get(k, 0)) for k in COUNT_KEYS},
+        "metros": int(counts.get("metros") or 1),  # a catalog without metros is one implicit metro
+        "naive_tokens": naive if isinstance(naive, int) else None,
+    }
+
+
+def catalog_lister(backend_dir: Path):
+    """Returns list_catalogs(): every <backend>/data/**/catalog.json, shallowest path first (the SF
+    catalog), each summary cached until its catalog or sidecar mtime changes."""
+    cache: dict[Path, tuple[tuple[float, float], dict]] = {}
+
+    def mtimes(path: Path) -> tuple[float, float]:
+        meta = path.with_name("catalog.meta.json")
+        return path.stat().st_mtime, meta.stat().st_mtime if meta.is_file() else 0.0
+
+    def list_catalogs() -> list[dict]:
+        paths = sorted((backend_dir / "data").glob("**/catalog.json"),
+                       key=lambda p: (len(p.relative_to(backend_dir).parts), p.as_posix()))
+        out = []
+        for path in paths:
+            try:
+                stamp = mtimes(path)
+                hit = cache.get(path)
+                if hit is None or hit[0] != stamp:
+                    cache[path] = hit = (stamp, _catalog_summary(path, backend_dir))
+            except (OSError, ValueError, TypeError) as e:
+                logger.warning(f"Skipping unreadable catalog {path}: {e}")
+                continue
+            out.append(hit[1])
+        return out
+
+    return list_catalogs
+
+
+def create_router(agents_dir: Optional[Path] = None, jev: Optional[JevClient] = None,
+                  backend_dir: Path = BACKEND_DIR) -> APIRouter:
     agents_dir = Path(agents_dir) if agents_dir else agents_dir_from_env()
     seed_agents_dir(agents_dir)
     router = APIRouter(prefix="/api")
+    list_catalogs = catalog_lister(Path(backend_dir))
 
     def agent_path(agent_id: str) -> Path:
         if not ID_RE.match(agent_id):
@@ -214,6 +267,10 @@ def create_router(agents_dir: Optional[Path] = None, jev: Optional[JevClient] = 
             return grader.grade(jev, req, agent)
         except grader.GradeError as e:
             return JSONResponse(status_code=e.status, content={"ok": False, "reason": e.reason})
+
+    @router.get("/catalogs")
+    def catalogs() -> list[dict]:
+        return list_catalogs()
 
     @router.get("/voices")
     def voices() -> list[dict]:

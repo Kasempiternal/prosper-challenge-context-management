@@ -145,3 +145,69 @@ def test_new_agent_is_valid_and_saves_unchanged(client):
     agent = client.post("/api/agents", json={"name": "Fresh"}).json()
     assert client.post("/api/agents/validate", json=agent).json() == {"ok": True, "errors": []}
     assert client.put(f"/api/agents/{agent['id']}", json=agent).status_code == 200
+
+
+def _write(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+@pytest.fixture
+def backend(tmp_path):
+    root = tmp_path / "backend"
+    _write(root / "data" / "catalog.json", {
+        "locations": [{"id": f"loc_{i}"} for i in range(8)],
+        "providers": [{"id": f"p_{i}"} for i in range(50)],
+        "appointment_types": [{"id": f"t_{i}"} for i in range(82)],
+    })
+    _write(root / "data" / "national" / "catalog.json", {"metros": [], "locations": []})
+    _write(root / "data" / "national" / "catalog.meta.json", {
+        "label": "National (synthetic, 40 metros)", "sha256": "ab", "naive_tokens": 651234,
+        "counts": {"metros": 40, "locations": 300, "providers": 5000, "appointment_types": 300, "bookable_rows": 140000},
+    })
+    return root
+
+
+@pytest.fixture
+def catalogs_client(agents_dir, backend):
+    app = FastAPI()
+    app.include_router(create_router(agents_dir, backend_dir=backend))
+    return TestClient(app)
+
+
+def test_catalogs_lists_sf_first_with_sidecar_counts(catalogs_client):
+    assert catalogs_client.get("/api/catalogs").json() == [
+        {"path": "data/catalog.json", "label": "data/catalog.json", "locations": 8, "providers": 50,
+         "appointment_types": 82, "metros": 1, "naive_tokens": None},
+        {"path": "data/national/catalog.json", "label": "National (synthetic, 40 metros)", "locations": 300,
+         "providers": 5000, "appointment_types": 300, "metros": 40, "naive_tokens": 651234},
+    ]
+
+
+def test_catalogs_refresh_when_a_sidecar_appears_and_skip_unreadable(catalogs_client, backend):
+    assert catalogs_client.get("/api/catalogs").json()[0]["naive_tokens"] is None
+    _write(backend / "data" / "catalog.meta.json", {
+        "label": "San Francisco clinics", "naive_tokens": 8412,
+        "counts": {"locations": 8, "providers": 50, "appointment_types": 82},
+    })
+    (backend / "data" / "broken").mkdir()
+    (backend / "data" / "broken" / "catalog.json").write_text("{", encoding="utf-8")
+    listed = catalogs_client.get("/api/catalogs").json()
+    assert [c["path"] for c in listed] == ["data/catalog.json", "data/national/catalog.json"]
+    assert listed[0] == {"path": "data/catalog.json", "label": "San Francisco clinics", "locations": 8,
+                         "providers": 50, "appointment_types": 82, "metros": 1, "naive_tokens": 8412}
+
+
+def test_national_scheduler_agent_is_valid_when_its_catalog_exists():
+    from agent_builder import validate_agent
+    from agent_builder.validation import BACKEND_DIR
+
+    agent = json.loads((BACKEND_DIR / "agents" / "national-scheduler.json").read_text(encoding="utf-8"))
+    clinic = json.loads((BACKEND_DIR / "agents" / "clinic-scheduler.json").read_text(encoding="utf-8"))
+    assert agent["catalog"] == "data/national/catalog.json"
+    assert agent["nodes"] == clinic["nodes"]
+    if (BACKEND_DIR / agent["catalog"]).is_file():
+        assert validate_agent(agent) == []
+    else:
+        assert validate_agent(agent) == [
+            {"path": "catalog", "message": "Catalog file 'data/national/catalog.json' not found."}]

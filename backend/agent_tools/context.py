@@ -9,6 +9,7 @@ resolver runs with its no-op disambiguator.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import threading
 import time
@@ -34,17 +35,56 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 EventCallback = Callable[[dict], Awaitable[None]]
 
 
-@lru_cache(maxsize=None)
+_indexes: dict[Path, CatalogIndex] = {}
+_index_locks: dict[Path, threading.Lock] = {}
+_index_locks_guard = threading.Lock()
+
+
 def load_index(catalog_path: Path) -> CatalogIndex:
-    started = time.perf_counter()
-    index = CatalogIndex.load(catalog_path)
-    logger.info(f"Loaded catalog {catalog_path.name}: {len(index.bookable)} bookable rows "
-                f"in {(time.perf_counter() - started) * 1000:.0f} ms")
-    return index
+    """Built once per process per catalog path. The per-path lock makes a call that arrives while
+    the startup preload is still building the same catalog wait for it instead of building twice."""
+    index = _indexes.get(catalog_path)
+    if index is not None:
+        return index
+    with _index_locks_guard:
+        lock = _index_locks.setdefault(catalog_path, threading.Lock())
+    with lock:
+        if catalog_path not in _indexes:
+            started = time.perf_counter()
+            index = CatalogIndex.load(catalog_path)
+            logger.info(f"Loaded catalog {catalog_path.parent.name}/{catalog_path.name}: {len(index.bookable)} "
+                        f"bookable rows in {(time.perf_counter() - started) * 1000:.0f} ms")
+            _indexes[catalog_path] = index
+        return _indexes[catalog_path]
 
 
 def resolve_catalog_path(catalog: str) -> Path:
     return (BACKEND_DIR / catalog).resolve()
+
+
+def preload_catalogs(agents_dir: Path) -> threading.Thread:
+    """Build, in a background thread, the index of every catalog an agent in agents_dir names, so the
+    first call on a large catalog does not wait for its build."""
+    catalogs: set[str] = set()
+    for path in sorted(Path(agents_dir).glob("*.json")):
+        try:
+            catalog = json.loads(path.read_text(encoding="utf-8")).get("catalog")
+        except (OSError, ValueError, AttributeError) as e:
+            logger.warning(f"Catalog preload skips {path.name}: {e}")
+            continue
+        if isinstance(catalog, str):
+            catalogs.add(catalog)
+
+    def run() -> None:
+        for catalog in sorted(catalogs):
+            try:
+                load_index(resolve_catalog_path(catalog))
+            except (OSError, ValueError) as e:
+                logger.warning(f"Catalog preload failed for {catalog}: {e}")
+
+    thread = threading.Thread(target=run, name="catalog-preload", daemon=True)
+    thread.start()
+    return thread
 
 
 @lru_cache(maxsize=None)

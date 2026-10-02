@@ -77,6 +77,19 @@ export interface AgentSummary {
   updated_at: string
 }
 
+/** GET /api/catalogs entry; counts come from the catalog's sidecar or the catalog itself. */
+export interface CatalogSummary {
+  /** Relative to backend/, forward slashes; the value of AgentConfig.catalog. */
+  path: string
+  label: string
+  locations: number
+  providers: number
+  appointment_types: number
+  metros: number
+  /** Tokens of the whole catalog pasted into a prompt; null when the catalog has no sidecar. */
+  naive_tokens: number | null
+}
+
 export interface ValidationIssue {
   path: string
   message: string

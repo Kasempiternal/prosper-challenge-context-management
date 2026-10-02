@@ -1,4 +1,4 @@
-import type { AgentConfig, AgentNode, AgentSummary, ValidationIssue, Voice } from '../types/agent'
+import type { AgentConfig, AgentNode, AgentSummary, CatalogSummary, ValidationIssue, Voice } from '../types/agent'
 import type { CheckName, GradeOutcome, GradeRequest, GradeResult } from '../types/grade'
 
 export class ApiError extends Error {
@@ -82,6 +82,28 @@ export function parseGrade(raw: unknown): GradeResult {
   }
 }
 
+const COUNT_KEYS = ['locations', 'providers', 'appointment_types', 'metros'] as const
+const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0
+
+/** Entries that are not well-formed summaries are dropped rather than failing the whole list. */
+export function parseCatalogs(raw: unknown): CatalogSummary[] {
+  if (!Array.isArray(raw)) throw new ApiError(0, 'Server returned a malformed catalog list')
+  return raw.flatMap((c): CatalogSummary[] => {
+    if (!isRecord(c) || typeof c.path !== 'string' || !COUNT_KEYS.every((k) => isCount(c[k]))) return []
+    return [
+      {
+        path: c.path,
+        label: typeof c.label === 'string' ? c.label : c.path,
+        locations: c.locations as number,
+        providers: c.providers as number,
+        appointment_types: c.appointment_types as number,
+        metros: c.metros as number,
+        naive_tokens: isCount(c.naive_tokens) ? c.naive_tokens : null,
+      },
+    ]
+  })
+}
+
 export type SaveResult = { ok: true } | { ok: false; errors: ValidationIssue[] }
 
 export const api = {
@@ -122,6 +144,9 @@ export const api = {
   },
   async listModels(): Promise<string[]> {
     return (await request('/api/models')).json()
+  },
+  async listCatalogs(): Promise<CatalogSummary[]> {
+    return parseCatalogs(await (await request('/api/catalogs')).json())
   },
   /** Errors carry the backend's `reason` (e.g. "JEV not configured") as the message. */
   async grade(body: GradeRequest): Promise<GradeResult> {

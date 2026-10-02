@@ -56,3 +56,62 @@ def test_bad_catalog_fails_at_boundary():
                           "capabilities": []}], "providers": [], "appointment_types": []}
     with pytest.raises(CatalogError, match="unparseable hours"):
         build_index(raw, {"aliases": {}})
+
+
+def test_sf_is_one_implicit_metro(index):
+    assert list(index.metros) == ["_"]
+    assert index.locs_by_metro == {"_": tuple(sorted(index.locations))}
+    assert all(loc.metro_id == "_" and loc.lat is None for loc in index.locations.values())
+    assert index.metros_by_type["appt_065"] == {"_"}
+    assert index.metros_by_type["appt_045"] == frozenset()  # unoffered
+
+
+def test_derived_row_indexes_partition_bookable(index):
+    by_type_loc = [r for rows in index.rows_by_type_loc.values() for r in rows]
+    by_provider = [r for rows in index.rows_by_provider.values() for r in rows]
+    assert sorted(r.key for r in by_type_loc) == sorted(r.key for r in by_provider) == [r.key for r in index.bookable]
+    assert all(k == (r.type.id, r.location.id) for k, rows in index.rows_by_type_loc.items() for r in rows)
+    assert {r.key for r in index.rows_by_type_loc[("appt_065", "loc_004")]} == {("appt_065", "prov_014", "loc_004")}
+    assert set(index.rows_by_provider) == set(index.providers)
+
+
+def _geo_raw() -> dict:
+    def loc(lid, lat, lon):
+        return {"id": lid, "name": f"{lid} Health Center", "address": "1 Main St", "hours": "Mon-Fri 8:00-17:00",
+                "capabilities": [], "metro_id": "austin-tx", "zip": "78701", "state": "TX", "lat": lat, "lon": lon}
+    return {"metros": [{"id": "austin-tx", "name": "Austin", "state": "TX", "lat": 30.27, "lon": -97.74}],
+            "locations": [loc("loc_a", 30.2, -97.7), loc("loc_b", 30.3, -97.8)],
+            "providers": [], "appointment_types": []}
+
+
+def _edit(fn):
+    raw = _geo_raw()
+    fn(raw)
+    return raw
+
+
+@pytest.mark.parametrize("raw,message", [
+    (_edit(lambda r: [r["locations"][1].pop(k) for k in ("lat", "lon")]), "some locations have lat/lon"),
+    (_edit(lambda r: r["locations"][0].pop("lon")), "lat and lon must be given together"),
+    (_edit(lambda r: r["locations"][0].update(lat=123.0)), "bad coordinates"),
+    (_edit(lambda r: r["locations"][0].update(lat="30.2")), "bad coordinates"),
+    (_edit(lambda r: r["locations"][0].update(metro_id="dallas-tx")), "not a declared metro"),
+    (_edit(lambda r: r["locations"][0].pop("metro_id")), "not a declared metro"),
+    (_edit(lambda r: r.pop("metros")), "declares no metros"),
+    (_edit(lambda r: r["locations"][0].update(zip="7870")), "'zip' malformed"),
+    (_edit(lambda r: r["locations"][0].update(state="Texas")), "'state' malformed"),
+    (_edit(lambda r: r["metros"].append(dict(r["metros"][0]))), "duplicate or reserved metro id"),
+    (_edit(lambda r: r["metros"][0].update(id="_")), "duplicate or reserved metro id"),
+    (_edit(lambda r: [r["metros"][0].pop(k) for k in ("lat", "lon")]), "metro needs lat and lon"),
+    (_edit(lambda r: r.update(metros=[])), "metros must be a non-empty list"),
+])
+def test_bad_geography_fails_at_boundary(raw, message):
+    with pytest.raises(CatalogError, match=message):
+        build_index(raw, {"aliases": {}})
+
+
+def test_valid_geography_loads():
+    ix = build_index(_geo_raw(), {"aliases": {}})
+    assert ix.has_geo and not ix.multi_metro
+    assert ix.metros["austin-tx"].lat == 30.27
+    assert ix.locations["loc_b"].lon == -97.8
