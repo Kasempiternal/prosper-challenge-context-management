@@ -22,10 +22,11 @@ from .catalog_index import BookableRow, CatalogIndex
 from .decision import DECLINE, Verdict, gender_of, unanswered
 from .geo import (RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, option_named, over_state_line,
                   resolve_place)
-from .lexicon import (SHORTLIST_ABOVE, Doubt, TypeCandidate, match_types, nearest_type, pointed_default,
-                      stated_doubt, type_shortlist, types_named, unexplained_words)
-from .names import (STREET_TYPES, ProviderClues, hear_place, match_locations, match_providers, only_no,
-                    read_confirmation, read_provider_clues)
+from .lexicon import (SHORTLIST_ABOVE, Doubt, TypeCandidate, describes_symptom, diagnostic_variant, fasting_answer,
+                      fasting_pair, general_kin, is_screening, match_types, nearest_type, pointed_default, stated_doubt,
+                      type_shortlist, types_named, umbrella, unexplained_words)
+from .names import (STREET_TYPES, ProviderClues, clue_words, hear_place, match_locations, match_providers, only_no,
+                    read_confirmation, read_provider_clues, unmatched_first_name)
 from .policy import IssueKind, Rule, Violation, check, has_violation
 from .request import WEEKDAY_NAMES, AltRef, OfferRef, PendingAsk, Request, Slot, TimePref
 from .text import phonetic_keys, tokens
@@ -179,6 +180,7 @@ def resolve(index: CatalogIndex, req: Request, availability: Availability,
 
 class _Resolution:
     def __init__(self, index, req, availability, disambiguator, chooser, site_chooser):
+        self.args = (index, req, availability, disambiguator, chooser, site_chooser)
         self.ix: CatalogIndex = index
         self.req: Request = req
         self.av: Availability = availability
@@ -195,6 +197,9 @@ class _Resolution:
         self.widened = False               # nothing in the place's own radius: "the nearest is N miles away"
         self.place_memo: PlaceMatch | None = None
         self.type_consulted = False
+        self.umbrella_pick: str | None = None  # the one visit chosen before the umbrella widened it
+        self.umbrella_off = False          # searching that choice alone (_without_umbrella)
+        self.answer_describes = False      # a provider answer named nobody and described the doctors asked about
         self.doubt = False                 # the caller said they do not know which visit: never commit
         self.provider_declined = False     # "no" to "Do you mean Dr. X?": whoever is left is asked about
         self.named_providers: list[str] = []      # every doctor the name matches
@@ -286,7 +291,10 @@ class _Resolution:
     # ---- main search ---------------------------------------------------------------------
 
     def _search(self) -> Plan:
+        asks = self.slots["service"].asks
         svc = self._service_candidates()
+        if svc is not None and self._answers_neither(svc):
+            return self._ask_again(asks)
         if svc is not None:
             doubted = self._doubted(svc)
             if doubted == []:
@@ -308,18 +316,37 @@ class _Resolution:
             tier = [c for c in svc if c.score >= top - TYPE_TIE_GAP]
             offered = [c for c in tier if c.type_id not in self.ix.unoffered_types]
             if not offered:
-                return self._refuse_not_offered(tier[0].type_id)
+                instead = self._offered_instead(tier[0].type_id) if all(c.via == "specialty" for c in tier) else DECLINE
+                if not instead.act:
+                    return self._refuse_not_offered(tier[0].type_id)
+                offered = _model_candidates(instead)
             verdict = DECLINE
             if all(c.via == "specialty" for c in offered):
                 # "lung test" only reached Pulmonology's default type; the model may know better.
                 verdict = self._consult_types()
-            elif self.type_model and unexplained_words(self.ix, self.slots["service"].heard,
-                                                       [c.type_id for c in offered]):
+            elif self.type_model and offered[0].via != "answer" and unexplained_words(
+                    self.ix, self.slots["service"].heard, [c.type_id for c in offered]):
                 verdict = self._verify_types(offered)
             if verdict.failed:
                 # The words needed the model and its answer never came: say what we understood.
                 return self._ask_type(sorted(verdict.ask or [c.type_id for c in offered]), True)
             offered = _model_candidates(verdict) or offered
+            s = self.slots["service"]
+            one = offered[0].type_id if len(offered) == 1 and not s.exact else None
+            alike = umbrella(self.ix, s.heard, one, s.within) if one and not self.umbrella_off else ()
+            if alike:
+                # "my baby's checkup": the words fit Well-Child and Newborn Visit alike, so which
+                # one a model or an alias weight prefers is a prior. The caller is asked.
+                self.notes.append(f"umbrella: {list(alike)} fit the words alike")
+                self.umbrella_pick = one
+                offered = [TypeCandidate(t, 1.0, "umbrella") for t in alike]
+            elif not s.exact and any(is_screening(self.ix, c.type_id) for c in offered) and describes_symptom(s.heard):
+                if one and diagnostic_variant(self.ix, one) is None:
+                    return self._ask_screening(one)
+                # "a mammogram for a lump in my breast" is the diagnostic one; the offer names it.
+                found = {c.type_id: diagnostic_variant(self.ix, c.type_id) or c.type_id for c in offered}
+                self.notes.append(f"the words describe a symptom: screenings become {found}")
+                offered = [replace(c, type_id=found[c.type_id]) for c in offered]
             type_ids = [c.type_id for c in offered]
             self.scores = {c.type_id: c.score for c in offered}
             if len(type_ids) == 1:
@@ -329,11 +356,16 @@ class _Resolution:
         if provider_ids == []:
             return self._miss("provider")
         if provider_ids:
+            first = unmatched_first_name(self.ix, self.slots["provider"].heard, provider_ids)
+            if first:
+                return self._ask_unknown_first_name(first, provider_ids, type_ids)
             provider_ids = self._described(provider_ids, type_ids)
             if self.described_ask:
                 return self._ask_provider(list(self.described_ask))
         if self.geo:
             scope = self._geo_scope(type_ids, provider_ids, svc is not None)
+            if isinstance(scope, Plan) and provider_ids is None and len(type_ids) == 1:
+                scope = self._kin_nearby(scope, type_ids[0])
             if isinstance(scope, Plan):
                 return scope
             rows, location_ids = scope
@@ -414,6 +446,8 @@ class _Resolution:
 
         live = ok + pending
         live_types = sorted({r.type.id for r in live}, key=lambda t: (-self.scores.get(t, 0.0), t))
+        if self.umbrella_pick and live_types != [self.umbrella_pick] and len(live_types) == 1:
+            return self._without_umbrella(live_types[0])
         if len(live_types) > 1 or (self.doubt and svc is not None):
             return self._ask_type(live_types, svc is not None)
         type_id = live[0].type.id
@@ -484,6 +518,9 @@ class _Resolution:
         cands: list[TypeCandidate] = []
         if s.exact and s.heard:
             cands = [TypeCandidate(tid, 1.0, "name") for tid in types_named(self.ix, s.heard)]
+        answered = fasting_answer(self.ix, s.heard, s.within) if not cands else None
+        if answered:
+            cands = [TypeCandidate(answered, 1.0, "answer")]
         if not cands:
             cands = match_types(self.ix, s.heard, s.hint)
         if s.within:
@@ -492,6 +529,29 @@ class _Resolution:
         if cands:
             self.slots["service"] = replace(s, asks=0, candidates=tuple((c.type_id, c.score) for c in cands[:5]))
         return cands
+
+    def _answers_neither(self, svc: list[TypeCandidate]) -> bool:
+        """An answer to "Is that A or B?" that names neither and whose words fit both alike ("the
+        checkup", answering "a well-child visit or a newborn visit?"): it is no new request, and no
+        model reads it as one of them. Words that fit neither ("the one down the throat") are still
+        the model's to weigh. An answer to "Did your doctor say to fast?" that says neither yes nor
+        no is no answer either."""
+        s = self.slots["service"]
+        if not s.within or s.exact:
+            return False
+        if not svc:
+            return fasting_pair(self.ix, s.within) is not None
+        if {c.type_id for c in svc} & set(s.within):
+            return False
+        return umbrella(self.ix, s.heard, s.within[0], s.within) == tuple(sorted(s.within))
+
+    def _ask_again(self, asks: int) -> Plan:
+        s = self.slots["service"]
+        self.slots["service"] = replace(s, asks=asks + 1, candidates=())
+        self.notes.append(f"service answer names none of {list(s.within)}: asking again")
+        if asks + 1 >= HANDOFF_AFTER_MISSES:
+            return self._refuse("handoff")
+        return self._ask("service", options=s.within)
 
     def _name_candidates(self, slot_name: str) -> list[str] | None:
         s = self.slots[slot_name]
@@ -503,6 +563,13 @@ class _Resolution:
                 return self._confirmed_provider(s, answer)
         matcher = match_providers if slot_name == "provider" else match_locations
         cands = matcher(self.ix, s.heard, s.within or None)
+        if not cands and slot_name == "provider" and len(s.within) > 1 and clue_words(self.ix, s.heard, s.within):
+            # "the nurse practitioner" answering "which Dr. Maria Garcia?": the doctors asked about,
+            # described by title, specialty, site, language or gender (_described, _consult_provider).
+            self.notes.append(f"provider answer describes {list(s.within)}")
+            self.answer_describes = True
+            self.slots[slot_name] = replace(s, asks=0, candidates=tuple((p, 1.0) for p in s.within))
+            return list(s.within)
         if cands:
             self.slots[slot_name] = replace(s, asks=0, candidates=tuple((c.id, c.score) for c in cands))
         return [c.id for c in cands]
@@ -577,6 +644,38 @@ class _Resolution:
             self.dist = self._distances((anchor,), FINAL_RING_MI)
             return _union(self._rows_at(type_ids, self.dist), prov_rows), site_ids
         return self._ring(place.anchors, type_ids, provider_ids, prov_rows, has_service)
+
+    def _kin_nearby(self, refusal: Plan, type_id: str) -> Plan:
+        """Nothing within reach has the visit meant, but a more general one the caller's words also
+        name is near (lexicon.general_kin: "a CT scan of my chest", no CT - Chest within 50 miles, a
+        CT Scan 3 miles away). The caller is asked and keeps the far option: "The nearest CT - chest
+        is about 229 miles away, in Detroit; a CT scan is 3 miles away, at Lakeview. Would that work,
+        or should I look in Detroit?" Both are pickable alternatives; neither is offered."""
+        s = self.slots["service"]
+        if not (refusal.refusal and refusal.refusal.code == "none_nearby" and s.heard and not s.exact):
+            return refusal
+        kin = list(general_kin(self.ix, s.heard, type_id))
+        if not kin:
+            return refusal
+        saved = (self.area, self.dist, self.site_choice, self.widened, self.preface, len(self.notes))
+        self.area, self.dist, self.site_choice, self.widened = None, {}, False, False
+        scope = self._geo_scope(kin, None, True)
+        near = None if isinstance(scope, Plan) else next(
+            (r for r in scope[0] if r.location.id in self.dist and not has_violation(check(r, self.patient))), None)
+        area, dist = self.area, self.dist
+        self.area, self.dist, self.site_choice, self.widened, self.preface, n = saved
+        del self.notes[n:]
+        if near is None or area is None:
+            return refusal
+        anchor, far = area.anchors[0], refusal.refusal.alternatives[:1]
+        far_loc = self.ix.locations[far[0][2]] if far else None
+        far_mi = (haversine(anchor.lat, anchor.lon, far_loc.lat, far_loc.lon)
+                  if far_loc and None not in (anchor.lat, far_loc.lat) else None)
+        self.notes.append(f"no {type_id} within reach; {near.type.id} at {near.location.id}: asking")
+        return self._refuse("none_nearby", type_id=type_id, alternatives=(*far, near.key),
+                            location_id=far_loc.id if far_loc else None, nearest_mi=far_mi, near=anchor.label,
+                            near_kind=anchor.kind, radius_mi=area.radius_mi,
+                            related=(near.type.id, near.location.id, dist[near.location.id]))
 
     def _ring(self, anchors: tuple[Place, ...], type_ids: list[str], provider_ids: list[str] | None,
               prov_rows: list[BookableRow] | None, has_service: bool):
@@ -894,6 +993,11 @@ class _Resolution:
         by_name = [self._named_alternative(option) for option in doubt.options]
         if None not in by_name and len(set(by_name)) == 1:
             return None
+        sure = self._named_alternative(doubt.sure) if doubt.sure else None
+        if sure is not None and sure in by_name and set(by_name) <= {sure, None}:
+            # "starting birth control, maybe the pill or an IUD": the visit was named before the
+            # doubt, and an alternative names it again; the doubt is about what happens in it.
+            return None
         found = self._modeled_alternatives(doubt, by_name)
         self.doubt = self.type_consulted = True
         self.notes.append(f"caller unsure between {list(doubt.options)}: {found}")
@@ -951,6 +1055,27 @@ class _Resolution:
         full = [t for t in (s.within or sorted(self.ix.types)) if t not in self.ix.unoffered_types]
         pool = self._type_pool(full)
         return self._model_types(pool, (), shortlisted=len(pool) < len(full))
+
+    def _offered_instead(self, unoffered: str) -> Verdict:
+        """Only a body word pointed at a visit no clinic offers ("my eyes get itchy and watery" ->
+        eye care): the caller did not ask for that visit, so the model hears the whole phrase over
+        every offered visit and that one. Acts only on an offered visit the check confirms against
+        it; anything else declines, and the caller hears that we do not offer it."""
+        s = self.slots["service"]
+        if not self.type_model or self.type_consulted:
+            return DECLINE
+        self.type_consulted = True
+        full = [t for t in (s.within or sorted(self.ix.types)) if t not in self.ix.unoffered_types]
+        pool = sorted(set(self._type_pool(full, [unoffered])) | {unoffered})
+        first = self.dis.pick_type(s.heard, s.hint, pool)
+        self._consulted("type", first, f"type disambiguator beside unoffered {unoffered}: {first.describe()}")
+        if first.failed or first.act not in set(pool) - {unoffered}:
+            return DECLINE
+        checked = self.dis.check_type(s.heard, s.hint, first, unoffered)
+        if checked is None:
+            return DECLINE
+        self._consulted("type check", checked, f"type check {first.act} vs {unoffered}: {checked.describe()}")
+        return checked if checked.act == first.act else DECLINE
 
     def _verify_types(self, lexical: list[TypeCandidate]) -> Verdict:
         """The lexicon matched, but the caller said more than the matched names and aliases explain
@@ -1124,6 +1249,11 @@ class _Resolution:
             fits = kept
         if len(fits) == 1:
             return Verdict(act=fits[0])
+        if clues.rest and self.answer_describes:
+            # "the one who speaks Spanish" answering "which Dr. Maria Garcia?", when neither does:
+            # words no fact of the doctors asked about explains describe none of them.
+            self.notes.append(f"provider answer {list(clues.rest)} fits none of {fits}: asking again")
+            return Verdict(ask=tuple(fits))
         if clues.rest:
             verdict = self.chooser.pick_provider(heard, type_id, fits)
             self._consulted("provider", verdict, f"provider chooser on {list(clues.rest)}: {verdict.describe()}")
@@ -1137,6 +1267,39 @@ class _Resolution:
         fields = Counter(v.field for r in pending for v in issues[r.key] if v.kind is IssueKind.NEEDS_INFO)
         field = max(("is_new", "has_referral"), key=lambda f: fields.get(f, 0))
         return self._ask(field, context=type_id)
+
+    def _without_umbrella(self, left: str) -> Plan:
+        """The rules left one of the visits the words fit alike, and not the one chosen ("cholesterol
+        blood test" with a doctor who does no lipid panel): the words fit it no better, so it is not
+        booked in its place. The search runs again on the choice alone, and what stands in its way
+        is said ("I can't book a lipid panel with Dr. Leila Sato")."""
+        again = _Resolution(*self.args)
+        again.umbrella_off = True
+        again.notes.append(f"umbrella: the rules leave only {left}, not the choice {self.umbrella_pick}: "
+                           "searched the choice alone")
+        return again.run()
+
+    def _ask_unknown_first_name(self, first: str, provider_ids: list[str], type_ids: list[str]) -> Plan:
+        """A full name nobody here has ("Dr. Linda Ramirez", and only a Dr. Priya Ramirez) is never
+        booked as the doctor of that surname: "I don't see a Dr. Linda Ramirez. Do you mean Dr. Priya
+        Ramirez?" Those who do the visit are asked about, else every one of that name."""
+        self.notes.append(f"first name {first!r} is none of {provider_ids}: asking")
+        surnames = {self.ix.providers[p].last_name for p in provider_ids}
+        if len(surnames) == 1:
+            self.preface += f"I don't see a Dr. {first.capitalize()} {surnames.pop()}. "
+        tset = set(type_ids)
+        doers = [p for p in provider_ids if any(r.type.id in tset for r in self.ix.rows_by_provider[p])]
+        return self._ask_provider(doers or provider_ids)
+
+    def _ask_screening(self, type_id: str) -> Plan:
+        """A screening chosen for words that describe a symptom, with no diagnostic visit beside it
+        ("a skin cancer screening, the mole is bleeding"): asked between it and its specialty's
+        default visit, else openly."""
+        default = self.ix.specialty_default.get(self.ix.types[type_id].specialty)
+        self.notes.append(f"{type_id} is a screening; the words describe a symptom: asking")
+        if default and default != type_id and default not in self.ix.unoffered_types:
+            return self._ask_type(sorted((type_id, default)), True)
+        return self._ask("service_open")
 
     def _ask_type(self, live_types: list[str], has_service: bool) -> Plan:
         if not has_service or len(live_types) > MAX_OPTIONS:

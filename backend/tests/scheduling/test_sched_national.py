@@ -4,12 +4,13 @@ imaging, and a dentist only reachable by widening the search."""
 
 from dataclasses import replace
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 
 from fake_models import RandomHooks
 from scheduling.availability import MockAvailability, Slot as TimeSlot
-from scheduling.catalog_index import build_index
+from scheduling.catalog_index import CatalogIndex, build_index
 from scheduling.decision import DECLINE, Verdict
 from scheduling.lexicon import SHORTLIST_SIZE, match_types, type_shortlist
 from scheduling.names import match_providers
@@ -541,6 +542,30 @@ def test_every_specialty_stays_reachable_when_nothing_lexical_matched():
     assert len(type_shortlist(ix, "specialty 7", None)) <= SHORTLIST_SIZE + len(ix.specialty_default)
 
 
+def test_the_sick_visit_is_a_choice_for_a_problem_no_word_reaches():
+    """Round 4 (nat4-sym-03): "it burns when I pee ... since yesterday" could only reach Urology's
+    default; Family Medicine's default is the Annual Physical, so a sick visit was no option. The
+    sick visit is read off the catalog's names: the most general visit named for being sick."""
+    raw = _many_types_raw()
+    names = {"appt_105": "Sick Visit", "appt_106": "Same-Day Sick Visit", "appt_107": "Urgent Care Visit"}
+    raw["appointment_types"] = [{**t, "name": names.get(t["id"], t["name"])} for t in raw["appointment_types"]]
+    pool = type_shortlist(build_index(raw, ALIASES), "my zorbly thing", None)
+    assert "appt_105" in pool and not {"appt_106", "appt_107"} & set(pool)
+
+
+def test_a_catalog_with_no_visit_named_for_being_sick_adds_none():
+    ix = build_index(_many_types_raw(), ALIASES)
+    assert set(type_shortlist(ix, "my zorbly thing", None)) == {
+        d for d in ix.specialty_default.values() if d not in ix.unoffered_types}
+
+
+def test_the_real_national_shortlist_offers_the_sick_visit_beside_the_specialists():
+    ix = CatalogIndex.load(Path(__file__).resolve().parents[2] / "data" / "national" / "catalog.json")
+    pool = type_shortlist(ix, "it burns when I pee and I gotta go all the time, since yesterday", None,
+                          frozenset({"houston-tx"}))
+    assert {"appt_007", "appt_077", "appt_002"} <= set(pool)
+
+
 # ---- lexicon: specificity -------------------------------------------------------------------
 
 SPECIFIC_TYPES = [
@@ -573,14 +598,15 @@ def specific():
     ("booking a physical therapy evaluation after surgery", ["appt_015"]),  # not Psychiatry's Therapy Session
     ("just a therapy session", ["appt_014"]),
     ("a knee x-ray, yes a knee x-ray please", ["appt_011"]),               # said twice
+    ("an x-ray of my knee", ["appt_011"]),                                  # in its own words
 ])
 def test_a_type_named_in_full_drops_the_types_inside_its_name(specific, phrase, ids):
     assert [c.type_id for c in match_types(specific, phrase)] == ids
 
 
 def test_lay_term_default_only_when_no_type_is_named_and_one_specialty_is_meant(specific):
-    knee = [c.type_id for c in match_types(specific, "an x-ray of the knee, it's been sore")]
-    assert "appt_017" not in knee and {"appt_010", "appt_011"} <= set(knee)
+    # "an x-ray of the knee" names Knee X-Ray in its own words, so plain X-Ray goes too (round 5).
+    assert [c.type_id for c in match_types(specific, "an x-ray of the knee, it's been sore")] == ["appt_011"]
     assert [c.type_id for c in match_types(specific, "my stomach keeps hurting")] == ["appt_018"]
     assert match_types(specific, "my throat and my stomach both burn") == []
 

@@ -206,7 +206,8 @@ def _score_providers(ni: NameIndex, words: list[str], within: list[str] | None) 
                 scored[pid] = NameCandidate(pid, round(s_last, 3), via_last)
         else:
             s_last, via = score(words[-1], last)
-            s_first, _ = score(words[0], first)
+            # The first name is said right before the surname: "actually Linda Ramirez".
+            s_first, _ = score(words[-2], first)
             s_joined, _ = score(joined, last)
             if s_joined > s_last:
                 scored[pid] = NameCandidate(pid, round(s_joined, 3), "fuzzy")
@@ -248,7 +249,9 @@ def _is_name_word(index: CatalogIndex, word: str, provider_ids: Iterable[str] | 
 _HONORIFICS = {"dr", "doctor", "doc"}
 _CLUE_STOPWORDS = {"the", "a", "an", "one", "who", "that", "with", "is", "i", "me", "my", "to", "see", "can",
                    "could", "please", "at", "in", "on", "over", "of", "and", "for", "want", "like", "would",
-                   "just", "there", "um", "uh", "okay", "ok", "yes", "yeah"}
+                   "just", "there", "um", "uh", "okay", "ok", "yes", "yeah",
+                   # A change of mind says nothing about the doctor: "Dr. Michael Sato instead".
+                   "actually", "instead", "rather", "sorry", "wait"}
 
 
 def clue_words(index: CatalogIndex, phrase: str | None, candidate_ids: Iterable[str]) -> tuple[str, ...]:
@@ -382,6 +385,43 @@ def read_confirmation(phrase: str | None) -> bool | None:
     return True if words & _YES and words <= _YES | _CONFIRM_FILLER else None
 
 
+_LEAD_FILLER = frozenset({"uh", "um", "oh", "well", "hmm", "mm"})
+
+
+def leading_answer(phrase: str | None) -> bool | None:
+    """A yes or a no that opens an answer to a yes-or-no question ("yeah, nothing after midnight",
+    "no, I can eat"); None when it opens with anything else."""
+    first = next((w for w in tokens(phrase or "") if w not in _LEAD_FILLER), None)
+    return True if first in _YES else False if first in _NO else None
+
+
+# Words before a surname that are no first name: "actually Dr. Ramirez", "with Ramirez".
+_NOT_FIRST_NAMES = _TITLE_WORDS | _CLUE_STOPWORDS | _NEVER_NAMES | _HONORIFICS | frozenset({
+    "mr", "mrs", "ms", "miss", "actually", "instead", "rather", "maybe", "sorry", "wait", "mean", "meant", "think",
+    "guess", "book", "booked", "seeing", "seen", "prefer", "named", "called", "last", "name"})
+
+
+def unmatched_first_name(index: CatalogIndex, phrase: str | None, candidate_ids: Iterable[str]) -> str | None:
+    """The first name the caller said with a surname ("Linda" in "actually Dr. Linda Ramirez") when
+    none of the doctors that surname matched has a first name like it; None when no first name was
+    said, or one matches. A first name is the word before the surname, said after "Dr." or opening
+    the phrase, or one some doctor here has."""
+    ids = list(candidate_ids)
+    ni = index.name_index
+    words = tokens(phrase or "")
+    lasts = {ni.last_of[p] for p in ids}
+    for i, w in enumerate(words):
+        if i == 0 or not any(_same_word(w, last) for last in lasts):
+            continue
+        first = words[i - 1]
+        if first in _NOT_FIRST_NAMES or first.isdigit() or first + w in ni.by_last:  # "Mc Donald"
+            continue
+        named = i == 1 or words[i - 2] in _HONORIFICS or first in ni.by_first
+        if named and not any(ni.score(first, ni.first_of[p])[0] >= _NAME_WORD_SCORE for p in ids):
+            return first
+    return None
+
+
 def only_no(phrase: str | None) -> bool:
     """A no and nothing else to hear ("no", "nope, not that one"); "no, Trenton, New Jersey" says more."""
     words = set(tokens(phrase or ""))
@@ -422,6 +462,11 @@ def _specialty_cues(index: CatalogIndex) -> _Cues:
     kept = {w: frozenset(s) for w, s in cues.items()
             if w not in _SPECIALTY_FILLER and w not in _CLUE_STOPWORDS and len(w) > 2}
     return _Cues(kept, tuple((w, stem(w)) for w in kept))
+
+
+def specialties_named(index: CatalogIndex, word: str) -> frozenset[str]:
+    """The specialties one word names: "pediatrician" Pediatrics, "cardiologist" Cardiology."""
+    return _specialties_named(_specialty_cues(index), word)
 
 
 @lru_cache(maxsize=8192)

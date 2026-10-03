@@ -31,8 +31,8 @@ SETS: dict[str, EvalSet] = {
     "national2": EvalSet("cases_national2.jsonl", national=True),
     "street": EvalSet("cases_street.jsonl", national=True),
     "national3": EvalSet("cases_national3.jsonl", national=True),
-    "heldout4": EvalSet("cases_heldout4.jsonl", blind=True),
-    "national4": EvalSet("cases_national4.jsonl", national=True, blind=True),
+    "heldout4": EvalSet("cases_heldout4.jsonl"),
+    "national4": EvalSet("cases_national4.jsonl", national=True),
     "heldout5": EvalSet("cases_heldout5.jsonl", blind=True),
     "national5": EvalSet("cases_national5.jsonl", national=True, blind=True),
 }
