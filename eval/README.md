@@ -921,3 +921,41 @@ together (two rounds to one).
 
 Spend: JEV 29 new cached requests for the review probes, 55,048 input tokens, $0.0022. No OpenAI
 requests.
+
+## Held-out round 4: scored once (2026-10-03)
+
+`heldout4` and `national4` were frozen in `99961d5`, before any round 4 fix landed. They were
+scored once on the code at `500e0ce`, with every chooser. JEV and OpenAI ran live. Raw outputs are
+in `eval/results/round4_*.txt`.
+
+| set | mode | wrong commits | top-1 | questions per booking |
+|---|---|---|---|---|
+| heldout4 (SF, 62 turns) | no model | 7/25 (28.0%) | 33/62 | 0.55 |
+| | embeddings | 7/32 (21.9%) | 40/62 | 0.40 |
+| | OpenAI gpt-4o-mini | 9/40 (22.5%) | 46/62 | 0.23 |
+| | **JEV** | **3/38 (7.9%)** | **53/62** | 0.20 |
+| national4 (56 turns) | no model | 0/26 (0.0%) | 41/56 | 0.54 |
+| | embeddings | 1/30 (3.3%) | 46/56 | 0.36 |
+| | OpenAI gpt-4o-mini | 0/33 (0.0%) | 50/56 | 0.36 |
+| | **JEV** | **1/31 (3.2%)** | **47/56** | 0.36 |
+
+JEV-mode wrong commits went from round 3's 7/42 to 3/38 on the SF set, and from 3/35 to 1/31
+nationally. That is the generalization trend; the dev-set numbers do not show it. The remaining
+JEV wrong commits:
+
+- **Umbrella words** that name several visits, which the model resolved with false confidence:
+  - h4-m06 "my stomach doctor said I need a scope" (upper or lower) chose 0.94, and the check
+    confirmed it at 0.82.
+  - h4-m05 "my baby's checkup" (well-child or newborn visit).
+  - h4-27 "some blood work" (blood draw or fasting test).
+
+  The author flagged h4-27 and h4-m05 as uncertain labels before scoring.
+- **Triage nuance**: nat4-sym-03, "it burns when I pee ... since yesterday", went to a urology
+  consultation; the label expects a sick visit or UTI visit.
+
+Misses that are not wrong commits but matter:
+- **False refusals.** h4-09 is a seasonal allergy described with "my eyes get itchy and watery";
+  the agent answered "we don't offer eye care". nat4-geo-07 and nat4-noloc-02 refused a chest CT
+  within 50 miles because the specific "CT - chest" visit is not offered there, while a general
+  CT scan that the label accepts is.
+- Gender policy (pre-registered): h4-p10 and h4-p11 confirm a doctor by name instead of booking.

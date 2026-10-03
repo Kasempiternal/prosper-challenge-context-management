@@ -1,0 +1,61 @@
+Resolver eval (o200k_base tokenizer); chooser none
+
+=== national4: no model ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   48 / 56
+WRONG-COMMIT rate per commit (headline)   0/26 = 0.0%  (over 56 resolve turns)
+top-1 (turn fully correct)                41/56 = 73.2%
+ask precision (field-level)               8/22 = 36.4%
+ask recall (field-level)                  8/9 = 88.9%
+mean questions per booking                0.54 over 39 bookings
+refusal correctness                       7/8 = 87.5%
+resolver latency p50 / p95 (no network)   0.71 ms / 5.11 ms  (n=1120)
+Plan.say tokens  mean / p95 / max         28 / 56 / 70
+Plan.summary tokens mean / p95 / max      64 / 94 / 99
+tool result tokens mean / p95 / max       98 / 144 / 150
+  ... speak-direct (no say) mean/p95/max  67 / 91 / 97
+model requests; turns where a hook fired  0; 0 of 56 turns
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       5/5
+  dup_name_metro         6/6
+  geo                    10/18
+  new_patient            5/5
+  no_location            2/3
+  ring                   1/1
+  symptom                3/8
+  unoffered              2/2
+MISSES (14):
+  nat4-geo-02 turn 1: status ask != offer
+      said: Is that a CT scan or a CT - chest?
+  nat4-geo-03 turn 1: status ask != offer
+      said: Is that an ultrasound - abdomen or an ultrasound?
+  nat4-geo-08 turn 1: status ask != offer
+      said: Is that a sick visit or a strep test?
+  nat4-geo-09 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-geo-14 turn 1: ask service_open != metro
+      said: What's the visit for?
+  nat4-geo-14 turn 2: status ask != offer
+      said: What's the visit for?
+  nat4-geo-15 turn 2: status ask != offer
+      said: That's not available at Pasadena. There's nothing closer to Pasadena; the nearest is 6 miles away, in Glendale. What's the visit for?
+  nat4-geo-16 turn 1: alternative locations ['loc_058'] not within ['loc_049', 'loc_051']
+      said: We don't offer a brain MRI in Idaho. The nearest is Hawthorne in Portland. Want me to look there?
+  nat4-geo-18 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-02 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-03 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-05 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-06 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-08 turn 1: status ask != offer
+      said: Is that a dermatology consultation or a rash evaluation?
+  nat4-noloc-01 turn 2: status ask != offer
+      said: Is that a sick visit or a strep test?
+
+=== HEADLINE: wrong commits per commit; top-1 per evaluated turn ===
+set                           no model                            

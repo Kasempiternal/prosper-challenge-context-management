@@ -1,0 +1,87 @@
+Resolver eval (o200k_base tokenizer); chooser none
+
+=== heldout4: no model ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   56 / 62
+WRONG-COMMIT rate per commit (headline)   7/25 = 28.0%  (over 62 resolve turns)
+top-1 (turn fully correct)                33/62 = 53.2%
+ask precision (field-level)               8/28 = 28.6%
+ask recall (field-level)                  8/14 = 57.1%
+mean questions per booking                0.55 over 40 bookings
+refusal correctness                       8/8 = 100.0%
+resolver latency p50 / p95 (no network)   0.26 ms / 0.95 ms  (n=1240)
+Plan.say tokens  mean / p95 / max         23 / 44 / 47
+Plan.summary tokens mean / p95 / max      55 / 85 / 90
+tool result tokens mean / p95 / max       85 / 126 / 129
+  ... speak-direct (no say) mean/p95/max  59 / 82 / 86
+model requests; turns where a hook fired  0; 2 of 62 turns
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  heldout4_multiturn     2/6
+  heldout4_policy        5/5
+  heldout4_provider      12/14
+  heldout4_type          10/31
+MISSES (27):
+  h4-01 turn 1: status ask != offer
+      said: What's the visit for?
+  h4-02 turn 1: status ask != offer
+      said: What's the visit for?
+  h4-03 turn 1: status ask != offer
+      said: What's the visit for?
+  h4-04 turn 1: status ask != offer
+      said: Is that a pulmonology consultation or a spirometry?
+  h4-09 turn 1: status refuse != offer
+      said: Sorry, we don't offer eye care at our clinics.
+  h4-10 turn 1: types ['appt_050'] != appt_052
+      said: For an ENT consultation, Dr. Maria Martinez has tomorrow at 8, Monday at 8, or Thursday the 15th at 8 at Midtown. Which works best?
+  h4-11 turn 1: types ['appt_050'] != appt_007
+      said: For an ENT consultation, Dr. Maria Martinez has tomorrow at 8, Monday at 8, or Thursday the 15th at 8 at Midtown. Which works best?
+  h4-12 turn 1: status ask != offer
+      said: What's the visit for?
+  h4-13 turn 1: status ask != offer
+      said: Is that a vaccination, a flu shot, or a COVID-19 vaccine?
+  h4-14 turn 1: status ask != offer
+      said: What's the visit for?
+  h4-15 turn 1: status ask != offer
+      said: Is that an OB/GYN new patient visit or a contraception consultation?
+  h4-17 turn 1: types ['appt_056'] != appt_057
+      said: For an endocrinology consultation, Dr. Samuel Kim has today at 11:20 at Downtown, tomorrow at 9:20 at Richmond, or Friday at 8 at Downtown. Which works best?
+  h4-18 turn 1: status ask != offer
+      said: Is that an annual physical, an annual wellness visit, or a prenatal visit?
+  h4-19 turn 1: status ask != offer
+      said: Is that an annual physical or an annual wellness visit?
+  h4-21 turn 1: status ask != offer
+      said: Is that a cardiology consultation or an echocardiogram?
+  h4-23 turn 1: status ask != offer
+      said: What's the visit for?
+  h4-25 turn 1: status ask != offer
+      said: What's the visit for?
+  h4-26 turn 1: status offer != ask; ask None != service; ask options None != ['appt_060', 'appt_061']; WRONG COMMIT: offered when it should not
+      said: For a psychiatric evaluation, Dr. Wei Smith has today at 11 at Mission District and Dr. Fatima Smith has tomorrow at 8 or Friday at 9 at Mission District. Which works best?
+  h4-27 turn 1: status offer != ask; ask None != service; ask options None != ['appt_072', 'appt_073']; WRONG COMMIT: offered when it should not
+      said: For a blood draw, Dr. Leila Sato has Wednesday the 14th at 8, Friday the 16th at 8, or Monday the 19th at 8 at Mission Bay. Which works best?
+  h4-28 turn 1: ask service_open != service; ask options [] != ['appt_063', 'appt_066']
+      said: What's the visit for?
+  h4-29 turn 1: ask service_open != service; ask options [] != ['appt_000', 'appt_001']
+      said: What's the visit for?
+  h4-p10 turn 1: status ask != offer
+      said: Do you mean Dr. Nina Chen?
+      provider gender female: ['prov_039'] of ['prov_039'], p(woman) 
+  h4-p11 turn 1: status ask != offer
+      said: Do you mean Dr. Carlos Nguyen?
+      provider gender male: ['prov_037'] of ['prov_037'], p(woman) 
+  h4-m03 turn 2: status ask != offer
+      said: Sorry, which doctor was that?
+  h4-m04 turn 1: ask service_open != service; ask options [] != ['appt_066', 'appt_067']
+      said: What's the visit for?
+  h4-m05 turn 1: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+      said: Is that an annual physical or an annual wellness visit?
+  h4-m05 turn 2: status ask != offer
+      said: What's the visit for?
+  h4-m06 turn 1: status offer != ask; ask None != service; ask options None != ['appt_054', 'appt_055']; WRONG COMMIT: offered when it should not
+      said: For a GI consultation, Dr. Fatima Hernandez has today at 11:20, Friday at 8:40, or Thursday the 15th at 9:20 at North Gate. Which works best?
+  h4-m06 turn 2: types ['appt_050'] != appt_055
+      said: For an ENT consultation, Dr. Maria Martinez has tomorrow at 8, Monday at 8, or Thursday the 15th at 8 at Midtown. Which works best?
+
+=== HEADLINE: wrong commits per commit; top-1 per evaluated turn ===
+set                           no model                            

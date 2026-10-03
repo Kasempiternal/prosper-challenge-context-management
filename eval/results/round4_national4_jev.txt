@@ -1,0 +1,139 @@
+Resolver eval (o200k_base tokenizer); chooser jev (LIVE network)
+
+=== national4: no model ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   48 / 56
+WRONG-COMMIT rate per commit (headline)   0/26 = 0.0%  (over 56 resolve turns)
+top-1 (turn fully correct)                41/56 = 73.2%
+ask precision (field-level)               8/22 = 36.4%
+ask recall (field-level)                  8/9 = 88.9%
+mean questions per booking                0.54 over 39 bookings
+refusal correctness                       7/8 = 87.5%
+resolver latency p50 / p95 (no network)   0.73 ms / 5.38 ms  (n=1120)
+Plan.say tokens  mean / p95 / max         28 / 56 / 70
+Plan.summary tokens mean / p95 / max      64 / 94 / 99
+tool result tokens mean / p95 / max       98 / 144 / 150
+  ... speak-direct (no say) mean/p95/max  67 / 91 / 97
+model requests; turns where a hook fired  0; 0 of 56 turns
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       5/5
+  dup_name_metro         6/6
+  geo                    10/18
+  new_patient            5/5
+  no_location            2/3
+  ring                   1/1
+  symptom                3/8
+  unoffered              2/2
+MISSES (14):
+  nat4-geo-02 turn 1: status ask != offer
+      said: Is that a CT scan or a CT - chest?
+  nat4-geo-03 turn 1: status ask != offer
+      said: Is that an ultrasound - abdomen or an ultrasound?
+  nat4-geo-08 turn 1: status ask != offer
+      said: Is that a sick visit or a strep test?
+  nat4-geo-09 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-geo-14 turn 1: ask service_open != metro
+      said: What's the visit for?
+  nat4-geo-14 turn 2: status ask != offer
+      said: What's the visit for?
+  nat4-geo-15 turn 2: status ask != offer
+      said: That's not available at Pasadena. There's nothing closer to Pasadena; the nearest is 6 miles away, in Glendale. What's the visit for?
+  nat4-geo-16 turn 1: alternative locations ['loc_058'] not within ['loc_049', 'loc_051']
+      said: We don't offer a brain MRI in Idaho. The nearest is Hawthorne in Portland. Want me to look there?
+  nat4-geo-18 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-02 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-03 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-05 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-06 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-08 turn 1: status ask != offer
+      said: Is that a dermatology consultation or a rash evaluation?
+  nat4-noloc-01 turn 2: status ask != offer
+      said: Is that a sick visit or a strep test?
+
+=== national4: JEV ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   48 / 56
+WRONG-COMMIT rate per commit (headline)   1/31 = 3.2%  (over 56 resolve turns)
+top-1 (turn fully correct)                47/56 = 83.9%
+ask precision (field-level)               9/15 = 60.0%
+ask recall (field-level)                  9/9 = 100.0%
+mean questions per booking                0.36 over 39 bookings
+refusal correctness                       8/8 = 100.0%
+resolver latency p50 / p95 (no network)   1.21 ms / 5.38 ms  (n=1120)
+Plan.say tokens  mean / p95 / max         33 / 57 / 70
+Plan.summary tokens mean / p95 / max      68 / 95 / 99
+tool result tokens mean / p95 / max       106 / 145 / 150
+  ... speak-direct (no say) mean/p95/max  70 / 93 / 97
+model requests (rate per resolve turn)    52 (92.9%); live 52, disk cache 0, failed 0
+model latency p50 / p95 / max (live)      549 / 776 / 1580 ms
+  ... over the 1.5 s request timeout      1 of 52
+  ... turns past the 2.5 s turn budget    0 of 31 (summed request time)
+model input tokens total / per request    50812 / 977
+model cost if every request were live     $0.00203
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       5/5
+  dup_name_metro         6/6
+  geo                    15/18
+  new_patient            5/5
+  no_location            1/3
+  ring                   1/1
+  symptom                4/8
+  unoffered              2/2
+MISSES (9):
+  nat4-geo-03 turn 1: status ask != offer
+      said: Is that an ultrasound - abdomen or an ultrasound?
+      type disambiguator: act appt_213 [appt_213=0.98 appt_067=0.02 appt_001=0.00]
+      type check appt_213 vs appt_067: ask ('appt_213', 'appt_067') [appt_213=0.52 appt_067=0.05 either=0.43]
+  nat4-geo-07 turn 1: status refuse != offer; alternative locations ['loc_168'] not within ['loc_153', 'loc_154', 'loc_155']
+      said: We don't offer a CT - chest within 50 miles of 60657. The nearest is Southfield in Detroit, about 229 miles away. Want me to look there?
+      type disambiguator: act appt_210 [appt_210=1.00 appt_001=0.00 appt_002=0.00]
+      type check appt_210 vs appt_066: act appt_210 [appt_210=0.99 appt_066=0.01 either=0.00]
+  nat4-geo-08 turn 1: status ask != offer
+      said: Is that a sick visit or a strep test?
+  nat4-sym-03 turn 1: types ['appt_077'] not within ['appt_007', 'appt_008', 'appt_084', 'appt_230']
+      said: For an urology consultation, Dr. Jian Fong has today at 11:40 or Friday at 9 at Katy and Dr. Vijay Vaidya has tomorrow at 8 at Montrose. Which works best?
+      type disambiguator: act appt_077 [appt_077=0.97 appt_001=0.03 appt_002=0.00]
+      type disambiguator within Urology: act appt_077 [appt_077=0.96 appt_242=0.02 appt_244=0.01]
+      type check appt_077 vs appt_242: act appt_077 [appt_077=0.60 appt_242=0.02 either=0.38]
+  nat4-sym-04 turn 1: status ask != offer
+      said: Is that a GI consultation or a colonoscopy consultation?
+      type disambiguator: act appt_053 [appt_053=0.88 appt_054=0.10 appt_001=0.02]
+      type check appt_053 vs appt_054: ask ('appt_053', 'appt_054') [appt_053=0.07 appt_054=0.70 either=0.23]
+  nat4-sym-05 turn 1: status ask != offer
+      said: Is that a psychiatric evaluation or a psychiatric intake assessment?
+      type disambiguator: act appt_059 [appt_059=1.00 appt_001=0.00 appt_002=0.00]
+      type disambiguator within Psychiatry: ask ('appt_196', 'appt_059') [appt_196=0.68 appt_059=0.31 appt_060=0.01]
+      type check appt_196 vs appt_059: ask ('appt_196', 'appt_059') [appt_196=0.22 appt_059=0.38 either=0.40]
+  nat4-sym-06 turn 1: status ask != offer
+      said: Is that a new patient consultation or a new patient visit?
+      type disambiguator: act appt_001 [appt_001=0.81 appt_050=0.08 appt_036=0.04]
+      type disambiguator within General: ask ('appt_001', 'appt_000') [appt_001=0.56 appt_000=0.44 appt_004=0.00]
+      type check appt_001 vs appt_000: ask ('appt_001', 'appt_000') [appt_001=0.04 appt_000=0.05 either=0.91]
+  nat4-noloc-01 turn 2: status ask != offer
+      said: Is that a sick visit or a strep test?
+  nat4-noloc-02 turn 2: status refuse != offer; alternative locations ['loc_049'] not within ['loc_058', 'loc_059']
+      said: We don't offer a CT - chest within 50 miles of Portland. The nearest is Capitol Hill in Seattle, about 146 miles away. Want me to look there?
+      type disambiguator: act appt_210 [appt_210=1.00 appt_001=0.00 appt_002=0.00]
+      type check appt_210 vs appt_066: act appt_210 [appt_210=0.99 appt_066=0.01 either=0.00]
+
+--- national4: no model vs JEV ---
+metric                          off                             on
+wrong-commit (per commit)       0/26 = 0.0%                     1/31 = 3.2%
+top-1                           41/56 (73.2%)                   47/56 (83.9%)
+questions per booking           0.54                            0.36
+model requests (rate)           0 (0%)                          52 (93%)
+model latency p50/p95/max       -                               549/776/1580 ms
+model $ per run (per 1k turns)  $0.00000 ($0.0000/1k turns)     $0.00203 ($0.0363/1k turns)
+
+LIVE this run: 52 requests, 50812 input tokens, $0.00203
+
+=== HEADLINE: wrong commits per commit; top-1 per evaluated turn ===
+set                           no model                            JEV

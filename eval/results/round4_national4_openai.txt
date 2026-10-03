@@ -1,0 +1,124 @@
+Resolver eval (o200k_base tokenizer); chooser openai (LIVE network)
+
+=== national4: no model ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   48 / 56
+WRONG-COMMIT rate per commit (headline)   0/26 = 0.0%  (over 56 resolve turns)
+top-1 (turn fully correct)                41/56 = 73.2%
+ask precision (field-level)               8/22 = 36.4%
+ask recall (field-level)                  8/9 = 88.9%
+mean questions per booking                0.54 over 39 bookings
+refusal correctness                       7/8 = 87.5%
+resolver latency p50 / p95 (no network)   0.72 ms / 5.09 ms  (n=1120)
+Plan.say tokens  mean / p95 / max         28 / 56 / 70
+Plan.summary tokens mean / p95 / max      64 / 94 / 99
+tool result tokens mean / p95 / max       98 / 144 / 150
+  ... speak-direct (no say) mean/p95/max  67 / 91 / 97
+model requests; turns where a hook fired  0; 0 of 56 turns
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       5/5
+  dup_name_metro         6/6
+  geo                    10/18
+  new_patient            5/5
+  no_location            2/3
+  ring                   1/1
+  symptom                3/8
+  unoffered              2/2
+MISSES (14):
+  nat4-geo-02 turn 1: status ask != offer
+      said: Is that a CT scan or a CT - chest?
+  nat4-geo-03 turn 1: status ask != offer
+      said: Is that an ultrasound - abdomen or an ultrasound?
+  nat4-geo-08 turn 1: status ask != offer
+      said: Is that a sick visit or a strep test?
+  nat4-geo-09 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-geo-14 turn 1: ask service_open != metro
+      said: What's the visit for?
+  nat4-geo-14 turn 2: status ask != offer
+      said: What's the visit for?
+  nat4-geo-15 turn 2: status ask != offer
+      said: That's not available at Pasadena. There's nothing closer to Pasadena; the nearest is 6 miles away, in Glendale. What's the visit for?
+  nat4-geo-16 turn 1: alternative locations ['loc_058'] not within ['loc_049', 'loc_051']
+      said: We don't offer a brain MRI in Idaho. The nearest is Hawthorne in Portland. Want me to look there?
+  nat4-geo-18 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-02 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-03 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-05 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-06 turn 1: status ask != offer
+      said: What's the visit for?
+  nat4-sym-08 turn 1: status ask != offer
+      said: Is that a dermatology consultation or a rash evaluation?
+  nat4-noloc-01 turn 2: status ask != offer
+      said: Is that a sick visit or a strep test?
+
+=== national4: OpenAI ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   48 / 56
+WRONG-COMMIT rate per commit (headline)   0/33 = 0.0%  (over 56 resolve turns)
+top-1 (turn fully correct)                50/56 = 89.3%
+ask precision (field-level)               9/15 = 60.0%
+ask recall (field-level)                  9/9 = 100.0%
+mean questions per booking                0.36 over 39 bookings
+refusal correctness                       8/8 = 100.0%
+resolver latency p50 / p95 (no network)   1.38 ms / 6.43 ms  (n=1120)
+Plan.say tokens  mean / p95 / max         34 / 57 / 70
+Plan.summary tokens mean / p95 / max      69 / 95 / 99
+tool result tokens mean / p95 / max       108 / 145 / 150
+  ... speak-direct (no say) mean/p95/max  71 / 93 / 97
+model requests (rate per resolve turn)    50 (89.3%); live 50, disk cache 0, failed 0
+model latency p50 / p95 / max (live)      503 / 658 / 684 ms
+  ... over the 1.5 s request timeout      0 of 50
+  ... turns past the 2.5 s turn budget    0 of 31 (summed request time)
+model input tokens total / per request    21276 / 426
+model cost if every request were live     $0.00322
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       5/5
+  dup_name_metro         6/6
+  geo                    15/18
+  new_patient            5/5
+  no_location            2/3
+  ring                   1/1
+  symptom                6/8
+  unoffered              2/2
+MISSES (6):
+  nat4-geo-02 turn 1: status ask != offer
+      said: Is that a CT scan or a CT - chest?
+      type disambiguator: act appt_210 [appt_210=1.00 appt_066=0.00 appt_209=0.00]
+      type check appt_210 vs appt_066: ask ('appt_210', 'appt_066') [appt_210=0.07 appt_066=0.00 either=0.92]
+  nat4-geo-03 turn 1: status ask != offer
+      said: Is that an ultrasound - abdomen or an ultrasound?
+      type disambiguator: act appt_067 [appt_067=1.00 appt_213=0.00 appt_003=0.00]
+      type check appt_067 vs appt_213: ask ('appt_067', 'appt_213') [appt_067=0.00 appt_213=1.00 either=0.00]
+  nat4-geo-08 turn 1: status ask != offer
+      said: Is that a sick visit or a strep test?
+  nat4-sym-03 turn 1: status ask != offer
+      said: Is that an urology consultation or an urology follow-up?
+      type disambiguator: act appt_077 [appt_077=1.00 appt_036=0.00 appt_075=0.00]
+      type disambiguator within Urology: act appt_077 [appt_077=1.00 appt_242=0.00 appt_246=0.00]
+      type check appt_077 vs appt_242: ask ('appt_077', 'appt_242') [appt_077=0.01 appt_242=0.00 either=0.00]
+  nat4-sym-06 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: open [appt_292=0.22 appt_050=0.03 appt_301=0.00]
+  nat4-noloc-01 turn 2: status ask != offer
+      said: Is that a sick visit or a strep test?
+
+--- national4: no model vs OpenAI ---
+metric                          off                             on
+wrong-commit (per commit)       0/26 = 0.0%                     0/33 = 0.0%
+top-1                           41/56 (73.2%)                   50/56 (89.3%)
+questions per booking           0.54                            0.36
+model requests (rate)           0 (0%)                          50 (89%)
+model latency p50/p95/max       -                               503/658/684 ms
+model $ per run (per 1k turns)  $0.00000 ($0.0000/1k turns)     $0.00322 ($0.0575/1k turns)
+
+LIVE this run: 50 requests, 21276 input tokens, $0.00322
+
+=== HEADLINE: wrong commits per commit; top-1 per evaluated turn ===
+set                           no model                            OpenAI
