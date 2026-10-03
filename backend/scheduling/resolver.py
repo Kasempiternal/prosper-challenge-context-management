@@ -23,7 +23,7 @@ from .decision import DECLINE, Verdict, gender_of, unanswered
 from .geo import RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, over_state_line, resolve_place
 from .lexicon import (SHORTLIST_ABOVE, Doubt, TypeCandidate, fitting_kin, match_types, nearest_type,
                       pointed_default, stated_doubt, type_shortlist, types_named, umbrella, unexplained_words)
-from .names import (STREET_TYPES, ProviderClues, hear_place, match_locations, match_providers, only_no,
+from .names import (STREET_TYPES, ProviderClues, clue_words, hear_place, match_locations, match_providers, only_no,
                     read_confirmation, read_provider_clues)
 from .policy import IssueKind, Rule, Violation, check, has_violation
 from .request import WEEKDAY_NAMES, AltRef, OfferRef, PendingAsk, Request, Slot, TimePref
@@ -514,6 +514,12 @@ class _Resolution:
                 return self._confirmed_provider(s, answer)
         matcher = match_providers if slot_name == "provider" else match_locations
         cands = matcher(self.ix, s.heard, s.within or None)
+        if not cands and slot_name == "provider" and len(s.within) > 1 and clue_words(self.ix, s.heard, s.within):
+            # "the nurse practitioner" answering "which Dr. Maria Garcia?": the doctors asked about,
+            # described by title, specialty, site, language or gender (_described, _consult_provider).
+            self.notes.append(f"provider answer describes {list(s.within)}")
+            self.slots[slot_name] = replace(s, asks=0, candidates=tuple((p, 1.0) for p in s.within))
+            return list(s.within)
         if cands:
             self.slots[slot_name] = replace(s, asks=0, candidates=tuple((c.id, c.score) for c in cands))
         return [c.id for c in cands]
