@@ -126,7 +126,7 @@ def test_builds_and_every_tool_resolves(clinic):
     builder = AgentBuilder.from_json(CLINIC)
     initial = builder.build_initial_node()
     assert initial["name"] == "greeting"
-    assert [f.name for f in initial["functions"]] == ["start", "transfer_to_staff"]
+    assert [f.name for f in initial["functions"]] == ["lookup", "start", "transfer_to_staff"]
     assert "context_strategy" not in initial
 
     schedule = builder._make_node(builder._nodes_by_name["schedule"])

@@ -303,6 +303,7 @@ _POSSESSIVES = frozenset({"my", "our", "his", "her", "their", "your"})
 # "women's health" names a field, and "her" / "his" are as often someone else's.
 _GENDER_NOUNS = {"woman": "female", "lady": "female", "female": "female",
                  "man": "male", "male": "male", "guy": "male", "gentleman": "male"}
+GENDER_WORDS = frozenset(_GENDER_NOUNS)
 # "she's the one at Mission Bay" is the doctor; in "my wife says she's great" it is not.
 _PRONOUNS = {"she": "female", "he": "male"}
 _OTHER_PEOPLE = _KIN | _PATIENT_GROUPS | frozenset({

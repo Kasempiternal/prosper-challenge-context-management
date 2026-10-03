@@ -178,6 +178,14 @@ def test_lookup_facts(index):
     assert all(len(lookup(index, k, p)) <= 5 for k, p in [("provider_info", "Dr. Nguyen"), ("do_you_offer", "mri")])
 
 
+def test_a_language_question_lists_speakers_not_a_namesake(index):
+    facts = lookup(index, "provider_info", "Spanish speaking doctor in Mission Bay")
+    assert facts[0] == "2 of our doctors at Mission Bay speak Spanish."
+    assert all("Mission Bay" in f for f in facts[1:])
+    assert lookup(index, "provider_info", "Spanish")[0] == "15 of our doctors speak Spanish."
+    assert lookup(index, "provider_info", "Klingon") == ["No provider matches 'Klingon'."]
+
+
 # ---- NameIndex equivalence: the pre-NameIndex matcher, frozen as the oracle -----------------
 
 import json  # noqa: E402

@@ -14,10 +14,13 @@
   "nodes": [
     {
       "name": "greeting",
+      "tools": [
+        "lookup"
+      ],
       "task_messages": [
         {
           "role": "developer",
-          "content": "Greet the caller in one short sentence and ask what you can help them book. The moment the caller mentions anything they might want, such as a need, symptom, injury, visit, doctor, place, day or time, call start with their words right away, even if the words are unclear or seem garbled; the next step sorts out the details and asks any questions. Only small talk with nothing else, such as a hello, waits for more. If they want to reschedule, cancel or talk to a person, call transfer_to_staff."
+          "content": "Greet the caller in one short sentence and ask what you can help them book. The moment the caller mentions anything they might want, such as a need, symptom, injury, visit, doctor, place, day or time, call start with their words right away, even if the words are unclear or seem garbled; the next step sorts out the details and asks any questions. Only small talk with nothing else, such as a hello, waits for more. If they ask a question about our clinics, doctors or visits, such as a clinic's hours or address, whether a doctor takes new patients or speaks a language, whether a visit needs a referral, or whether we offer something, call lookup and answer only from its facts, then ask if they would like to book. Only if they want to reschedule, cancel or talk to a person, call transfer_to_staff; a question is not a request for a person."
         }
       ],
       "edges": [

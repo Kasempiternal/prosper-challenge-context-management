@@ -13,7 +13,7 @@ All counts measured (tiktoken `o200k_base` on compact JSON).
 
 ## Quick start
 
-Needs Python 3.11 (tested on 3.11.8), Node 22 and pnpm 10. No `make` needed.
+Needs Python 3.11 (tested on 3.11.8), Node 22 and pnpm 10. On macOS or Linux, `make install`, then `make run` and `make studio` in two terminals, does the same as the steps below.
 
 1. **Backend.** Install once, then run from the repo root.
 
@@ -245,7 +245,7 @@ The blind runs are recorded as scored in `eval/results/round3_*.txt` and `eval/r
 
 ## What the live calls taught us
 
-Three voice calls, driven by a person. Each found something the offline eval could not.
+The first three voice calls, driven by a person. Each found something the offline eval could not.
 
 | Call | What happened | What changed |
 |---|---|---|
@@ -254,6 +254,19 @@ Three voice calls, driven by a person. Each found something the offline eval cou
 | 3. National Scheduler | Clean pass. Two real bookings. A request from Maine got `none_nearby` with the nearest Boston site as the alternative. | None needed. |
 
 A prompt instruction did not stop the model from claiming a booking in call 2. Moving the booking into an edge action did.
+
+Later rounds of live calls on 2026-10-03 (about 35 calls) found one recurring fault: the conversation model rewrote the caller before the resolver saw them.
+
+| What the caller said | What the model sent | What changed |
+|---|---|---|
+| "Washington." to "Seattle, Washington or Washington, DC?" | `Washington, DC` | While a doctor, place or visit question is open, an answer with a word the caller never said is replaced by the caller's own words |
+| "The lady one." to "Dr. David Chen or Dr. Emily Chen?" | `Dr. Emily Chen`, skipping the name confirmation | Same check: the resolver gets "The lady one." and confirms by name |
+| "I don't remember if it goes down my throat or up from below" | `scope` | Sentences that state a doubt or say whom the visit is for are restored into the visit phrase, including on the first turn after the context reset |
+| "My 10-year-old needs a physical…" | `physical and form signed` (a child was offered a pre-employment physical) | Same restore |
+| "Day of checkup." | `time_pref.day = wednesday` | A day the caller did not say is dropped |
+| "What are the hours at the Mission Bay clinic?" as the first words | `transfer_to_staff`: the greeting node had no `lookup` tool, so a question could only start a booking or end in a handoff | The greeting node has `lookup` and answers questions from its facts. Replayed through gpt-4o: 9/9 questions went to `lookup`, 6/6 booking requests to `start` |
+
+Replaying those turns through the same prompt with gpt-4.1 gave the same rewrites, and it answered "dental exam" for a caller who had not chosen. A stronger model was not the fix; a check in code was. The same calls led to a scope shortlist fix ("GI doc wants a scope" now asks), visit names matching without a bracketed abbreviation ("Upper Endoscopy (EGD)"), a second unknown place asking for a nearby city or ZIP instead of repeating itself, and the agent's name in the call panel header. The scripted retests are in [docs/live-call-tests.html](docs/live-call-tests.html); every fault and fix is in [eval/README.md](eval/README.md).
 
 ## Honest limits
 
@@ -266,7 +279,7 @@ Remaining failure classes from blind round 4 (JEV mode):
 
 Other limits:
 
-- The offline eval feeds tool-call arguments, not audio. LLM extraction accuracy is not measured. Three live calls are a smoke test.
+- The offline eval feeds tool-call arguments, not audio. LLM extraction accuracy is measured only by live calls, about 35 so far.
 - Availability is a seeded mock with a fixed `DEMO_NOW` (Wednesday 2026-10-07, 09:00). Bookings and holds live in memory and are lost on restart.
 - JEV probabilities move by 0.02-0.08 between identical requests, so a case near a threshold can flip between runs.
 - Reschedule, cancel and anything outside booking go to a handoff node with no real transfer behind it.
@@ -334,7 +347,8 @@ Replay beats offline, with no LLM, audio or network: `python backend/tools/text_
 | `backend/tests/` | Backend tests, including the policy property test, the fuzz test and the review probes |
 | `eval/` | Resolver eval, case files, set registry (`sets.py`), model caches, tuning scripts, recorded results |
 | `frontend/` | Agent Studio (React 19, Vite, React Flow, Zustand, Pipecat client) |
-| `docs/` | `PHASE2_DESIGN.md`, `AGENT_FORMAT.md` |
+| `docs/` | `PHASE2_DESIGN.md`, `AGENT_FORMAT.md`, `live-call-tests.html` (live-call retest script) |
+| `solution.md` | The submission overview: requirements, key decisions, trade-offs |
 
 ## Tests
 
@@ -344,9 +358,11 @@ cd frontend && pnpm test                                   # vitest
 cd frontend && pnpm typecheck && pnpm lint && pnpm build
 ```
 
-Last run: **1,288 backend tests passed, 1 live JEV smoke test skipped** (2026-10-03, resolver `222eb22`). **122 frontend tests passed**, and the frontend production build passed after restoring dependencies from the unchanged lockfile.
+Last run: **1,313 backend tests passed, 1 live JEV smoke test skipped** (2026-10-03, after the live-call fixes). **122 frontend tests passed**, and the frontend production build passed.
 
 ## Final verification (2026-10-03, resolver frozen at `222eb22`)
+
+This section is the round 5 score, taken at `222eb22`. Fixes made after it came from live voice calls, not from the blind cases, and are listed in [What the live calls taught us](#what-the-live-calls-taught-us). Every dev and stress set was re-run after them: still 0 JEV wrong commits, both stress gates PASS.
 
 Round 5 was scored once in all four modes, after the hard-suite fixes and before any blind result was inspected. No resolver fix was made after scoring. JEV and OpenAI used live calls; Off and embeddings ran locally. Scores are preserved in `eval/results/round5_*.txt`.
 

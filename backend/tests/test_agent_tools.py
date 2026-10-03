@@ -610,3 +610,15 @@ def test_the_first_update_after_a_context_reset_is_checked_against_the_start_wor
     call(ctx, fm, "update_request", {"service_phrase": "physical and form signed", "is_new": False})
     assert fm.state["req"]["service"]["heard"] == "My 10-year-old needs a physical and a form signed by the doctor."
     assert "started_with" not in fm.state
+
+
+@pytest.mark.parametrize("phrase,said,sent", [
+    ("Doctor Chen", "I need to see the heart doctor again. The lady one. Doctor. Chen. It has to be in the morning.",
+     "Doctor Chen. The lady one."),
+    ("Dr. Garcia", "The one who speaks Arabic. Dr. Garcia.", "Dr. Garcia. The one who speaks Arabic."),
+    ("Dr. Chen, the lady one", "Dr. Chen, the lady one.", "Dr. Chen, the lady one"),
+    ("Dr. Patel", "My wife says Dr. Patel is great.", "Dr. Patel"),
+])
+def test_the_doctor_keeps_how_the_caller_described_them(phrase, said, sent):
+    from agent_tools.scheduling_tools import with_dropped_description
+    assert with_dropped_description(phrase, said) == sent

@@ -35,6 +35,7 @@ from scheduling.request import PARTS_OF_DAY, SLOT_NAMES, WEEKDAY_NAMES, Request,
 from scheduling.resolver import Offer, Plan, resolve
 from scheduling.templates import spoken_when, type_label
 from scheduling.lexicon import says_unsure
+from scheduling.names import GENDER_WORDS
 from scheduling.text import tokens
 
 from .context import ToolContext, model_call_event
@@ -282,6 +283,20 @@ def with_dropped_clauses(phrase: str, said: str) -> str:
     return " ".join([phrase.rstrip(".") + ".", *kept])
 
 
+# Words that describe the doctor rather than name them: "the lady one", "he speaks Spanish".
+_DESCRIBES_DOCTOR = GENDER_WORDS | {"speaks", "speak"}
+
+
+def with_dropped_description(phrase: str, said: str) -> str:
+    """The doctor phrase with the caller's sentences that describe the doctor and that the
+    conversation model dropped: "Doctor Chen" from "...the lady one. Doctor Chen." The resolver
+    reads the description (and still confirms a doctor picked by it by name)."""
+    have = set(tokens(phrase))
+    kept = [x.strip() for x in _SENTENCE_END.split(said)
+            if (words := set(tokens(x))) & _DESCRIBES_DOCTOR and not words & _DESCRIBES_DOCTOR <= have]
+    return " ".join([phrase.rstrip(".") + ".", *kept]) if kept else phrase
+
+
 def grounded(args: dict, req: Request, said: str) -> tuple[dict, list[str]]:
     """What the caller answers must come from the caller, not from the conversation model: it
     turned "The lady one" into "Dr. Emily Chen" and "Washington" into "Washington, DC", skipping
@@ -299,6 +314,11 @@ def grounded(args: dict, req: Request, said: str) -> tuple[dict, list[str]]:
     phrase = args.get(key) if key else None
     if isinstance(phrase, str) and not all(w in heard or w in _FILLER_WORDS for w in tokens(phrase)):
         args, replaced = {**args, key: said}, [phrase]
+    provider = args.get("provider_phrase")
+    if key != "provider_phrase" and isinstance(provider, str) and provider.strip():
+        fuller = with_dropped_description(provider, said)
+        if fuller != provider:
+            args, replaced = {**args, "provider_phrase": fuller}, [*replaced, provider]
     service = args.get("service_phrase")
     if key != "service_phrase" and isinstance(service, str) and service.strip():
         fuller = with_dropped_clauses(service, said)

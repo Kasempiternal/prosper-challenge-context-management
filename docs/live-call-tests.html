@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Live-call retest, round 3</title>
+<title>Real-caller round</title>
 <style>
 :root{--fg:#1a1a1a;--mute:#6b6b6b;--line:#e6e6e6;--bg:#fff;--ok:#1a7f37;--bad:#c62828;--warn:#b26a00;--say:#0b57d0}
 @media (prefers-color-scheme:dark){:root{--fg:#e8e8e8;--mute:#9a9a9a;--line:#2c2c2c;--bg:#121212;--say:#8ab4f8;--ok:#4caf50;--bad:#ef5350;--warn:#ffb74d}}
@@ -42,89 +42,93 @@ code{font-size:13px}
 </style>
 </head>
 <body>
-<div class="bar"><span>Must-pass <b id="must">0/5</b></span><span style="color:var(--ok)">Pass <b id="cp">0</b></span><span style="color:var(--bad)">Fail <b id="cf">0</b></span><span style="color:var(--warn)">Extra Q <b id="ce">0</b></span><a href="#" id="reset" class="mute">reset</a></div>
+<div class="bar"><span>Done <b id="must">0/7</b></span><span style="color:var(--ok)">Pass <b id="cp">0</b></span><span style="color:var(--bad)">Fail <b id="cf">0</b></span><span style="color:var(--warn)">Rough <b id="ce">0</b></span><a href="#" id="reset" class="mute">reset</a></div>
 <main>
-<h1>Live-call retest, round 3</h1>
-<p><b>5 calls.</b> They check only what round 2 broke or never reached. Everything else passed.</p>
+<h1>Real-caller round</h1>
+<p><b>7 calls.</b> No script this time. Each card is a <b>person</b>, not lines to read. Become her, talk the way she would, and let the conversation go where it goes. The opening line is only a nudge: say it in your own words.</p>
 
 <table class="plan">
-<tr><th>#</th><th>Agent (left sidebar)</th><th>Disambiguator</th><th>Checks</th></tr>
-<tr><td>1</td><td><b>Clinic Scheduler</b></td><td>JEV</td><td>Unsure which scope, on the right agent this time</td></tr>
-<tr><td>2</td><td>National Scheduler</td><td>JEV</td><td>The same words: the doubt must survive</td></tr>
-<tr><td>3</td><td>National Scheduler</td><td>JEV</td><td>A child's physical: never an adult visit</td></tr>
-<tr><td>4</td><td>National Scheduler</td><td>JEV</td><td>“Upper endoscopy.” as your answer</td></tr>
-<tr><td>5</td><td>National Scheduler</td><td>JEV</td><td>Trenton with no visit said: the call keeps going</td></tr>
+<tr><th>#</th><th>Caller</th><th>Agent (left sidebar)</th><th>What she wants</th></tr>
+<tr><td>1</td><td>Margaret, 79</td><td>Clinic Scheduler</td><td>Heart check-up with “the lady Dr. Chen”, mornings only</td></tr>
+<tr><td>2</td><td>Rose, 84</td><td>Clinic Scheduler</td><td>Her grandson's rash</td></tr>
+<tr><td>3</td><td>Betty, 76</td><td>Clinic Scheduler</td><td>Flu shots for her and her husband</td></tr>
+<tr><td>4</td><td>Joan, 81</td><td>Clinic Scheduler</td><td>Move an appointment she already has</td></tr>
+<tr><td>5</td><td>Dorothy, 77</td><td>National Scheduler</td><td>Her knee, after a fall</td></tr>
+<tr><td>6</td><td>Evelyn, 83</td><td>National Scheduler</td><td>Questions first, then a cough</td></tr>
+<tr><td>7</td><td>Ruth, 80</td><td>National Scheduler</td><td>Her yearly women's check-up, changes her mind mid-call</td></tr>
 </table>
 
-<h2>Before you start</h2>
-<ol>
-<li>Open <b>http://localhost:5174</b>, reload the page once, and press <b>D</b> for the Dev view.</li>
-<li><b>To change agent, click its name in the left sidebar</b> (“Clinic Scheduler” or “National Scheduler”). The Test call panel's header now shows it: <b>TEST CALL · CLINIC SCHEDULER</b>. Check it before each call. In round 2 every call ran on National.</li>
-<li>One new call per number. Hang up after the card's last line.</li>
-<li>Answer anything not on the card naturally (<b>returning patient</b>, <b>yes, I have a referral</b>). That's <b>Extra Q</b>, not Fail.</li>
-</ol>
-
-<h2>Call 1 · Clinic Scheduler · JEV</h2>
-<div class="switch">Click <b>Clinic Scheduler</b> in the left sidebar. Header must read <b>TEST CALL · CLINIC SCHEDULER</b>.</div>
-
-<section class="call" data-id="1"><div class="head"><h3><span class="n">1</span>Unsure which scope</h3><div class="res"></div></div>
-<table>
-<tr><td class="say">“The GI doc wants a scope. I don't remember if it goes down my throat or up from below. I'm a returning patient and I have a referral.”</td><td>“Is that a colonoscopy consultation or an endoscopy consultation?” Hang up.</td></tr>
-</table>
-<p class="x">It offers times before asking. It asks “Which city?” (wrong agent: check the header).</p></section>
-
-<h2>Calls 2–5 · National Scheduler · JEV</h2>
-<div class="switch">Click <b>National Scheduler</b> in the left sidebar. Header must read <b>TEST CALL · NATIONAL SCHEDULER</b>.</div>
-
-<section class="call" data-id="2"><div class="head"><h3><span class="n">2</span>The same doubt, national</h3><div class="res"></div></div>
-<table>
-<tr><td class="say">“The GI doc wants a scope. I don't remember if it goes down my throat or up from below. I'm a returning patient and I have a referral.”</td><td>“Which city are you in?”</td></tr>
-<tr><td class="say">“San Francisco.”</td><td>A question between two visits, e.g. “Is that a GI consultation or an endoscopy consultation?” Hang up.</td></tr>
-</table>
-<p class="x">It offers times (round 2 offered a GI consultation here). In the Dev view, the <code>update_request</code> service phrase should include “I don't remember if…”.</p></section>
-
-<section class="call" data-id="3"><div class="head"><h3><span class="n">3</span>A child's physical</h3><div class="res"></div></div>
-<table>
-<tr><td class="say">“My 10-year-old needs a physical and a form signed by the doctor. We are returning patients and we have a referral.”</td><td>“Which city are you in?”</td></tr>
-<tr><td class="say">“San Francisco.”</td><td>A school physical, or a question about which physical. Hang up.</td></tr>
-</table>
-<p class="x">A pre-employment physical, an annual physical or any other adult visit (round 2 offered a pre-employment physical). A school physical is the known weakness (it should ask school or sports), so mark it <b>Extra Q</b>, not Fail.</p></section>
-
-<section class="call" data-id="4"><div class="head"><h3><span class="n">4</span>“Upper endoscopy.” as the answer</h3><div class="res"></div></div>
-<table>
-<tr><td class="say">“My stomach doctor said I need a scope. I'm in Houston, I'm a returning patient, and I have a referral.”</td><td>“Is that an endoscopy consultation or an upper endoscopy?”</td></tr>
-<tr><td class="say">“Upper endoscopy.”</td><td>Upper endoscopy times (Dr. Johnnie Na at Katy). Hang up.</td></tr>
-</table>
-<p class="x">It offers an endoscopy <i>consultation</i> after you said “Upper endoscopy.”</p></section>
-
-<section class="call" data-id="5"><div class="head"><h3><span class="n">5</span>Trenton, no visit said</h3><div class="res"></div></div>
-<table>
-<tr><td class="say">“I'm in Trenton. I'm a returning patient.”</td><td>“Did you mean Renton, Washington?”</td></tr>
-<tr><td class="say">“No, Trenton, New Jersey.”</td><td>“Our nearest clinic in New Jersey is Cherry Hill, near Philadelphia. What's the visit for?”</td></tr>
-<tr><td class="say">“A flu shot.”</td><td>“…for a flu shot is Cherry Hill, near Philadelphia. Want me to look there?”</td></tr>
-<tr><td class="say">“Yes.”</td><td>Flu shot times at Cherry Hill. Hang up.</td></tr>
-</table>
-<p class="x">It goes silent after Cherry Hill (round 2 did). It offers Renton.</p></section>
-
-<h2>On a fail, check in the Dev view</h2>
+<h2>How to play her</h2>
 <ul>
-<li><b>Header:</b> the agent name is the one on the card.</li>
-<li><b>Tool arguments:</b> <code>update_request</code> carries your words, not a doctor, place, visit or day you never said.</li>
-<li><b>Hearing:</b> the transcript caught what you said.</li>
+<li><b>Talk slowly, trail off, restart.</b> “I need to… oh, what was it. The heart doctor.”</li>
+<li><b>Give things out of order</b> and in the wrong place: your age, your late husband, the bus. Not everything is about the appointment.</li>
+<li><b>Get names a little wrong</b> and correct yourself: “Dr. Chin… Chen, I mean.”</li>
+<li><b>Mishear and ask again:</b> “Tuesday at what, dear?”, “Say that again?”</li>
+<li><b>Don't know things:</b> “Is that a referral? The doctor gave me a paper.” “I think I came once, years ago.”</li>
+<li>Agent: <b>JEV</b> on every call. Check the header reads the right agent before calling. Reload the page once first.</li>
 </ul>
-<p class="mute">Replies come from the scheduler with live JEV and the fixes in place. The conversation model's wording can still differ.</p>
+
+<h2>How to score</h2>
+<p><b>Pass</b>: she got what she needed, or a clear, honest reason why not. <b>Rough</b>: it got there but was clumsy (a pointless question, an odd phrase, a repeat). <b>Fail</b>: any red line on the card. Write what happened in the note box; the logs show the rest.</p>
+
+<h2>Clinic Scheduler (San Francisco)</h2>
+<div class="switch">Click <b>Clinic Scheduler</b> in the left sidebar. Header: <b>TEST CALL · CLINIC SCHEDULER</b>.</div>
+
+<section class="call" data-id="1"><div class="head"><h3><span class="n">1</span>Margaret, 79: “the lady Dr. Chen”</h3><div class="res"></div></div>
+<p><b>Who she is.</b> Widowed, takes the 38 bus, so <b>mornings only</b>. Has seen the heart doctor before and has a letter from her GP (that's her referral, but she isn't sure what it's called). Can't quite remember the doctor's name, only that she's a woman and “very kind”.</p>
+<p class="note">Nudge: “Hello, yes, I need to see the heart doctor again, the lady one, Dr. Chin… Chen. It has to be in the morning, dear, because of my bus.”</p>
+<p><b>Somewhere in the call:</b> ask whether the clinic has parking, and ask it to repeat the time.</p>
+<p class="x">Books a doctor she didn't confirm by name (it must ask “Do you mean Dr. Emily Chen?”). Invents a parking answer (the catalog has no parking information). Offers afternoons after she said mornings. Books before reading it back and hearing her yes.</p></section>
+
+<section class="call" data-id="2"><div class="head"><h3><span class="n">2</span>Rose, 84: her grandson's rash</h3><div class="res"></div></div>
+<p><b>Who she is.</b> Looking after <b>Tommy, 6</b>, while his mother works. He's had a red, itchy rash on his arms for three days. She doesn't know if he has been to this clinic (“his mother takes him, I think he's been”). No referral that she knows of.</p>
+<p class="note">Nudge: “I'm calling about my grandson, Tommy, he's six, he's got this rash all up his arms and his mother's at work, so…”</p>
+<p class="x">Books an adult visit for Tommy without asking. Books before reading it back. Gets confused about who the patient is (Rose vs Tommy) in a way that changes the visit.</p>
+<p class="note">Fine: asking “pediatric sick visit or dermatology consultation?”, or asking about a referral for the skin doctor.</p></section>
+
+<section class="call" data-id="3"><div class="head"><h3><span class="n">3</span>Betty, 76: flu shots for two</h3><div class="res"></div></div>
+<p><b>Who she is.</b> Wants a flu shot. She has been to the clinic before. Halfway through, remembers her husband <b>Frank</b> needs one too, and <b>he has never been</b> to this clinic. “He won't call himself, you know how men are.”</p>
+<p class="note">Nudge: “Hi love, I'd like to get my flu shot before it gets cold.” Book hers, then: “Oh, and Frank! My husband. Can you do him too?”</p>
+<p class="x">Books Frank as a returning patient (he's new). Books both in one read-back without a yes for each. Loses Betty's booking when Frank's starts.</p></section>
+
+<section class="call" data-id="4"><div class="head"><h3><span class="n">4</span>Joan, 81: move an appointment</h3><div class="res"></div></div>
+<p><b>Who she is.</b> Already has an appointment <b>Thursday with the skin doctor</b>. Her daughter can't drive her that day. She doesn't have a confirmation number (“I have a card somewhere…”).</p>
+<p class="note">Nudge: “Hello, I have an appointment on Thursday with the skin doctor and my daughter can't take me, can I change it?”</p>
+<p class="x">Books a brand-new appointment as if it were the change (her Thursday one would still stand). Pretends to have moved it. A polite transfer to staff is the expected answer today.</p></section>
+
+<h2>National Scheduler</h2>
+<div class="switch">Click <b>National Scheduler</b> in the left sidebar. Header: <b>TEST CALL · NATIONAL SCHEDULER</b>.</div>
+
+<section class="call" data-id="5"><div class="head"><h3><span class="n">5</span>Dorothy, 77: her knee</h3><div class="res"></div></div>
+<p><b>Who she is.</b> Lives in <b>Overland Park</b> (“that's by Kansas City”). Fell in the garden two weeks ago, the knee still swells. Thinks she came “once, years ago”. Her regular doctor said “get it looked at”, and she doesn't know if that counts as a referral.</p>
+<p class="note">Nudge: “I took a tumble in the garden, oh, two weeks ago now, and my knee's still swollen, my doctor said I ought to get it looked at.”</p>
+<p class="x">Offers a clinic outside the Kansas City area without saying so. Treats “my doctor said get it looked at” as a referral for a visit that requires one, without asking. Books before her yes.</p></section>
+
+<section class="call" data-id="6"><div class="head"><h3><span class="n">6</span>Evelyn, 83: questions first</h3><div class="res"></div></div>
+<p><b>Who she is.</b> Careful. Asks before committing: is there a clinic in <b>Independence</b>, what time does it open, and does anyone there speak Spanish (for her neighbor Lupe). Then books for herself: a <b>cough that won't go away</b>, ten days now. Returning patient.</p>
+<p class="note">Nudge: “Before I book anything, dear, do you have a clinic in Independence? What time do they open?”</p>
+<p class="note">True answers: Independence Community Clinic, 2160 3rd St, Mon–Fri 8:00–17:00. One doctor there speaks Spanish: Dr. Sandra Jernigan (Family Medicine).</p>
+<p class="x">Transfers her to staff for a question. Answers with anything not in the line above (other hours, other doctors). Forgets her cough after the questions.</p></section>
+
+<section class="call" data-id="7"><div class="head"><h3><span class="n">7</span>Ruth, 80: changes her mind</h3><div class="res"></div></div>
+<p><b>Who she is.</b> In <b>Philadelphia</b>. Wants “the woman's check-up, the yearly one” (she won't say “well-woman exam”). Returning patient. When she hears the times, asks <b>what street the clinic is on</b>, then decides <b>afternoons are better</b> after all.</p>
+<p class="note">Nudge: “I'm due for my yearly check-up, the woman's one, you know.” After the first offer: “Which one is that, what street?” then “Oh, actually, could it be in the afternoon?”</p>
+<p class="x">Gives a street that the tool didn't return. Ignores the switch to afternoons. Drops the visit type when she changes the time. Books before her yes.</p></section>
+
+<h2>Reading the logs together</h2>
+<p class="mute">Do all seven, then tell me “done”. I'll read every turn: what she said, what the model sent, what the scheduler decided, and what was spoken.</p>
 </main>
 <script>
-const K='prosper-live-calls-r3',s=JSON.parse(localStorage.getItem(K)||'{}');
-const opts=[['p','Pass','pass'],['e','Extra Q','extra'],['f','Fail','fail']];
+const K='prosper-live-calls-real',s=JSON.parse(localStorage.getItem(K)||'{}');
+const opts=[['p','Pass','pass'],['e','Rough','extra'],['f','Fail','fail']];
 function paint(){
   let p=0,f=0,e=0,m=0;
   document.querySelectorAll('.call').forEach(c=>{
     const v=(s[c.dataset.id]||{}).r;c.className='call'+(v?' '+v:'');
     if(v==='pass')p++;if(v==='fail')f++;if(v==='extra')e++;
-    if(+c.dataset.id<=5&&(v==='pass'||v==='extra'))m++;
+    if(+c.dataset.id<=7&&v)m++;
   });
-  must.textContent=m+'/5';cp.textContent=p;cf.textContent=f;ce.textContent=e;
+  must.textContent=m+'/7';cp.textContent=p;cf.textContent=f;ce.textContent=e;
   localStorage.setItem(K,JSON.stringify(s));
 }
 document.querySelectorAll('.call').forEach(c=>{
