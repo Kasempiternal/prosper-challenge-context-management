@@ -306,14 +306,29 @@ def test_site_chooser_only_runs_on_descriptive_words(talk):
     assert hooks.calls == [("site", "Pearl District in Austin", ["loc_a2", "loc_a3", "loc_a1", "loc_a4"])]
 
 
+def test_a_site_choice_that_got_no_answer_asks_instead_of_offering_the_area(talk):
+    plan = talk({**FOLLOW_UP, "location_phrase": "the big new one in Austin"},
+                hooks=Recorder(Verdict(called=True, failed=True)))
+    assert plan.status == "ask" and plan.ask.field in ("location", "location_open")
+
+
+def test_a_street_none_of_our_clinics_is_on_is_no_site_clue(talk):
+    """"Peachtree Street in Atlanta": only geography the catalog lacks could place that street."""
+    hooks = Recorder(Verdict(ask=("loc_a1", "loc_a2"), called=True))
+    plan = talk({**FOLLOW_UP, "location_phrase": "the one on Elm Street in Austin"}, hooks=hooks)
+    assert plan.status == "offer" and not [c for c in hooks.calls if c[0] == "site"]
+    plan = talk({**FOLLOW_UP, "location_phrase": "the one by the lake in Austin"}, hooks=hooks)
+    assert [c[0] for c in hooks.calls].count("site") == 1
+
+
 def test_site_chooser_act_books_there_and_pair_asks(talk):
     act = Recorder(Verdict(act="loc_a3", called=True))
     plan = talk({**FOLLOW_UP, "location_phrase": "the big new one in Austin"}, hooks=act)
     assert plan.status == "offer" and _offered_sites(plan) == {"loc_a3"}
-    pair = Recorder(Verdict(pair=("loc_a3", "loc_a1"), called=True))
+    pair = Recorder(Verdict(ask=("loc_a3", "loc_a1"), called=True))
     plan = talk({**FOLLOW_UP, "location_phrase": "the big new one in Austin"}, hooks=pair)
     assert plan.say == "Is that Riverside or Mueller?"
-    stray = Recorder(Verdict(pair=("loc_a3", "loc_p1"), called=True))
+    stray = Recorder(Verdict(ask=("loc_a3", "loc_p1"), called=True))
     plan = talk({**FOLLOW_UP, "location_phrase": "the big new one in Austin"}, hooks=stray)
     assert plan.status == "offer" and len(_offered_sites(plan)) > 1
 
@@ -468,13 +483,19 @@ class _Adversary:
             return DECLINE
         if roll < 0.7:
             return Verdict(act=self.rng.choice(pool), called=True)
-        return Verdict(pair=(self.rng.choice(pool), self.rng.choice(self.universe[kind])), called=True)
+        return Verdict(ask=(self.rng.choice(pool), self.rng.choice(self.universe[kind])), called=True)
 
     def pick_type(self, phrase, hint, candidate_ids):
         return self._verdict(candidate_ids, "type")
 
+    def check_type(self, phrase, hint, first, rival):
+        return self._verdict([first.act or first.ask[0], rival], "type")
+
     def pick_provider(self, phrase, type_id, candidate_ids):
         return self._verdict(candidate_ids, "provider")
+
+    def provider_genders(self, candidate_ids):
+        return {p: self.rng.choice((0.02, 0.5, 0.98)) for p in candidate_ids if self.rng.random() < 0.7}
 
     def pick_site(self, phrase, type_id, candidate_ids):
         return self._verdict(candidate_ids, "site")

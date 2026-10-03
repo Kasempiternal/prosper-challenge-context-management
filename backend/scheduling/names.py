@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Callable, Iterable
 
 import jellyfish
 
-from .text import normalize, phonetic_keys, tokens
+from .text import normalize, phonetic_keys, stem, tokens
 
 if TYPE_CHECKING:
     from .catalog_index import CatalogIndex, Location, Provider
@@ -24,6 +25,7 @@ STREET_TYPES = frozenset({"st", "street", "ave", "av", "avenue", "blvd", "boulev
 MIN_PROVIDER_SCORE = 0.78
 MIN_LOCATION_SCORE = 0.4
 TIE_GAP = 0.08
+_SOUNDALIKE_HIT = 0.9
 
 
 @dataclass(frozen=True)
@@ -119,13 +121,19 @@ def _top_tier(cands: Iterable[NameCandidate], floor: float) -> list[NameCandidat
 def match_providers(index: CatalogIndex, phrase: str | None, within: Iterable[str] | None = None) -> list[NameCandidate]:
     """Return the top tier of providers for a spoken name. "Dr. Chen" returns every Chen;
     "Emily Chen" returns one; "Dr. Nwin" reaches the Nguyens through the spoken-form key."""
-    words = [w for w in tokens(phrase or "") if w not in _TITLE_WORDS]
+    # "Dr. Chen, the family medicine one": "one" sounds like Nguyen ("win") but names nobody here.
+    ni = index.name_index
+    words = [w for w in tokens(phrase or "") if w not in _TITLE_WORDS
+             and (w not in _NEVER_NAMES or w in ni.by_last or w in ni.by_first)]
     if not words:
         return []
     within = list(within) if within else None
     tier = _top_tier(_score_providers(index.name_index, words, within), MIN_PROVIDER_SCORE)
-    if within and not tier:
-        return match_providers(index, phrase)
+    if within:
+        # An answer to "Do you mean Dr. Emily Chen?" may name someone else ("Lucas Chen"): a
+        # better match outside the options asked about wins.
+        anywhere = match_providers(index, phrase)
+        return anywhere if not tier or (anywhere and anywhere[0].score > tier[0].score) else tier
     if not tier and len(words) > 1:
         # "Dr. Chen, the heart doctor": retry on the words that sound like a name, so the
         # clue words do not break the match. The clue itself is read by clue_words().
@@ -184,7 +192,14 @@ def _score_providers(ni: NameIndex, words: list[str], within: list[str] | None) 
 # "family" (vs Emily) land at 0.78-0.83. Short function words still collide through sound
 # keys ("who" ~ Wei, "saw" ~ Sofia, "i" ~ Wei), so they are never names.
 _NAME_WORD_SCORE = 0.88
-_NEVER_NAMES = {"who", "he", "she", "her", "him", "his", "saw", "one", "the"}
+# Yes and no words too: "no, Lucas Chen" must not read "no" as the first name.
+_NEVER_NAMES = {"who", "he", "she", "her", "him", "his", "saw", "one", "the", "yes", "yeah", "yep", "no", "nope",
+                "not"}
+
+
+def is_catalog_name(index: CatalogIndex, word: str) -> bool:
+    """Exactly some provider's first or last name, and never a function word ("he", "who")."""
+    return word in index.name_index.keys and word not in _NEVER_NAMES and word not in _CLUE_STOPWORDS
 
 
 def _is_name_word(index: CatalogIndex, word: str, provider_ids: Iterable[str] | None = None) -> bool:
@@ -210,6 +225,167 @@ def clue_words(index: CatalogIndex, phrase: str | None, candidate_ids: Iterable[
     ids = list(candidate_ids)
     return tuple(w for w in tokens(phrase or "")
                  if w not in _HONORIFICS and w not in _CLUE_STOPWORDS and not _is_name_word(index, w, ids))
+
+
+_TITLE_CLUES = {"np": "NP", "nurse": "NP", "practitioner": "NP", "pa": "PA", "assistant": "PA", "md": "MD"}
+# Words that only tie a fact to the doctor ("who speaks", "works at", "sees kids").
+_CLUE_LINKS = frozenset({"speaks", "speak", "speaking", "language", "works", "work", "working", "sees", "seeing",
+                         "treats", "practices", "located", "office", "specialist", "physician", "he", "she", "s"})
+# Specialty words too common to name one specialty on their own.
+_SPECIALTY_FILLER = frozenset({"general", "care", "medicine", "work", "and", "therapy"})
+# "not the one who speaks Spanish", "isn't", "other than": the fact is the one the caller does not want.
+_NEGATIONS = frozenset({"not", "t", "no", "never", "other", "except", "without", "nor", "neither"})
+# The caller's relatives: "the one my daughter recommended" names no specialty. A patient group
+# ("who sees kids") does, unless it is the caller's own ("my kids").
+_KIN = frozenset({"son", "sons", "daughter", "daughters", "child", "kid", "boy", "boys", "girl", "girls", "baby",
+                  "babies"})
+_PATIENT_GROUPS = frozenset({"kids", "children"})
+_POSSESSIVES = frozenset({"my", "our", "his", "her", "their", "your"})
+# Only words that describe the doctor say their gender: "the woman", "a male doctor", "the guy".
+# "women's health" names a field, and "her" / "his" are as often someone else's.
+_GENDER_NOUNS = {"woman": "female", "lady": "female", "female": "female",
+                 "man": "male", "male": "male", "guy": "male", "gentleman": "male"}
+# "she's the one at Mission Bay" is the doctor; in "my wife says she's great" it is not.
+_PRONOUNS = {"she": "female", "he": "male"}
+_OTHER_PEOPLE = _KIN | _PATIENT_GROUPS | frozenset({
+    "wife", "husband", "partner", "mom", "mother", "mum", "dad", "father", "sister", "brother", "friend",
+    "neighbor", "neighbour", "aunt", "uncle", "grandma", "grandmother", "grandpa", "grandfather", "cousin",
+    "boyfriend", "girlfriend", "coworker", "colleague", "boss"})
+
+
+def _said_gender(raw: list[str]) -> tuple[str | None, set[str]]:
+    """The doctor's gender as the caller described it, and the words that said it: a gender noun
+    anywhere, or "he" / "she" before any other person is mentioned. Both genders: None."""
+    said = {w: _GENDER_NOUNS[w] for w in raw if w in _GENDER_NOUNS}
+    for i, w in enumerate(raw):
+        if w in _PRONOUNS and not set(raw[:i]) & _OTHER_PEOPLE:
+            said[w] = _PRONOUNS[w]
+    genders = set(said.values())
+    return (genders.pop() if len(genders) == 1 else None), set(said)
+
+
+@dataclass(frozen=True)
+class ProviderClues:
+    """What a provider phrase says beyond the name. `fits`: the candidates left by every catalog fact
+    the caller named (language, title, specialty, site); `gender`: "female" or "male", a fact the
+    catalog does not hold; `rest`: clue words neither explains ("the one I saw last time");
+    `negated`: the phrase says who the caller does not mean, so nothing narrows."""
+
+    words: tuple[str, ...]
+    fits: tuple[str, ...]
+    facts: tuple[str, ...] = ()
+    gender: str | None = None
+    rest: tuple[str, ...] = ()
+    negated: bool = False
+
+
+def read_provider_clues(index: CatalogIndex, phrase: str | None, candidate_ids: Iterable[str]) -> ProviderClues:
+    """"Dr. Nguyen, he speaks Spanish" -> fits the Spanish-speaking Nguyens, gender male, no rest.
+    A fact that fits none of the candidates is ignored: the caller misremembered, and asking which
+    one they mean is the honest answer."""
+    ids = sorted(candidate_ids)
+    words = clue_words(index, phrase, ids)
+    raw = tokens(phrase or "")
+    if words and set(raw) & _NEGATIONS:
+        return ProviderClues(words, tuple(ids), negated=True)
+    kin = {w for i, w in enumerate(raw)
+           if w in _KIN or (w in _PATIENT_GROUPS and i and raw[i - 1] in _POSSESSIVES)}
+    providers = [index.providers[p] for p in ids]
+    explained: set[str] = set()
+    facts: list[str] = []
+
+    def narrow(kind: str, keep: Callable[[Provider], bool], used: set[str]) -> None:
+        nonlocal providers
+        kept = [p for p in providers if keep(p)]
+        if used and kept:
+            providers = kept
+            facts.append(kind)
+            explained.update(used)
+
+    heard = set(words)
+    languages = {lang for p in providers for lang in p.languages if set(tokens(lang)) <= heard}
+    narrow("language", lambda p: bool(languages & set(p.languages)),
+           {w for lang in languages for w in tokens(lang)})
+    titles = {_TITLE_CLUES[w] for w in words if w in _TITLE_CLUES}
+    narrow("title", lambda p: p.title in titles, {w for w in words if w in _TITLE_CLUES})
+    cues = _specialty_cues(index)
+    by_word = {w: specs for w in words if w not in kin and (specs := _specialties_named(cues, w))}
+    specialties = set().union(*by_word.values()) if by_word else set()
+    narrow("specialty", lambda p: p.specialty in specialties,
+           set(by_word) | {w for w in words if w in _SPECIALTY_FILLER})
+    gender, gender_words = _said_gender(raw)
+    sites, said = _sites_named(index, [w for w in words if w not in explained and w not in _GENDER_NOUNS
+                                       and w not in _CLUE_LINKS and w not in kin],
+                               hear_place(phrase).street_words, {lid for p in providers for lid in p.location_ids})
+    narrow("site", lambda p: bool(sites & set(p.location_ids)), said)
+
+    if gender:
+        explained.update(gender_words)
+    if facts or gender:
+        explained.update(w for w in words if w in _CLUE_LINKS)
+    rest = tuple(w for w in words if w not in explained)
+    return ProviderClues(words, tuple(p.id for p in providers), tuple(facts), gender, rest)
+
+
+_YES = frozenset({"yes", "yeah", "yep", "yup", "yea", "correct", "right", "exactly", "sure", "ok", "okay", "mhm"})
+_NO = frozenset({"no", "nope", "nah", "wrong", "different"})
+_CONFIRM_FILLER = frozenset({"that", "s", "it", "is", "the", "one", "her", "him", "she", "he", "um", "uh", "huh",
+                             "please", "i", "mean", "meant", "who", "doctor", "dr", "a", "someone", "somebody",
+                             "else", "isn", "wasn", "don", "doesn", "didn"})
+
+
+def read_confirmation(phrase: str | None) -> bool | None:
+    """The answer to a question about one doctor ("Do you mean Dr. Emily Chen?"). False when the
+    caller says no in any words ("no", "not her", "the other one", "no, Lucas Chen"): that doctor
+    is out, and a name said with the no is not trusted to pick another. True for a bare yes
+    ("yes", "yeah, that's her"). None for anything else, which is matched as a name."""
+    words = set(tokens(phrase or ""))
+    if words & (_NO | _NEGATIONS):
+        return False
+    return True if words & _YES and words <= _YES | _CONFIRM_FILLER else None
+
+
+def _sites_named(index: CatalogIndex, words: list[str], street_words: frozenset[str],
+                 pool: set[str]) -> tuple[set[str], set[str]]:
+    """The sites of `pool` a provider description names, and the words that named them. Only a
+    site's own name words count, exactly as said ("Mission Bay"), and its street when said as a
+    street ("on Geary Boulevard"): an ordinary word that sounds like a site ("man" ~ Main St,
+    "boy" ~ Bay) is no fact about the doctor. The sites matching the most words win."""
+    hits = {lid: {w for w in words if w in _location_words(index.locations[lid])
+                  or (w in street_words and w in street_of(index.locations[lid]).words)} for lid in pool}
+    best = max((len(h) for h in hits.values()), default=0)
+    sites = {lid for lid, h in hits.items() if h and len(h) == best}
+    return sites, {w for lid in sites for w in hits[lid]}
+
+
+def _specialty_cues(index: CatalogIndex) -> dict[str, frozenset[str]]:
+    hit = _CUES.get(id(index))
+    if hit is None or hit[0] is not index:
+        cues: dict[str, set[str]] = defaultdict(set)
+        for spec in index.specialties:
+            for w in tokens(spec) + tokens(index.specialty_spoken.get(spec, "")):
+                cues[w].add(spec)
+        for term, spec in index.lay_terms.items():
+            if " " not in term:
+                cues[term].add(spec)
+        hit = _CUES[id(index)] = (index, {w: frozenset(s) for w, s in cues.items()
+                                          if w not in _SPECIALTY_FILLER and w not in _CLUE_STOPWORDS and len(w) > 2})
+    return hit[1]
+
+
+_CUES: dict[int, tuple[CatalogIndex, dict[str, frozenset[str]]]] = {}
+
+
+def _specialties_named(cues: dict[str, frozenset[str]], word: str) -> frozenset[str]:
+    """"pediatrician" names Pediatrics, "cardiologist" Cardiology, "kids" Pediatrics (a lay term):
+    the same word, or a shared stem of at least six letters covering most of the shorter word."""
+    out: set[str] = set()
+    for cue, specs in cues.items():
+        common = len(os.path.commonprefix([cue, word]))
+        shared_stem = common >= 6 and common >= 0.75 * min(len(cue), len(word))
+        if cue in (word, word.removesuffix("s")) or stem(cue) == stem(word) or shared_stem:
+            out |= specs
+    return frozenset(out)
 
 
 # Cached: every turn would otherwise re-tokenize every site's name and address.
@@ -286,6 +462,7 @@ def hear_place(phrase: str | None) -> HeardPlace:
         if w not in STREET_TYPES:
             continue
         if i and raw[i - 1] in _ORDINALS:
+            explicit.add(raw[i - 1])  # the street as said, so it is not taken for a description
             raw[i - 1] = _ORDINALS[raw[i - 1]]  # "second street" -> "2nd"
         # The street's own name is the one or two words before its type.
         for j in range(i - 1, max(i - 3, -1), -1):
@@ -328,10 +505,11 @@ def match_locations(index: CatalogIndex, phrase: str | None, within: Iterable[st
     for loc in pool:
         name_words = _location_words(loc)
         street = street_of(loc).words
-        hits, street_hits, said_street = 0, 0.0, set()
+        hits, street_hits, said_street = 0.0, 0.0, set()
         for w in words:
             if w not in heard.street_words and any(_same_word(w, nw) for nw in name_words):
-                hits += 1
+                # "The Hill" names The Hill outright; Hialeah only shares its sound key.
+                hits += 1.0 if w in name_words else _SOUNDALIKE_HIT
             elif any(_same_word(w, sw) for sw in street):
                 street_hits += 1.0 if w in heard.street_words else 0.6
                 if w in heard.street_words:

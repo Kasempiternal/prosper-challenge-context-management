@@ -10,21 +10,32 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Verdict:
-    """act: commit to this id. pair: ask the caller between these two. Neither: decline, and the
-    resolver does what it would do with no model at all."""
+    """act: commit to this id. ask: ask the caller between these (one alone: confirm it). Neither: decline,
+    and the resolver does what it would do with no model at all. failed: a model was asked and no
+    answer came (timeout, error); the resolver then asks the caller instead of committing."""
 
     act: str | None = None
-    pair: tuple[str, str] | None = None
+    ask: tuple[str, ...] | None = None
     top: tuple[tuple[str, float], ...] = ()
     called: bool = False
+    failed: bool = False
+
+    @property
+    def p(self) -> float | None:
+        """The probability behind the decision: the chosen option's, else the most likely answer's."""
+        probs = dict(self.top)
+        return probs[self.act] if self.act in probs else max(probs.values(), default=None)
 
     def describe(self) -> str:
+        if self.failed:
+            return "no answer"
         probs = " ".join(f"{k}={p:.2f}" for k, p in self.top)
-        kind = f"act {self.act}" if self.act else f"pair {self.pair}" if self.pair else "open"
+        kind = f"act {self.act}" if self.act else f"ask {self.ask}" if self.ask else "open"
         return f"{kind} [{probs}]" if self.called else f"{kind} (no call)"
 
 
 DECLINE = Verdict()
+FAILED = Verdict(called=True, failed=True)
 
 
 @dataclass(frozen=True)
@@ -42,5 +53,73 @@ class Gate:
         if pa >= self.act_p and pa - pb >= self.margin:
             return Verdict(act=a, top=top, called=True)
         if b and pa + pb >= self.pair_p:
-            return Verdict(pair=(a, b), top=top, called=True)
+            return Verdict(ask=(a, b), top=top, called=True)
         return Verdict(top=top, called=True)
+
+
+@dataclass(frozen=True)
+class Check:
+    """A second, focused question after a choice: does the caller mean `chosen`, `rival`, or do
+    their words fit both alike ("either")? answered=False: it was asked and no answer came."""
+
+    chosen: float = 0.0
+    rival: float = 0.0
+    either: float = 0.0
+    answered: bool = True
+
+
+UNANSWERED = Check(answered=False)
+
+
+@dataclass(frozen=True)
+class CheckGate:
+    """Settles a choice with its check. Chosen on the dev sets (eval/README.md, round 3):
+
+    - twins: "either" at or above this means the words cannot tell the two apart. Indistinguishable
+      pairs ("my yearly exam": physical or wellness) score 0.92-0.98; pairs where either answer
+      is right but one fits better score 0.52 or less.
+    - a choice the first question was sure of stands only if the check still prefers it to the
+      rival: when the two questions disagree, the caller is asked.
+    - settle: a first question that left two gets its answer only from a check more than this
+      sure, with "either" under settle_either. Strictly more: h2-28 sits at 0.65 exactly, and a
+      case on the boundary takes the safe side (eval/README.md, threshold sensitivity).
+    """
+
+    twins: float = 0.8
+    settle: float = 0.65
+    settle_either: float = 0.5
+
+    def decide(self, first: Verdict, rival: str, check: Check) -> Verdict:
+        """`first` acted or asked; `rival` is the option the check weighed against its top. The
+        result's `top` is the check's answer; an unanswered check asks."""
+        chosen = first.act or first.ask[0]
+        pair = first.ask or (chosen, rival)
+        top = ((chosen, round(check.chosen, 3)), (rival, round(check.rival, 3)), ("either", round(check.either, 3)))
+        if not check.answered:
+            # A confident choice is confirmed with the caller; the rival may be a long shot.
+            return Verdict(ask=(chosen,) if first.act else pair, called=True, failed=True)
+        if first.act:
+            if check.either >= self.twins or check.chosen <= check.rival:
+                return Verdict(ask=pair, top=top, called=True)
+            return Verdict(act=first.act, top=top, called=True)
+        lead, p_lead, p_other = (chosen, check.chosen, check.rival) if check.chosen >= check.rival \
+            else (rival, check.rival, check.chosen)
+        if p_lead > self.settle and check.either < self.settle_either and p_lead > p_other:
+            return Verdict(act=lead, top=top, called=True)
+        return Verdict(ask=pair, top=top, called=True)
+
+
+# Inferred gender: the model's probability that a provider is a woman, read off the first name (the
+# catalog has no gender field). It counts only this sure either way: clearly female names scored
+# 0.82-0.89 in round 3, and the score moves with the other names in the request. Pre-registered
+# with the policy that gender narrows the doctors but never books one on its own (eval/README.md).
+GENDER_SURE = 0.9
+
+
+def gender_of(p_woman: float | None) -> str | None:
+    """"female" at p >= GENDER_SURE, "male" at p <= 1 - GENDER_SURE, else None (unknown)."""
+    if p_woman is None:
+        return None
+    if p_woman >= GENDER_SURE:
+        return "female"
+    return "male" if p_woman <= round(1 - GENDER_SURE, 9) else None

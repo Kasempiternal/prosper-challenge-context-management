@@ -5,10 +5,13 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
+from itertools import takewhile
 
 import jellyfish
 
 from .catalog_index import CatalogIndex
+from .names import is_catalog_name
+from .request import TIME_WORDS
 from .text import normalize, stem, tokens
 
 _GENERIC = {"consultation", "consult", "visit", "exam", "test", "session", "evaluation", "screening", "of",
@@ -20,6 +23,10 @@ _STRONG = 0.7
 _SPECIALTY_DEFAULT_SCORE = 0.75
 # Words a type name carries that say nothing about it: "MRI - Brain", "Vaccination / Immunization".
 _NAME_STOP = {"of", "a", "an", "the", "and", "with", "for"}
+# Words callers use for a type-name word, either way: "yearly physical" says the name "Annual
+# Physical". English, not catalog data, so every catalog shares it (aliases.json is per catalog).
+_SAME_AS = {"yearly": "annual"}
+_SAME = {**_SAME_AS, **{v: k for k, v in _SAME_AS.items()}}
 # A model choosing among every offered type is fine at SF's 74; at national scale (~300) the
 # request is cut to the types the phrase plausibly reaches.
 SHORTLIST_ABOVE = 80
@@ -34,7 +41,7 @@ class TypeCandidate:
 
 
 def _token_match(a: str, b: str) -> bool:
-    if a == b or stem(a) == stem(b):
+    if a == b or stem(a) == stem(b) or _SAME.get(a) == b:
         return True
     # Fuzzy only for long, similar-length words: "checkup" must not match "check".
     return (min(len(a), len(b)) > 4 and abs(len(a) - len(b)) <= 1
@@ -64,6 +71,8 @@ class _Vocab:
     by_name: dict[str, tuple[str, ...]]           # normalized type name -> type ids
     name_parts: dict[str, tuple[tuple[str, ...], ...]]  # type id -> each "/" alternative's words
     lay_term_words: int                           # words in the longest lay term
+    lay_words: frozenset[str]                     # every word of a lay term
+    place_words: frozenset[str]                   # every word of a clinic's or city's name
 
     @classmethod
     def build(cls, index: CatalogIndex) -> "_Vocab":
@@ -92,9 +101,12 @@ class _Vocab:
 
         def freeze(d: dict) -> dict:
             return {k: tuple(v) for k, v in d.items()}
+        places = [loc.name for loc in index.locations.values()] + [m.name for m in index.metros.values()]
         return cls(freeze(by_stem), freeze(by_len), freeze(aliases_by_word), alias_words,
                    freeze(types_by_name_word), name_words, freeze(by_name), name_parts,
-                   max((len(t.split()) for t in index.lay_terms), default=0))
+                   max((len(t.split()) for t in index.lay_terms), default=0),
+                   frozenset(w for t in index.lay_terms for w in t.split()),
+                   frozenset(w for p in places for w in tokens(p)))
 
     def matched(self, heard: list[str]) -> set[str]:
         """Vocabulary words v with _token_match(h, v) for some heard word h."""
@@ -104,6 +116,8 @@ class _Vocab:
 @lru_cache(maxsize=8192)
 def _word_hits(vocab: _Vocab, h: str) -> frozenset[str]:
     out = set(vocab.by_stem.get(stem(h), ()))
+    if h in _SAME:
+        out.update(v for v in vocab.by_stem.get(stem(_SAME[h]), ()) if v == _SAME[h])
     if len(h) > 4:
         jw = jellyfish.jaro_winkler_similarity
         for n in (len(h) - 1, len(h), len(h) + 1):
@@ -180,6 +194,7 @@ def _score_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | 
                 offer(tid, 0.85 * (0.6 * recall + 0.4 * precision), "words")
 
     named = _drop_dominated(index, vocab, words, best, alias_support)
+    _drop_inside_aliases(vocab, words, best, alias_support)
 
     if any(c.via == "name" for c in best.values()):
         for tid, c in list(best.items()):
@@ -197,7 +212,11 @@ def _score_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | 
         # Lay terms of two specialties ("throat" and "stomach") are no single default's evidence.
         specialty = specialty_hint or (lay[0] if len(lay) == 1 else None)
         default = index.specialty_default.get(specialty) if specialty else None
-        if default:
+        # "an echo for my heart": an alias already names a visit of the specialty "heart" points
+        # to, so the specialty's default visit adds no evidence.
+        named_in_specialty = any(c.via in ("name", "alias") and index.types[c.type_id].specialty == specialty
+                                 for c in best.values())
+        if default and not named_in_specialty:
             offer(default, _SPECIALTY_DEFAULT_SCORE, "specialty")
     return best
 
@@ -239,6 +258,20 @@ def _drop_dominated(index: CatalogIndex, vocab: _Vocab, words: list[str], best: 
     return True
 
 
+def _drop_inside_aliases(vocab: _Vocab, words: list[str], best: dict[str, TypeCandidate],
+                         alias_support: dict[str, set[int]]) -> None:
+    """The same rule for a said alias: in "I need my allergy shots" the alias "allergy shots"
+    (Allergy Shots) covers "allergy", the only evidence for Allergy Consultation, which a name
+    word alone reached. A candidate with an alias of its own keeps its place, and so does one
+    whose evidence is the whole alias: in "I need my a1c" the alias "a1c" (Diabetes Management)
+    says no more than the type named A1C Test does."""
+    hits = [_word_hits(vocab, w) for w in words]
+    for tid in [t for t, c in best.items() if c.via == "words" and t not in alias_support]:
+        evidence = {i for i, h in enumerate(hits) for part in vocab.name_parts[tid] if not h.isdisjoint(part)}
+        if evidence and any(other != tid and evidence < span for other, span in alias_support.items()):
+            del best[tid]
+
+
 def _lay_specialties(index: CatalogIndex, words: list[str]) -> list[str]:
     """Specialties the phrase's lay terms point to: longer terms first ("hurt my knee" before
     "knee"), then earlier in the phrase. With one-word terms only, that is phrase order."""
@@ -256,6 +289,22 @@ def ranked_types(index: CatalogIndex, phrase: str | None, hint: str | None) -> l
     """Types any word of the phrase or the hint reaches, best lexical score first."""
     scored = sorted(_score_types(index, phrase, hint).values(), key=lambda c: (-c.score, c.type_id))
     return [c.type_id for c in scored]
+
+
+def nearest_type(index: CatalogIndex, chosen: str, pool: list[str], phrase: str | None, hint: str | None) -> str | None:
+    """The type in `pool` a caller who said `phrase` most plausibly meant instead of `chosen`: one
+    the catalog calls confusable with it (a shared name word or alias, and the same specialty or
+    the same providers), else another visit of its specialty. Among several, the one the phrase
+    reaches first lexically, then the specialty's default, then by id. None: no neighbour."""
+    spec = index.types[chosen].specialty
+    others = [t for t in pool if t != chosen]
+    near = ([t for t in others if t in index.confusables.get(chosen, ())]
+            or [t for t in others if index.types[t].specialty == spec])
+    if not near:
+        return None
+    rank = {t: i for i, t in enumerate(ranked_types(index, phrase, hint))}
+    default = index.specialty_default.get(spec)
+    return min(near, key=lambda t: (rank.get(t, len(rank)), t != default, t))
 
 
 def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
@@ -280,15 +329,45 @@ def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
 # Filler that carries no meaning about which visit is wanted (contractions arrive split: "i m").
 _FILLER = _GENERIC | {"m", "s", "ve", "d", "ll", "t", "is", "be", "it", "this", "that", "while", "just", "please",
                       "like", "so", "um", "uh", "also", "me", "you", "have", "got", "do", "can", "could", "would",
-                      "one", "up", "done", "book", "schedule", "make", "set"}
+                      "one", "up", "done", "book", "schedule", "make", "set", "as"}
+_TITLES = frozenset({"dr", "doctor", "doc"})
+_PLACE_PREPOSITIONS = frozenset({"at", "in", "near", "by", "around"})
 
 
 def unexplained_words(index: CatalogIndex, phrase: str | None, type_ids: list[str]) -> tuple[str, ...]:
     """Content words of the phrase that no name or alias of `type_ids` accounts for. "checkup"
     against Annual Physical / Wellness Visit leaves nothing, so only the caller can choose;
-    "checkups while I'm expecting" leaves "expecting", which a model can weigh."""
+    "checkups while I'm expecting" leaves "expecting", which a model can weigh. Words another
+    parser of the turn takes are accounted for: "a flu shot today" and "a flu shot with Dr.
+    Chen" are as clear as "a flu shot"."""
     ids = set(type_ids)
     known = [w for t in type_ids for w in tokens(index.types[t].name)]
     known += [w for a in index.aliases if ids & {tid for tid, _ in a.weights} for w in a.phrase.split()]
-    return tuple(w for w in tokens(phrase or "")
-                 if w not in _FILLER and not any(_token_match(w, k) for k in known))
+    words = tokens(phrase or "")
+    elsewhere = _parsed_elsewhere(index, words)
+    return tuple(w for i, w in enumerate(words)
+                 if i not in elsewhere and w not in _FILLER and not any(_token_match(w, k) for k in known))
+
+
+def _parsed_elsewhere(index: CatalogIndex, words: list[str]) -> set[int]:
+    """Positions of the words other parsers take: time-preference words ("today", "next week"),
+    a doctor's name after a title ("Dr. Emily Chen"), a clinic or city after a preposition ("at
+    Mission Bay"). A name or place word that is also a visit word ("in the back") stays with the
+    lexicon, which hears it as one."""
+    vocab = _vocab(index)
+    out = {i for i, w in enumerate(words) if w in TIME_WORDS}
+
+    def no_visit_word(w: str) -> bool:
+        return not _word_hits(vocab, w) and w not in vocab.lay_words
+
+    for i, w in enumerate(words):
+        if w in _TITLES:
+            names = list(takewhile(lambda j: is_catalog_name(index, words[j]) and no_visit_word(words[j]),
+                                   range(i + 1, min(i + 3, len(words)))))
+            out.update([i, *names] if names else [])
+        elif w in _PLACE_PREPOSITIONS:
+            start = i + 2 if words[i + 1:i + 2] == ["the"] else i + 1
+            place = [k for k in takewhile(lambda k: words[k] in vocab.place_words, range(start, len(words)))
+                     if no_visit_word(words[k])]
+            out.update([*range(i, start), *place] if place else [])
+    return out

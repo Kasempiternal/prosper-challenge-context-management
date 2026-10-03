@@ -15,6 +15,11 @@ from .policy import Patient
 SLOT_NAMES = ("service", "provider", "location")
 WEEKDAY_NAMES = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 PARTS_OF_DAY = ("morning", "afternoon")
+# Words about when, not what: the time preference takes them, so a service phrase that carries
+# them ("a flu shot today", "next week") is no less clear.
+TIME_WORDS = frozenset({*WEEKDAY_NAMES, *(d + "s" for d in WEEKDAY_NAMES), *PARTS_OF_DAY, "mornings", "afternoons",
+                        "evening", "evenings", "today", "tomorrow", "tonight", "next", "this", "week", "weekend",
+                        "month", "soon", "soonest", "asap", "earliest", "possible"})
 
 
 @dataclass(frozen=True)

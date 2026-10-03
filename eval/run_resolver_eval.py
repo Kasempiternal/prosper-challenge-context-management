@@ -6,7 +6,7 @@ Usage:
 
 --set national  eval/cases_national.jsonl against the national catalog. Refuses to run unless the
            catalog's sha256 equals the one pinned in every case. `all` stays the SF sets.
---set national2 the same for eval/cases_national2.jsonl, a second held-out national draw.
+--set national2 the same for eval/cases_national2.jsonl, a second national draw (held-out until round 3).
 --set street    the same for eval/cases_street.jsonl: street names, house numbers and addresses (dev set).
 
 --jev off  no model; no network.
@@ -58,6 +58,9 @@ NATIONAL_CATALOG = ROOT / "backend" / "data" / "national" / "catalog.json"
 LATENCY_REPEATS = 20
 ENC = tiktoken.get_encoding("o200k_base")  # gpt-4o / gpt-4.1 tokenizer
 COMMIT = {"offer", "confirm"}
+# Resolver notes of a model hook firing, and the wider set a miss printout shows.
+MODEL_NOTES = ("type disambiguator", "type check", "provider chooser", "provider gender", "site chooser")
+DECISION_NOTES = MODEL_NOTES + ("provider facts", "provider clues", "provider prov_")
 
 
 def load_set(name: str) -> list[dict]:
@@ -202,7 +205,7 @@ def evaluate(index, cases: list[dict], hooks: dict, client: JevClient | None, la
         for t in turns:
             if t["kind"] == "resolve":
                 plan = t["plan"]
-                jev_turns += any("disambiguator:" in n or "chooser" in n for n in plan.notes)
+                jev_turns += any(n.startswith(MODEL_NOTES) for n in plan.notes)
                 say_tok.append(tokens(plan.say))
                 summary_tok.append(tokens(plan.summary))
                 result_tok.append(tokens(plan_json(plan)))
@@ -320,7 +323,7 @@ def print_table(title: str, m: dict) -> None:
                     said = t["plan"].say if t["kind"] == "resolve" else t["facts"]
                     print(f"  {case['id']} turn {i + 1}: {'; '.join(t['errs'])}\n      said: {said}")
                     for n in (t["plan"].notes if t["kind"] == "resolve" else ()):
-                        if "disambiguator" in n or "chooser" in n:
+                        if n.startswith(DECISION_NOTES):
                             print(f"      {n}")
 
 
@@ -331,11 +334,11 @@ def wrong_commit(m: dict) -> str:
 
 
 def print_headline(results: dict, model: str = "JEV") -> None:
-    """Per set, with the held-out sets (never used to write rules or tune thresholds) on their own."""
+    """Per set. Since round 3 every set here is dev; the round 3 held-out sets are scored separately."""
     groups = [("main (rules written against)", ("main",)), ("tune (thresholds chosen on)", ("tune",)),
-              ("HELD-OUT heldout", ("heldout",)), ("HELD-OUT heldout2", ("heldout2",)),
-              ("HELD-OUT combined", ("heldout", "heldout2")), ("national (catalog-pinned)", ("national",)),
-              ("HELD-OUT national2 (pinned)", ("national2",)), ("street (catalog-pinned dev)", ("street",))]
+              ("heldout (dev)", ("heldout",)), ("heldout2 (dev)", ("heldout2",)),
+              ("heldout + heldout2 (dev)", ("heldout", "heldout2")), ("national (catalog-pinned)", ("national",)),
+              ("national2 (pinned, dev)", ("national2",)), ("street (catalog-pinned dev)", ("street",))]
     with_jev = any(on for _, on in results.values())
 
     def merged(names, which):
@@ -417,7 +420,8 @@ def main() -> None:
         if pinned != {actual}:
             ap.error(f"{catalog} has sha256 {actual}; cases_{args.set}.jsonl is pinned to {sorted(map(str, pinned))}")
     index = CatalogIndex.load(catalog)
-    names = SETS if args.set == "all" else (args.set,)
+    # `all` stays the four SF sets it always meant; heldout3 is scored by name.
+    names = tuple(s for s in SETS if s != "heldout3") if args.set == "all" else (args.set,)
     client = make_client(chooser, args.live, args.openai_model)
     if chooser == "embed":
         client.warm_up(index)  # as the live startup preload does; not counted in the latencies

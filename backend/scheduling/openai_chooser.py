@@ -18,7 +18,7 @@ import math
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import httpx
@@ -51,6 +51,8 @@ class OpenAICall:
     latency_ms: float      # this process for live/failed; the original fetch for cache hits
     input_tokens: int
     output_tokens: int = 0
+    purpose: str = ""
+    p: float | None = None
 
     @property
     def usd(self) -> float:
@@ -66,6 +68,7 @@ class OpenAIChoiceClient:
     that would send more than that many network requests (the eval's spend cap)."""
 
     provider = "openai"
+    asks_yes_no = False  # nouls() answers None without a request
 
     def __init__(self, api_key: str | None, *, mode: str = "auto", cache_path: Path | None = None,
                  model: str = MODEL, timeout_s: float = 2.5, turn_budget_s: float | None = 2.5,
@@ -98,11 +101,18 @@ class OpenAIChoiceClient:
         self._deadline = time.perf_counter() + self.turn_budget_s if self.turn_budget_s is not None else None
 
     def choice(self, state: str, instructions: str, criteria: dict[str, str],
-               ranking: list[str] = ()) -> OpenAIAnswer | None:
+               ranking: list[str] = (), purpose: str = "") -> OpenAIAnswer | None:
         """`ranking` is accepted for JevClient compatibility; every option is shown, in id order."""
         keys = option_keys(criteria)
-        entry = self._fetch(request_body(self.model, state, instructions, criteria, keys))
-        return distribution(entry["top_logprobs"], keys) if entry else None
+        entry = self._fetch(request_body(self.model, state, instructions, criteria, keys), purpose)
+        answer = distribution(entry["top_logprobs"], keys) if entry else None
+        if answer and answer.probabilities:
+            self.calls[-1] = replace(self.calls[-1], p=round(max(answer.probabilities.values()), 3))
+        return answer
+
+    def nouls(self, state: str, questions: dict[str, str], purpose: str = "") -> dict[str, float] | None:
+        """Yes/no questions are a JEV request type; one answer token has no calibrated yes."""
+        return None
 
     def warm_up(self) -> OpenAICall | None:
         """Opens the TLS connection with a free request (the model list), so the first real
@@ -133,25 +143,25 @@ class OpenAIChoiceClient:
 
     # ---- internals -----------------------------------------------------------------------
 
-    def _fetch(self, body: dict) -> dict | None:
+    def _fetch(self, body: dict, purpose: str = "") -> dict | None:
         key = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         if key in self._memo:
             entry = self._memo[key]
-            self.calls.append(OpenAICall(key, "memo", 0.0, entry["input_tokens"], entry["output_tokens"]))
+            self.calls.append(OpenAICall(key, "memo", 0.0, entry["input_tokens"], entry["output_tokens"], purpose))
             return entry
         if self.mode != "live" and key in self._disk:
             entry = self._memo[key] = self._disk[key]
             self.calls.append(OpenAICall(key, "cache", entry["latency_ms"], entry["input_tokens"],
-                                         entry["output_tokens"]))
+                                         entry["output_tokens"], purpose))
             return entry
         if self.mode == "cache" or not self.api_key:
-            self.calls.append(OpenAICall(key, "failed", 0.0, 0))
+            self.calls.append(OpenAICall(key, "failed", 0.0, 0, purpose=purpose))
             return None
         if self.live_limit is not None and self._sent >= self.live_limit:
             raise SpendCapExceeded(f"more than {self.live_limit} uncached OpenAI requests in one run")
         self._sent += 1
         entry, call = self._post(body, key)
-        self.calls.append(call)
+        self.calls.append(replace(call, purpose=purpose))
         if entry:
             self._memo[key] = self._disk[key] = entry
             self._dirty = True

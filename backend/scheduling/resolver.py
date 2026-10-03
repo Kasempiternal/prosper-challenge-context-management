@@ -19,15 +19,20 @@ import jellyfish
 
 from .availability import Availability, Slot as TimeSlot
 from .catalog_index import BookableRow, CatalogIndex
-from .decision import DECLINE, Verdict
+from .decision import DECLINE, Verdict, gender_of
 from .geo import RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, resolve_place
-from .lexicon import SHORTLIST_ABOVE, TypeCandidate, match_types, type_shortlist, types_named, unexplained_words
-from .names import STREET_TYPES, clue_words, match_locations, match_providers
+from .lexicon import (SHORTLIST_ABOVE, TypeCandidate, match_types, nearest_type, type_shortlist, types_named,
+                      unexplained_words)
+from .names import (STREET_TYPES, hear_place, match_locations, match_providers, read_confirmation,
+                    read_provider_clues)
 from .policy import IssueKind, Rule, Violation, check, has_violation
 from .request import WEEKDAY_NAMES, AltRef, OfferRef, PendingAsk, Request, Slot, TimePref
 from .text import phonetic_keys, tokens
 
 TYPE_TIE_GAP = 0.1
+# A runner-up the first answer gave less than this is a long shot: 28 of 68 round 3 checks weighed
+# one at <= 0.01 and none changed an outcome. The check weighs the choice's nearest neighbour instead.
+RIVAL_MIN_P = 0.05
 MAX_OPTIONS = 3
 HANDOFF_AFTER_MISSES = 3
 # An area search widens from the place's own radius to twice that, then to this, before refusing.
@@ -41,17 +46,26 @@ _REFUSAL_PRIORITY = (Rule.NEW_PATIENT_TYPE, Rule.REFERRAL, Rule.NEW_PATIENT_PROV
 class TypeDisambiguator(Protocol):
     """Maps a free-text reason to an appointment type among `candidate_ids` (every offered type,
     or the options of the question being answered). Consulted only when the lexicon found nothing,
-    found only a specialty default, or tied between confusables. A declined Verdict means: do
-    what the resolver does without a model."""
+    found only a specialty default, or left words of the phrase unexplained. A declined Verdict
+    means: do what the resolver does without a model. check_type weighs the choice's front-runner
+    against `rival` once more and returns the settled verdict, or None if it has no such question."""
 
     def pick_type(self, phrase: str, hint: str | None, candidate_ids: list[str]) -> Verdict: ...
+
+    def check_type(self, phrase: str, hint: str | None, first: Verdict, rival: str) -> Verdict | None: ...
 
 
 class ProviderChooser(Protocol):
     """Splits same-named, policy-valid providers using the caller's extra words. Consulted only
-    when those words exist; a bare name is a catalog fact that only a question can settle."""
+    when those words exist; a bare name is a catalog fact that only a question can settle.
+    pick_provider weighs words no catalog fact explains; provider_genders answers the one fact the
+    caller may give that the catalog lacks: the probability that each provider is a woman, read
+    off the first name (a provider left out has no answer), or None if the chooser has no such
+    question."""
 
     def pick_provider(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict: ...
+
+    def provider_genders(self, candidate_ids: list[str]) -> dict[str, float] | None: ...
 
 
 class SiteChooser(Protocol):
@@ -65,8 +79,14 @@ class NoDisambiguator:
     def pick_type(self, phrase: str, hint: str | None, candidate_ids: list[str]) -> Verdict:
         return DECLINE
 
+    def check_type(self, phrase: str, hint: str | None, first: Verdict, rival: str) -> Verdict | None:
+        return None
+
     def pick_provider(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
         return DECLINE
+
+    def provider_genders(self, candidate_ids: list[str]) -> dict[str, float] | None:
+        return None
 
     def pick_site(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
         return DECLINE
@@ -155,6 +175,8 @@ class _Resolution:
         self.site_choice = False           # the place left several sites a description could split
         self.place_memo: PlaceMatch | None = None
         self.type_consulted = False
+        self.type_unanswered = False       # the type model was needed and gave no usable answer
+        self.provider_declined = False     # "no" to "Do you mean Dr. X?": whoever is left is asked about
         self.patient = req.patient
         self.slots: dict[str, Slot] = {"service": req.service, "provider": req.provider, "location": req.location}
         self.notes: list[str] = []
@@ -238,8 +260,8 @@ class _Resolution:
 
     # ---- main search ---------------------------------------------------------------------
 
-    def _search(self, forced: list[TypeCandidate] | None = None) -> Plan:
-        svc = forced or self._service_candidates()
+    def _search(self) -> Plan:
+        svc = self._service_candidates()
         if svc is not None and not svc:
             svc = self._consult_types()
             if not svc:
@@ -258,7 +280,12 @@ class _Resolution:
             if all(c.via == "specialty" for c in offered):
                 # "lung test" only reached Pulmonology's default type; the model may know better.
                 offered = self._consult_types() or offered
+            elif unexplained_words(self.ix, self.slots["service"].heard, [c.type_id for c in offered]):
+                offered = self._verify_types(offered)
             type_ids = [c.type_id for c in offered]
+            if self.type_unanswered:
+                # The words needed the model and its answer never came: say what we understood.
+                return self._ask_type(sorted(type_ids), True)
             self.scores = {c.type_id: c.score for c in offered}
             if len(type_ids) == 1:
                 self.slots["service"] = replace(self.slots["service"], resolved_id=type_ids[0])
@@ -343,18 +370,7 @@ class _Resolution:
         live = ok + pending
         live_types = sorted({r.type.id for r in live}, key=lambda t: (-self.scores.get(t, 0.0), t))
         if len(live_types) > 1:
-            chosen = self._choose_type(live_types, svc is not None)
-            if chosen is None:
-                return self._ask_type(live_types, svc is not None)
-            if chosen not in live_types:
-                # "checkups while I'm expecting" tied Annual Physical / Wellness lexically, but the
-                # model is confident it is a prenatal visit: start over from that type.
-                pick = [TypeCandidate(chosen, 1.0, "model")]
-                self.slots["service"] = replace(self.slots["service"], candidates=((chosen, 1.0),))
-                return self._search(pick)
-            ok = [r for r in ok if r.type.id == chosen]
-            pending = [r for r in pending if r.type.id == chosen]
-            live = ok + pending
+            return self._ask_type(live_types, svc is not None)
         type_id = live[0].type.id
         self.slots["service"] = replace(self.slots["service"], resolved_id=type_id)
 
@@ -363,10 +379,12 @@ class _Resolution:
 
         if provider_ids is not None:
             provs = sorted({r.provider.id for r in live})
+            if self.provider_declined:
+                return self._ask_provider(provs)
             if len(provs) > 1:
                 verdict = self._consult_provider(provs, type_id)
-                if verdict.pair:
-                    return self._ask("provider", options=tuple(sorted(verdict.pair)))
+                if verdict.ask:
+                    return self._ask_provider(sorted(verdict.ask))
                 if verdict.act not in provs:
                     return self._ask_provider(provs)
                 provs = [verdict.act]
@@ -380,8 +398,11 @@ class _Resolution:
             sites = sorted({r.location.id for r in live}, key=lambda l: (self.dist.get(l, 0.0), l))
             if 2 <= len(sites) <= MAX_SITE_CHOICES:
                 verdict = self._consult_site(sites, type_id)
-                if verdict.pair:
-                    return self._ask("location", options=tuple(sorted(verdict.pair)))
+                if verdict.failed:
+                    return (self._ask("location", options=tuple(sorted(sites))) if len(sites) <= MAX_OPTIONS
+                            else self._ask("location_open"))
+                if verdict.ask:
+                    return self._ask("location", options=tuple(sorted(verdict.ask)))
                 if verdict.act in sites:
                     ok = [r for r in ok if r.location.id == verdict.act]
                     live = [r for r in live if r.location.id == verdict.act]
@@ -431,11 +452,29 @@ class _Resolution:
         s = self.slots[slot_name]
         if not s.heard:
             return None
+        if slot_name == "provider" and len(s.within) == 1:
+            answer = read_confirmation(s.heard)
+            if answer is not None:
+                return self._confirmed_provider(s, answer)
         matcher = match_providers if slot_name == "provider" else match_locations
         cands = matcher(self.ix, s.heard, s.within or None)
         if cands:
             self.slots[slot_name] = replace(s, asks=0, candidates=tuple((c.id, c.score) for c in cands))
         return [c.id for c in cands]
+
+    def _confirmed_provider(self, s: Slot, yes: bool) -> list[str]:
+        """The caller answered "Do you mean Dr. Emily Chen?" without a name. Yes pins the slot to
+        that doctor, as if they had said the full name; no leaves the other doctors of that
+        surname, to be asked about."""
+        pid = s.within[0]
+        ni = self.ix.name_index
+        ids = [pid] if yes else [o for o in ni.by_last[ni.last_of[pid]] if o != pid]
+        heard = self.ix.providers[pid].name if yes else f"Dr. {self.ix.providers[pid].last_name}"
+        self.notes.append(f"provider {pid} {'confirmed' if yes else 'declined'}")
+        self.provider_declined = not yes
+        self.slots["provider"] = replace(s, heard=heard, within=tuple(ids), asks=0,
+                                         candidates=tuple((p, 1.0) for p in ids))
+        return ids
 
     def _newer(self, a: str, b: str) -> bool:
         return self.slots[a].given and self.slots[a].turn > self.slots[b].turn
@@ -658,7 +697,7 @@ class _Resolution:
             return DECLINE
         verdict = self.site_chooser.pick_site(heard, type_id, sites)
         self.notes.append(f"site chooser on {list(clue)}: {verdict.describe()}")
-        if verdict.pair and not set(verdict.pair) <= set(sites):
+        if verdict.ask and not (len(verdict.ask) <= MAX_OPTIONS and set(verdict.ask) <= set(sites)):
             return DECLINE
         return verdict
 
@@ -677,6 +716,9 @@ class _Resolution:
             names.update(tokens(" ".join([m.name, m.state, T.state_name(m.state), *m.aliases])))
         names -= _PLACE_FILLER
         names |= STREET_TYPES
+        # A street said with its type ("Peachtree Street") that put the caller at no clinic is on
+        # none of our addresses: only geography the catalog does not hold could place it.
+        names |= hear_place(heard).street_words
 
         def is_name(w: str) -> bool:
             keys = phonetic_keys(w)
@@ -740,43 +782,109 @@ class _Resolution:
             return None
         self.type_consulted = True
         pool = self._type_pool([t for t in (s.within or sorted(self.ix.types)) if t not in self.ix.unoffered_types])
-        verdict = self.dis.pick_type(s.heard, s.hint, pool)
-        self.notes.append(f"type disambiguator: {verdict.describe()}")
-        ids = [verdict.act] if verdict.act else list(verdict.pair or ())
+        return self._model_types(pool, ())
+
+    def _verify_types(self, lexical: list[TypeCandidate]) -> list[TypeCandidate]:
+        """The lexicon matched, but the caller said more than the matched names and aliases explain
+        ("shots before my trip to Thailand", "my hay fever", "checkups while I'm expecting"): the
+        model hears the whole phrase over every offered type, and may confirm the match, replace
+        it, or leave two to ask between. A bare "MRI" or "checkup" never gets here: the model's
+        answer would be a prior ("MRI" -> brain 0.89), and the caller is asked instead."""
+        if self.type_consulted:
+            return lexical
+        self.type_consulted = True
+        ids = [c.type_id for c in lexical]
+        # An answer to "Is that A or B?" that matched one of them is heard among A and B only.
+        asked = self.slots["service"].within if set(ids) <= set(self.slots["service"].within) else ()
+        pool = self._type_pool(sorted(t for t in (asked or self.ix.types) if t not in self.ix.unoffered_types), ids)
+        return self._model_types(pool, ids) or lexical
+
+    def _model_types(self, pool: list[str], lexical: list[str]) -> list[TypeCandidate] | None:
+        """A choice over `pool`, then a check of its front-runner against the runner-up, or against
+        the lexical match when the choice went elsewhere. None: the model had nothing to add."""
+        s = self.slots["service"]
+        first = self.dis.pick_type(s.heard, s.hint, pool)
+        self.notes.append(f"type disambiguator: {first.describe()}")
+        self.type_unanswered = first.failed
+        ids = [first.act] if first.act else list(first.ask or ())
         if not ids or not set(ids) <= set(pool):
             return None
+        if lexical == [first.act]:
+            return None
+        chosen = ids[0]
+        rival = self._rival(first, chosen, pool, lexical)
+        if rival is not None:
+            checked = self.dis.check_type(s.heard, s.hint, first, rival)
+            if checked is None and lexical and (len(lexical) == 1 or not first.act):
+                # A model with no second question may break a lexical tie, but does not overrule
+                # a lexical match on its own word.
+                return None
+            first = checked or first
+            self.type_unanswered = first.failed
+            self.notes.append(f"type check {chosen} vs {rival}: {first.describe()}")
+        ids = [first.act] if first.act else list(first.ask or ())
+        if not set(ids) <= set(pool):
+            # The check gate only settles on the two it weighed; anything else is no usable answer.
+            self.notes.append("type check answered outside the options: asking")
+            self.type_unanswered = True
+            ids = [t for t in (chosen, rival) if t in pool]
         cands = [TypeCandidate(t, 1.0, "model") for t in ids]
         self.slots["service"] = replace(s, asks=0, candidates=tuple((c.type_id, c.score) for c in cands))
         return cands
 
-    def _choose_type(self, live_types: list[str], has_service: bool) -> str | None:
-        if not has_service or self.type_consulted:
-            return None
-        a, b = live_types[0], live_types[1]
-        tied = abs(self.scores.get(a, 0) - self.scores.get(b, 0)) <= TYPE_TIE_GAP
-        tie = [t for t in live_types if abs(self.scores.get(a, 0) - self.scores.get(t, 0)) <= TYPE_TIE_GAP]
-        if tied and b in self.ix.confusables[a] and unexplained_words(self.ix, self.slots["service"].heard, tie):
-            # Words beyond the tied names/aliases are the only evidence a model could use; without
-            # them its answer is a prior ("MRI" -> brain 0.89), so the caller is asked instead.
-            s = self.slots["service"]
-            self.type_consulted = True
-            pool = self._type_pool(sorted(t for t in self.ix.types if t not in self.ix.unoffered_types), tie)
-            verdict = self.dis.pick_type(s.heard or "", s.hint, pool)
-            self.notes.append(f"type disambiguator: {verdict.describe()}")
-            if verdict.act in pool:
-                return verdict.act
-        return None
+    def _rival(self, first: Verdict, chosen: str, pool: list[str], lexical: list[str]) -> str | None:
+        """What the check weighs the choice against: the other option of a pair; the lexical match
+        the choice overruled; the runner-up if the first answer gave it at least RIVAL_MIN_P; else
+        the chosen type's nearest neighbour in the pool (lexicon.nearest_type). A long-shot
+        runner-up is checked only when no neighbour exists, so the check is never skipped."""
+        if first.ask:
+            return first.ask[1]
+        if lexical and chosen not in lexical:
+            return lexical[0]
+        runner = next(((t, p) for t, p in first.top if t in pool and t != chosen), None)
+        if runner and runner[1] >= RIVAL_MIN_P:
+            return runner[0]
+        s = self.slots["service"]
+        return nearest_type(self.ix, chosen, pool, s.heard, s.hint) or (runner[0] if runner else None)
 
     def _consult_provider(self, provs: list[str], type_id: str) -> Verdict:
+        """Splits same-named providers by what the caller said about them: catalog facts
+        (language, title, specialty, site), then gender, which only the model can read off a first
+        name, then any words left, which only the model can weigh. Asks among whoever is left.
+
+        Inferred gender narrows but never books on its own. Only a sure answer rules a doctor out
+        (decision.gender_of); a doctor it alone singles out is confirmed by full name ("Do you mean
+        Dr. Emily Chen?"), and so is the one doctor the facts leave when the model cannot say they
+        are the gender the caller said. A gender that rules out everyone the facts left asks."""
         heard = self.slots["provider"].heard or ""
-        clue = clue_words(self.ix, heard, provs)
-        if not clue:
+        clues = read_provider_clues(self.ix, heard, provs)
+        if not clues.words:
             return DECLINE
-        verdict = self.chooser.pick_provider(heard, type_id, provs)
-        self.notes.append(f"provider chooser on {list(clue)}: {verdict.describe()}")
-        if verdict.pair and not set(verdict.pair) <= set(provs):
-            return DECLINE
-        return verdict
+        if clues.negated:
+            self.notes.append(f"provider clues negated {list(clues.words)}: asking")
+            return Verdict(ask=tuple(provs))
+        fits = list(clues.fits)
+        if clues.facts:
+            self.notes.append(f"provider facts {list(clues.facts)}: {fits}")
+        if clues.gender:
+            p_woman = self.chooser.provider_genders(fits) or {}
+            known = {p: g for p in fits if (g := gender_of(p_woman.get(p)))}
+            kept = [p for p in fits if known.get(p, clues.gender) == clues.gender]
+            self.notes.append(f"provider gender {clues.gender}: {kept} of {fits}, p(woman) "
+                              + " ".join(f"{p}={v:.2f}" for p, v in sorted(p_woman.items())))
+            if not kept:
+                return Verdict(ask=tuple(provs))
+            if len(kept) == 1 and (len(fits) > 1 or known.get(kept[0]) != clues.gender):
+                return Verdict(ask=(kept[0],))
+            fits = kept
+        if len(fits) == 1:
+            return Verdict(act=fits[0])
+        if clues.rest:
+            verdict = self.chooser.pick_provider(heard, type_id, fits)
+            self.notes.append(f"provider chooser on {list(clues.rest)}: {verdict.describe()}")
+            if verdict.act in fits or (verdict.ask and set(verdict.ask) <= set(fits)):
+                return verdict
+        return Verdict(ask=tuple(fits))
 
     def _ask_needed(self, pending: list[BookableRow], issues: dict[tuple, list[Violation]], type_id: str) -> Plan:
         fields = Counter(v.field for r in pending for v in issues[r.key] if v.kind is IssueKind.NEEDS_INFO)

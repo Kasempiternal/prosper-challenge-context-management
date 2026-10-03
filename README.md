@@ -123,13 +123,13 @@ JEV (Command Code decision model) returns calibrated probabilities over named op
 
 | Role | When | Built |
 |---|---|---|
-| Type chooser | The lexical matcher has no match, only a specialty default, or a tie the caller's extra words could break ("something for my back pain"). National catalogs send a shortlist of at most 20 types. | Yes |
-| Provider chooser | Two or more policy-valid providers match the name and the phrase has a clue beyond the name ("Dr. Nguyen, the one who speaks Spanish"). A bare "Dr. Chen" never calls JEV. | Yes |
+| Type chooser | The lexical matcher has no match, only a specialty default, or leaves words of the phrase unexplained ("something for my back pain", "shots before my trip to Thailand"). A second question then weighs the front-runner against its rival with an "either" answer, and the caller is asked when the words fit both or the two questions disagree. National catalogs send a shortlist of at most 20 types. | Yes |
+| Provider chooser | Two or more policy-valid providers match the name and the phrase has a clue beyond the name. Catalog facts in it (language, title, specialty, site) narrow without JEV; JEV answers gender from first names ("Dr. Nguyen, the lady doctor") and weighs words no fact explains. A bare "Dr. Chen" never calls JEV. | Yes |
 | Site chooser | A descriptive clinic clue matches several sites. | Yes |
 | Post-call grader | Once per call, after hang-up (Call review). | Yes |
 | Eval judge for a paid dialog simulation | | No. Designed, not built. |
 
-On live calls JEV has a 1.2 s budget per turn with no retry, then the resolver falls back to asking. A spoken "One moment." covers waits over 0.3 s. A 20-option warm-up request at call start moves the connection cost off the caller's first turn.
+On live calls JEV has a 2.5 s budget per turn (at most 1.5 s per request) with no retry; an answer that does not arrive is never committed on, and the resolver asks. A spoken "One moment." covers waits over 0.3 s. A 20-option warm-up request at call start moves the connection cost off the caller's first turn.
 
 ## Evidence
 
@@ -242,7 +242,7 @@ Call 2 is why the original design's LLM-called booking tool is gone. A prompt in
 ### Trade-offs we accepted
 
 - **Hand-written aliases.** SF has 237 aliases and 47 lay terms, national 426 and 80. They are cheap and auditable, but they cover only phrasings someone wrote down. JEV is the fallback for the rest.
-- **JEV adds latency on the turns that use it.** About 550 ms p50 on 31% of national2 turns. The 1.2 s cap bounds the worst case.
+- **JEV adds latency on the turns that use it.** A type decision is two sequential requests (a choice, then its check): measured live on heldout2, tune and national2, JEV turns took 1.0 s p50 and 1.46 s p95 (eval/README.md, round 3). The 2.5 s budget bounds the worst case.
 - **Speak-direct trades flexibility for safety.** Templated sentences are less varied than LLM prose. `resolver.speak_direct: false` turns it off per agent.
 - **Node transitions cost a hop.** A transition turn takes about 2-3 s against 1.1-1.3 s in-node. That is why the graph has five nodes and the work lives in tools.
 

@@ -127,8 +127,8 @@ def _decision_event(ctx: ToolContext, plan: Plan, result: dict, elapsed_ms: floa
         event["reason"] = plan.refusal.code
     called = [v for v in ctx.disambiguator.verdicts if v.called]
     if called:
-        event["model"] = {"used": True, "provider": ctx.provider,
-                          "p": called[-1].top[0][1] if called[-1].top else None, "ms": round(elapsed_ms)}
+        # The last verdict is the one that decided: a type check's, when the choice was checked.
+        event["model"] = {"used": True, "provider": ctx.provider, "p": called[-1].p, "ms": round(elapsed_ms)}
     else:
         event["model"] = {"used": False}
     event["tokens"] = {"result": count_tokens(result)}
@@ -191,15 +191,13 @@ def _with_day_word(args: dict, today: date) -> dict:
 
 async def _resolve(ctx: ToolContext, req: Request, flow_manager: FlowManager) -> Plan:
     ctx.disambiguator.verdicts.clear()
-    ctx.disambiguator.purposes.clear()
     if ctx.model_client is None:
         return resolve(ctx.index, req, ctx.availability, ctx.disambiguator, ctx.disambiguator, ctx.disambiguator)
     first_call = len(ctx.model_client.calls)
     plan = await _resolve_with_filler(ctx, req, flow_manager)
-    called = [(purpose, v) for purpose, v in zip(ctx.disambiguator.purposes, ctx.disambiguator.verdicts) if v.called]
-    for (purpose, verdict), call in zip(called, ctx.model_client.calls[first_call:]):
-        p = verdict.top[0][1] if verdict.top else None
-        await ctx.emit(model_call_event(ctx.provider, purpose, call, call.latency_ms, p))
+    # One event per request: a hook may make several (a choice, then its check).
+    for call in ctx.model_client.calls[first_call:]:
+        await ctx.emit(model_call_event(ctx.provider, call.purpose or "model", call, call.latency_ms, call.p))
     return plan
 
 

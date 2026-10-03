@@ -76,6 +76,9 @@ def test_disambiguator_used_only_for_confusable_ties(index, availability):
             self.calls.append((phrase, len(candidate_ids)))
             return Verdict(act="appt_002", called=True)
 
+        def check_type(self, phrase, hint, first, rival):
+            return None
+
     sure = Sure()
     # A bare tie phrase carries no evidence for either type: the caller is asked, no model call.
     plan = resolve(index, merge(Request(), Update.from_args({"service_phrase": "checkup"})), availability,
@@ -232,3 +235,40 @@ def test_sf_has_no_areas_so_the_site_chooser_never_runs(index, availability, phr
                                              "location_phrase": phrase}))
     plan = resolve(index, req, availability, site_chooser=_NoSiteChooser())
     assert plan.area is None and not any(n.startswith("site chooser") for n in plan.notes)
+
+
+def _with_allergy_shots():
+    """SF plus a returning-only Allergy Shots type, offered by the allergists, named by its alias."""
+    import json
+    from pathlib import Path
+
+    from scheduling.catalog_index import build_index
+
+    data = Path(__file__).resolve().parents[2] / "data"
+    raw = json.loads((data / "catalog.json").read_text(encoding="utf-8"))
+    aliases = json.loads((data / "aliases.json").read_text(encoding="utf-8"))
+    raw["appointment_types"].append({"id": "appt_900", "name": "Allergy Shots (Immunotherapy)",
+                                     "specialty": "Allergy/Immunology", "duration_min": 20,
+                                     "requires_referral": False, "new_patients_allowed": False})
+    for p in raw["providers"]:
+        if "appt_080" in p["appointment_type_ids"]:
+            p["appointment_type_ids"].append("appt_900")
+    aliases["aliases"]["allergy shots"] = {"appt_900": 1.0}
+    return build_index(raw, aliases)
+
+
+def test_a_said_alias_drops_types_whose_only_evidence_lies_inside_it():
+    from scheduling.lexicon import match_types
+
+    ix = _with_allergy_shots()
+    assert [c.type_id for c in match_types(ix, "I need my allergy shots")] == ["appt_900"]
+    assert "appt_080" in [c.type_id for c in match_types(ix, "my allergy consultation and my shots")]
+
+
+def test_a_new_patient_asking_for_a_returning_only_type_is_refused_not_offered_a_sibling():
+    from scheduling.availability import MockAvailability
+
+    ix = _with_allergy_shots()
+    plan = resolve(ix, merge(Request(), Update.from_args({**NEW_REF, "service_phrase": "I need my allergy shots"})),
+                   MockAvailability(ix))
+    assert (plan.status, plan.refusal.code, plan.refusal.alt_type_id) == ("refuse", "new_patient_type", "appt_080")

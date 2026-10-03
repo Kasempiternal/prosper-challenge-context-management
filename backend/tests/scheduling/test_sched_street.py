@@ -13,9 +13,9 @@ from scheduling.geo import resolve_place
 from scheduling.names import hear_place, match_locations, street_of
 from scheduling.request import Request, Update, merge
 from scheduling.resolver import resolve
+from eval_cases import dev_case_files
 
 DATA = Path(__file__).resolve().parents[2] / "data"
-EVAL = Path(__file__).resolve().parents[3] / "eval"
 RETURNING = {"is_new": False, "has_referral": True}
 SAN_JOSE = ["loc_013", "loc_014", "loc_015", "loc_016", "loc_017", "loc_018"]
 
@@ -97,6 +97,21 @@ def test_shared_street_asks_with_house_numbers_and_takes_a_spoken_number(nat):
     assert plan.status == "offer" and {o.location_id for o in plan.offers} == {"loc_014"}
 
 
+def test_a_street_said_as_an_ordinal_is_no_description_for_a_model(nat):
+    """"second street in Orlando" found both clinics on 2nd Street; "second" must not then be read
+    as a description that picks one of them (gpt-4o-mini put 0.82 on one)."""
+    assert {"second", "2nd"} <= hear_place("second street in Orlando").street_words
+
+    class Picky:
+        def pick_site(self, phrase, type_id, candidate_ids):
+            raise AssertionError("the site chooser has nothing to go on")
+
+    plan = resolve(nat, merge(Request(), Update.from_args({**RETURNING, "service_phrase": "sick visit",
+                                                           "location_phrase": "second street in Orlando"})),
+                   MockAvailability(nat), site_chooser=Picky())
+    assert (plan.status, plan.ask.options) == ("ask", ("loc_236", "loc_237"))
+
+
 def test_shared_street_with_one_valid_site_books_there(nat):
     plan = _say(nat, "dermatology consultation", "Market Street, San Jose")
     assert plan.status == "offer" and {o.location_id for o in plan.offers} == {"loc_013"}
@@ -123,8 +138,8 @@ def test_location_refusal_template_formats_every_named_site(nat):
 
 
 def _case_sets():
-    sf = [p for p in EVAL.glob("cases*.jsonl") if "national" not in p.name and "street" not in p.name]
-    national = [p for p in EVAL.glob("cases*.jsonl") if p not in sf]
+    sf = [p for p in dev_case_files() if "national" not in p.name and "street" not in p.name]
+    national = [p for p in dev_case_files() if p not in sf]
     return [(p, DATA / "catalog.json") for p in sf] + [(p, DATA / "national" / "catalog.json") for p in national]
 
 

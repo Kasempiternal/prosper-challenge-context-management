@@ -59,13 +59,19 @@ class Adversary:
         if roll < 0.7:
             return Verdict(act=self.rng.choice(pool), called=True)
         a, b = self.rng.choice(pool), self.rng.choice(universe)
-        return Verdict(pair=(a, b), called=True)
+        return Verdict(ask=(a, b), called=True)
 
     def pick_type(self, phrase, hint, candidate_ids):
         return self._verdict(list(candidate_ids), list(TYPES))
 
+    def check_type(self, phrase, hint, first, rival):
+        return self._verdict([first.act or first.ask[0], rival], list(TYPES))
+
     def pick_provider(self, phrase, type_id, candidate_ids):
         return self._verdict(list(candidate_ids), list(PROVIDERS))
+
+    def provider_genders(self, candidate_ids):
+        return {p: self.rng.choice((0.02, 0.5, 0.98)) for p in candidate_ids if self.rng.random() < 0.7}
 
 
 SERVICES = ([t["name"] for t in RAW["appointment_types"]] + list(ALIASES["aliases"])

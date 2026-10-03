@@ -1,14 +1,13 @@
 import json
 import math
-from pathlib import Path
 
 import pytest
 
 from scheduling.catalog_index import CatalogIndex, build_index
 from scheduling.geo import haversine, names_own_area, nearby, resolve_place
 from scheduling.names import match_locations
+from eval_cases import dev_case_files
 
-EVAL_DIR = Path(__file__).resolve().parents[3] / "eval"
 
 
 def _loc(lid, name, metro, nbhd, zip_, lat, lon, state, city):
@@ -154,7 +153,7 @@ def test_new_indexes_on_national(nat):
 def _sf_location_phrases() -> set[str]:
     out = {"Mission Bae", "down town", "the one on Geary", "near Mission Bay", "Narnia", "Downtown, SF",
            "I'm in San Francisco", "California", "94103"}
-    for path in EVAL_DIR.glob("cases*.jsonl"):
+    for path in dev_case_files():
         for line in path.read_text(encoding="utf-8").splitlines():
             for turn in json.loads(line)["turns"]:
                 if turn.get("update", {}).get("location_phrase"):
@@ -206,3 +205,28 @@ def test_names_own_area(nat):
     assert names_own_area(nat, "I'm in Riverside", "loc_a1")
     assert not names_own_area(nat, "Cedar Park Health Center", "loc_a4")
     assert not names_own_area(nat, "Mueller", "loc_a3")            # Mueller Clinic is in Hyde Park
+
+
+def test_a_misheard_city_beats_a_clinic_sharing_only_some_of_its_words():
+    """"San Antonyo" said "San" literally, which South San Antonio's name also has: the city wins."""
+    metros = METROS + [{"id": "san-antonio-tx", "name": "San Antonio", "state": "TX", "aliases": [],
+                        "lat": 29.42, "lon": -98.49}]
+    extra = _loc("loc_s1", "South San Antonio Health Center", "san-antonio-tx", "South Side", "78221", 29.36, -98.50,
+                 "TX", "San Antonio")
+    ix = build_index(national_raw(metros=metros, locations=LOCATIONS + [extra]), {"aliases": {}})
+    assert _anchors(resolve_place(ix, "San Antonyo")) == ["metro:san-antonio-tx"]
+    assert resolve_place(ix, "South San Antonio").site_ids == ("loc_s1",)
+
+
+def test_a_clinic_named_outright_beats_one_that_only_sounds_alike():
+    """"near The Hill": Hialeah shares The Hill's sound key, but only The Hill was said."""
+    metros = METROS + [{"id": "miami-fl", "name": "Miami", "state": "FL", "aliases": [], "lat": 25.76, "lon": -80.19},
+                       {"id": "st-louis-mo", "name": "St. Louis", "state": "MO", "aliases": [], "lat": 38.63,
+                        "lon": -90.20}]
+    extra = [_loc("loc_h1", "The Hill Family Clinic", "st-louis-mo", "The Hill", "63110", 38.62, -90.28, "MO",
+                  "St. Louis"),
+             _loc("loc_h2", "Hialeah Health Center", "miami-fl", "Hialeah", "33010", 25.86, -80.28, "FL", "Hialeah")]
+    ix = build_index(national_raw(metros=metros, locations=LOCATIONS + extra), {"aliases": {}})
+    assert [c.id for c in match_locations(ix, "the hill")] == ["loc_h1"]
+    assert _anchors(resolve_place(ix, "I'm near The Hill")) == ["site:loc_h1"]
+    assert [c.id for c in match_locations(ix, "Hialeah")] == ["loc_h2"]

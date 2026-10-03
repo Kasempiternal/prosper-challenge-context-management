@@ -1,8 +1,14 @@
+from pathlib import Path
+
 import pytest
 
+from scheduling.availability import MockAvailability
+from scheduling.catalog_index import CatalogIndex
 from scheduling.lexicon import match_types
 from scheduling.lookup import lookup
-from scheduling.names import match_locations, match_providers
+from scheduling.names import match_locations, match_providers, read_provider_clues
+from scheduling.request import Request, Update, merge
+from scheduling.resolver import TYPE_TIE_GAP, resolve
 
 
 def _ids(cands):
@@ -43,8 +49,54 @@ def test_lexicon_specialty_hint_and_lay_terms(index):
     assert _ids(match_types(index, "checkup", "Cardiology"))[:1] == ["appt_020"]
 
 
+@pytest.mark.parametrize("phrase,tied", [
+    ("I need my yearly physical", {"appt_002"}),          # says the name "Annual Physical"
+    ("my yearly exam", {"appt_002", "appt_003"}),         # "annual exam": still either
+    ("yearly checkup", {"appt_002", "appt_003"}),
+])
+def test_yearly_says_annual(index, phrase, tied):
+    cands = match_types(index, phrase)
+    assert {c.type_id for c in cands if c.score >= cands[0].score - 0.1} == tied
+
+
+@pytest.mark.parametrize("phrase,ids", [
+    ("an echo for my heart", ["appt_021"]),                          # not Cardiology Consultation too
+    ("the doctor wants me to do a breathing test", ["appt_079"]),    # not Pulmonology Consultation too
+    ("lung test", ["appt_078"]),                                     # no alias: the default stays
+])
+def test_a_specialty_default_is_no_evidence_beside_an_alias_of_that_specialty(index, phrase, ids):
+    assert [c.type_id for c in match_types(index, phrase) if c.score >= 0.6] == ids
+
+
+@pytest.fixture(scope="module")
+def nat() -> CatalogIndex:
+    return CatalogIndex.load(Path(__file__).resolve().parents[2] / "data" / "national" / "catalog.json")
+
+
+def _tier(cands):
+    return {c.type_id for c in cands if c.score >= cands[0].score - TYPE_TIE_GAP} if cands else set()
+
+
+@pytest.mark.parametrize("phrase,kept", [   # review round 3, finding 3 (national catalog)
+    ("I need my a1c", {"appt_232"}),                           # A1C Test, not Diabetes Management
+    ("I need my upper endoscopy", {"appt_055", "appt_184"}),   # Upper Endoscopy (EGD) stays beside the alias
+    ("I need my tonsils", {"appt_175"}),                       # Tonsil Evaluation, not ENT Consultation
+    ("I need my depression", {"appt_095"}),                    # Depression Screening Visit
+])
+def test_an_alias_that_only_matches_a_named_type_word_for_word_does_not_drop_it(nat, phrase, kept):
+    assert _tier(match_types(nat, phrase)) == kept
+
+
+def test_a_new_patient_asking_for_allergy_shots_is_still_refused(nat):
+    req = merge(Request(), Update.from_args({"is_new": True, "has_referral": True, "location_phrase": "I'm in Sacramento",
+                                             "service_phrase": "I need my allergy shots"}))
+    plan = resolve(nat, req, MockAvailability(nat))
+    assert (plan.status, plan.refusal.code) == ("refuse", "new_patient_type")
+
+
 NGUYENS = {"prov_015", "prov_016", "prov_023", "prov_024", "prov_028", "prov_030", "prov_036", "prov_037"}
 CHENS = {"prov_000", "prov_001", "prov_004", "prov_012", "prov_039", "prov_046", "prov_047"}
+PULMONOLOGY_NGUYENS = {"prov_023", "prov_024", "prov_028"}
 
 
 @pytest.mark.parametrize("phrase,expected", [
@@ -60,9 +112,40 @@ CHENS = {"prov_000", "prov_001", "prov_004", "prov_012", "prov_039", "prov_046",
     ("Dr. Garsha", {"prov_002", "prov_003", "prov_008"}),
     ("Dr. Jonson", {"prov_041"}),
     ("Dr. Zzyzx", set()),
+    ("Dr. Chen, the family medicine one", CHENS),   # "one" sounds like Nguyen but names nobody
 ])
 def test_provider_matching(index, phrase, expected):
     assert set(_ids(match_providers(index, phrase))) == expected
+
+
+@pytest.mark.parametrize("phrase,fits,facts,gender,rest", [
+    ("Dr. Nguyen, he speaks Spanish", {"prov_023", "prov_028"}, ("language",), "male", ()),
+    ("Dr. Nguyen, the lady doctor", PULMONOLOGY_NGUYENS, (), "female", ()),
+    ("Dr. Nguyen over in Richmond", {"prov_024", "prov_028"}, ("site",), None, ()),
+    ("Dr. Chen, the pediatrician", {"prov_012"}, ("specialty",), None, ()),
+    ("Dr. Maria Garcia who sees kids", {"prov_002"}, ("specialty",), None, ()),
+    ("Maria Garcia, the nurse practitioner", {"prov_003"}, ("title",), None, ()),
+    ("Dr. Nguyen who speaks French", PULMONOLOGY_NGUYENS, (), None, ("speaks", "french")),  # fits nobody
+    ("Dr. Nguyen, the one I saw last time", PULMONOLOGY_NGUYENS, (), None, ("saw", "last", "time")),
+    ("Dr. Nguyen, she's the one at Midtown", {"prov_023"}, ("site",), "female", ()),
+    ("Dr. Nguyen, my daughter's doctor, she is great", PULMONOLOGY_NGUYENS, (), None, ("daughter", "s", "she", "great")),
+    ("Dr. Nguyen, the women's health one", PULMONOLOGY_NGUYENS, (), None, ("women", "s", "health")),
+])
+def test_provider_clues(index, phrase, fits, facts, gender, rest):
+    pool = PULMONOLOGY_NGUYENS if "Nguyen" in phrase else {c.id for c in match_providers(index, phrase)}
+    clues = read_provider_clues(index, phrase, pool)
+    assert (set(clues.fits), clues.facts, clues.gender, clues.rest) == (fits, facts, gender, rest)
+
+
+def test_a_never_name_word_still_matches_a_provider_with_that_name():
+    raw = {"locations": [{"id": "l1", "name": "Main Clinic", "address": "1 Main St", "hours": "Mon-Fri 8:00-17:00",
+                          "capabilities": []}],
+           "appointment_types": [{"id": "t1", "name": "Sick Visit", "specialty": "General", "duration_min": 20,
+                                  "requires_referral": False, "new_patients_allowed": True}],
+           "providers": [{"id": "p1", "name": "Dr. Wen He", "specialty": "General", "location_ids": ["l1"],
+                          "accepting_new_patients": True, "appointment_type_ids": ["t1"]}]}
+    ix = build_index(raw, {"aliases": {}})
+    assert _ids(match_providers(ix, "Dr. He")) == ["p1"]
 
 
 def test_provider_matching_within_asked_options(index):
@@ -98,7 +181,7 @@ def test_lookup_facts(index):
 # ---- NameIndex equivalence: the pre-NameIndex matcher, frozen as the oracle -----------------
 
 import json  # noqa: E402
-from pathlib import Path  # noqa: E402
+
 
 import jellyfish  # noqa: E402
 
@@ -106,8 +189,8 @@ from scheduling.catalog_index import build_index  # noqa: E402
 from scheduling.names import (_NAME_WORD_SCORE, _NEVER_NAMES, _CLUE_STOPWORDS, _HONORIFICS, _TITLE_WORDS,  # noqa: E402
                               MIN_PROVIDER_SCORE, NameCandidate, _top_tier, clue_words)
 from scheduling.text import normalize, phonetic_keys, tokens  # noqa: E402
+from eval_cases import dev_case_files  # noqa: E402
 
-_EVAL = Path(__file__).resolve().parents[3] / "eval"
 _DATA = Path(__file__).resolve().parents[2] / "data"
 
 
@@ -129,7 +212,8 @@ def _oracle_is_name_word(index, word, provider_ids=None):
 
 
 def _oracle_match_providers(index, phrase, within=None):
-    words = [w for w in tokens(phrase or "") if w not in _TITLE_WORDS]
+    names = {normalize(n) for p in index.providers.values() for n in (p.first_name, p.last_name)}
+    words = [w for w in tokens(phrase or "") if w not in _TITLE_WORDS and (w not in _NEVER_NAMES or w in names)]
     if not words:
         return []
     pool = [index.providers[i] for i in within] if within else list(index.providers.values())
@@ -152,8 +236,9 @@ def _oracle_match_providers(index, phrase, within=None):
                 continue
             scored.append(NameCandidate(prov.id, round(s_last * (1.0 if s_first >= 0.88 else 0.9), 3), via))
     tier = _top_tier(scored, MIN_PROVIDER_SCORE)
-    if within and not tier:
-        return _oracle_match_providers(index, phrase)
+    if within:
+        anywhere = _oracle_match_providers(index, phrase)
+        return anywhere if not tier or (anywhere and anywhere[0].score > tier[0].score) else tier
     if not tier and len(words) > 1:
         names = [w for w in words if _oracle_is_name_word(index, w)]
         if names and names != words:
@@ -170,7 +255,7 @@ def _oracle_clue_words(index, phrase, ids):
 def _provider_phrases() -> list[str]:
     out = {"Dr. Nwin", "Dr. Win", "Dr. Gwen", "Dr. Shen", "Emily", "Dr. Hannah Nwin", "Maria Garcia", "Dr. Zzyzx",
            "David", "Mc Donald", "Dr. Ng Uyen", "doctor", "", "the woman who speaks Spanish", "Dr. Chen the heart one"}
-    for path in _EVAL.glob("cases*.jsonl"):
+    for path in dev_case_files():
         for line in path.read_text(encoding="utf-8").splitlines():
             for turn in json.loads(line)["turns"]:
                 if turn.get("update", {}).get("provider_phrase"):

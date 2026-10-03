@@ -59,11 +59,12 @@ def shared_embedder() -> FastEmbedder:
 
 @dataclass(frozen=True)
 class EmbedCall:
-    key: str               # the hook: type | provider | site | warmup
+    purpose: str           # the hook: type | provider | site | warmup
     source: str            # "live" | "failed"
     latency_ms: float
     input_tokens: int = 0
     usd: float = 0.0
+    p: float | None = None
 
 
 def type_text(index: CatalogIndex, type_id: str) -> str:
@@ -98,7 +99,8 @@ class EmbedClient:
             self.calls.append(EmbedCall(purpose, "failed", round((time.perf_counter() - t0) * 1000, 1)))
             return None
         probs = softmax_probs(vecs[1:] @ vecs[0], list(options), self.temperature)
-        self.calls.append(EmbedCall(purpose, "live", round((time.perf_counter() - t0) * 1000, 1)))
+        self.calls.append(EmbedCall(purpose, "live", round((time.perf_counter() - t0) * 1000, 1),
+                                    p=round(max(probs.values()), 3)))
         return probs
 
     def warm_up(self, index: CatalogIndex) -> EmbedCall:
@@ -138,6 +140,14 @@ class EmbedChooser:
 
     def pick_site(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
         return self._decide("site", phrase, site_criteria(self.ix, candidate_ids))
+
+    def check_type(self, phrase: str, hint: str | None, first: Verdict, rival: str) -> Verdict | None:
+        """Cosines have no "either": there is no second question to ask."""
+        return None
+
+    def provider_genders(self, candidate_ids: list[str]) -> dict[str, float] | None:
+        """A cosine between "the lady doctor" and a name says nothing reliable about gender."""
+        return None
 
     def _decide(self, purpose: str, query: str, options: dict[str, str]) -> Verdict:
         probs = self.client.probabilities(purpose, query, options) if options else None

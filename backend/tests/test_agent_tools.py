@@ -377,7 +377,7 @@ class ConsultingTypes:
 
     def pick_type(self, phrase, hint, candidate_ids):
         from scheduling.jev import JevCall
-        self.client.calls.append(JevCall("k", "live", 540.0, 900))
+        self.client.calls.append(JevCall("k", "live", 540.0, 900, "type", 0.79))
         return Verdict(top=(("appt_002", 0.79), ("appt_003", 0.21)), called=True)
 
 
@@ -492,3 +492,32 @@ def test_each_model_request_is_reported_for_the_dev_view(make_ctx):
     decision = next(e for e in events if e["type"] == "resolver_decision")
     assert isinstance(decision["ms"], int)
     assert decision["model"] == {"used": True, "provider": "jev", "p": 0.79, "ms": decision["ms"]}
+
+
+class CheckedTypes:
+    """A type hook that chooses Annual Physical at 0.97, then checks it: 0.71 against the rival."""
+
+    def pick_type(self, phrase, hint, candidate_ids):
+        return Verdict(act="appt_002", top=(("appt_002", 0.97), ("appt_003", 0.03)), called=True)
+
+    def check_type(self, phrase, hint, first, rival):
+        return Verdict(act="appt_002", top=(("appt_002", 0.71), (rival, 0.04), ("either", 0.25)), called=True)
+
+
+def test_the_dev_view_reports_the_check_and_its_final_p(make_ctx, events):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    ctx.model_client = FakeJevClient()
+    ctx.disambiguator = RecordingDisambiguator(CheckedTypes(), NoDisambiguator())
+    call(ctx, fm, "update_request", {"is_new": False, "service_phrase": "my zorbly thing"})
+    assert [v.p for v in ctx.disambiguator.verdicts] == [0.97, 0.71]
+    decision = next(e for e in events if e["type"] == "resolver_decision")
+    assert decision["model"]["p"] == 0.71
+
+
+def test_a_gender_question_no_chooser_can_ask_is_no_model_use(make_ctx, events):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    result, _ = call(ctx, fm, "update_request", {"is_new": False, "has_referral": True, "provider_phrase": "Dr. Chen, the woman",
+                                                 "service_phrase": "cardiology consultation"})
+    assert result["ask"]["field"] == "provider"
+    assert ctx.disambiguator.verdicts == []
+    assert next(e for e in events if e["type"] == "resolver_decision")["model"] == {"used": False}

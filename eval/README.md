@@ -89,16 +89,19 @@ The resolver consults it (`scheduling/jev.py`, hooks in `scheduling/resolver.py`
 
 1. **Types, no lexical match** ("something for my back pain"): a choice over all 74 offered types.
 2. **Types, only a specialty default matched** ("lung test" only reached Pulmonology's default type).
-3. **Types, a tie between confusables, and the caller said more than the tied names/aliases explain**
-   ("checkups while I'm expecting" leaves "expecting"). A bare "checkup", "MRI" or "follow-up"
-   does not call JEV, and the caller is asked (see "What went wrong first" below).
+3. **Types, the caller said more than the matched names/aliases explain** ("checkups while I'm
+   expecting" leaves "expecting"; since round 3 also a single match: "shots before my trip to
+   Thailand" leaves "trip" and "Thailand"). A bare "checkup", "MRI" or "follow-up" does not call
+   JEV, and the caller is asked (see "What went wrong first" below).
 4. **Providers**: two or more policy-valid providers match the name, and the phrase has a clue
-   beyond the name, honorific and filler (specialty, site, title, gender, history words). A bare
-   "Can I see Dr. Chen?" never calls JEV; the splitting question is a catalog fact.
+   beyond the name, honorific and filler. Since round 3, catalog facts in the clue (language, title,
+   specialty, site) are applied without a model; JEV is asked only for gender and for words no fact
+   explains. A bare "Can I see Dr. Chen?" never calls JEV; the splitting question is a catalog fact.
 
 Unoffered types are never JEV candidates ("we don't offer that" stays lexical). JEV only picks;
-policy runs after it, so a policy-invalid pick takes the usual refusal path. A failed, timed-out or
-low-confidence answer gives exactly the no-JEV behavior (unit-tested).
+policy runs after it, so a policy-invalid pick takes the usual refusal path. A low-confidence answer
+gives the no-JEV behavior. Since round 3, every type choice is followed by a check (see round 3
+below), and a failed or timed-out answer is never committed on: the caller is asked (unit-tested).
 
 ### Gate, and how it was chosen
 
@@ -175,11 +178,12 @@ aliases don't explain (`lexicon.unexplained_words`), the same rule as the provid
 
 ### Latency and the live budget
 
-The live call path defaults to `JevClient(timeout_s=1.2, retries=0, turn_budget_s=1.2)`, with
-`begin_turn()` called before each `resolve()`. The total wait is bounded with a worker thread,
-because httpx timeouts are per phase. The eval uses 2.5 s and one connect retry so it fills the
-cache. Live requests over 1.2 s: 1 of 49 in the second live run (1,709 ms, the first request of the
-heldout set). In production that turn would have fallen back to no-JEV.
+The live call path used `JevClient(timeout_s=1.2, retries=0, turn_budget_s=1.2)` until round 3
+(now 1.5 s per request within a 2.5 s turn budget; see round 3), with `begin_turn()` called before
+each `resolve()`. The total wait is bounded with a worker thread, because httpx timeouts are per
+phase. The eval uses 2.5 s and one connect retry so it fills the cache. Live requests over 1.2 s:
+1 of 49 in the second live run (1,709 ms, the first request of the heldout set). In production that
+turn would have fallen back to no-JEV.
 
 Warm-up experiment (`eval/jev_warmup_experiment.py`; each trial on a fresh connection, unique phrases):
 
@@ -429,3 +433,229 @@ backend/.venv/Scripts/python eval/validate_case_format.py heldout3 national3   #
 `phrase` (and `repair IDS TAG`) is the step that calls DeepSeek. The national merge needs
 `backend/data/national/catalog.json` checked out with LF line endings, so that its sha256 matches
 `catalog.meta.json`.
+
+## Round 3: every set is dev; JEV hillclimb to zero wrong commits
+
+All the sets above are now **dev** sets: their failures were read and fixed against. The blind
+held-out round 3 sets (`cases_heldout3.jsonl`, `cases_national3.jsonl`) were authored separately and
+are scored once, after this work. Nothing here was run on them. Every number below is from dev
+sets that were studied, so it shows the fixes work on the cases they were written for, not that
+they generalize.
+
+Priorities, set by the user during the round: zero wrong commits in JEV mode first, top-1 second;
+when in doubt, ask; an answer that does not arrive is never committed on.
+
+### Results (offline, from the committed caches)
+
+Wrong commits per commit; top-1 per evaluated turn. Baseline is `phase1-ui` (fc2682b).
+
+| set | JEV before | JEV after | no model before | no model after |
+|---|---|---|---|---|
+| main | 0/48; 105/105 | 0/48; 105/105 | 0/48; 105/105 | 0/48; 105/105 |
+| heldout | 0/6; 12/12 | 0/6; 12/12 | 1/5; 9/12 | 1/5; 10/12 |
+| heldout2 | 2/33; 37/49 | **0/39; 48/49** | 3/17; 18/49 | 3/24; 28/49 |
+| tune | 2/22; 24/26 | **0/22; 26/26** | 4/12; 10/26 | 4/15; 14/26 |
+| national | 0/39; 56/56 | 0/39; 56/56 | 1/35; 51/56 | 1/35; 51/56 |
+| national2 | 1/37; 50/54 | **0/38; 53/54** | 1/24; 37/54 | 0/25; 40/54 |
+| street | 0/25; 36/36* | 0/25; 36/36 | 0/25; 36/36 | 0/25; 36/36 |
+
+\* The baseline's 3 street site-chooser requests were never cached, so they failed and declined;
+answered, one of them (str-25) asked "Downtown or Midtown?" until the street rule below.
+
+The no-model wrong-commit count never rose; it fell on national2. Other choosers, same sets
+(before -> after): OpenAI heldout2 8/38; 33/49 -> 3/35; 38/49, tune 4/24; 22/26 -> 1/20; 22/26,
+national2 1/35; 48/54 -> 1/35; 49/54; embeddings heldout2 6/32; 29/49 -> 5/31; 31/49, tune
+4/20; 18/26 -> 3/18; 17/26, national2 2/33; 45/54 -> 1/36; 50/54. Neither crashes; OpenAI has
+no yes/no question, so it rules nobody out by gender, and embeddings have no check.
+
+### What changed (one mechanism per commit, each measured on every dev set)
+
+| mechanism | where | measured effect (JEV unless noted) |
+|---|---|---|
+| A clinic named outright beats a soundalike; a misheard city beats a clinic sharing some of its words | `names.match_locations`, `geo._resolve_head` | national2 50 -> 52/54 ("near The Hill", "San Antonyo") |
+| A said alias drops types whose only evidence lies inside it | `lexicon._drop_inside_aliases` | national2 wrong 1 -> 0: "I need my allergy shots" (new patient) is refused, not offered the consultation |
+| Words that are never names do not reach surnames by sound | `names.match_providers` | no metric change; "Dr. Chen, the family medicine one" reaches 3 Chens, not 15 providers |
+| Same-named providers: catalog facts first, then gender from first names, then the model | `names.read_provider_clues`, `JevProviderChooser.provider_genders` | heldout2 37 -> 39/49, wrong 2 -> 1 ("the lady doctor" asks between the two women; "he speaks Spanish" books Daniel); no model +10 turns |
+| A street that put the caller at no clinic is no site clue | `resolver._place_clue` | street str-25 offers in Atlanta |
+| Every type choice gets a second question, with an "either" answer | `JevTypeDisambiguator.check_type`, `decision.CheckGate` | heldout2 39 -> 43/49 (h2-01, h2-03, h2-05, h2-28); national2 53 -> 52 (nat2-sym-04 asks) |
+| A lexical match that leaves words unexplained is heard by the model | `resolver._verify_types` | heldout2 43 -> 46/49, wrong 1 -> 0; tune 24 -> 26/26, wrong 2 -> 0 (Thailand, hay fever, skip breakfast) |
+| A specialty's default is no evidence beside an alias of that specialty | `lexicon._score_types` | heldout2 46 -> 47 ("an echo for my heart"); no model +2 |
+| A model answer that never came is never committed on | `decision.FAILED`, resolver | unchanged offline; 18 unit cases |
+| "yearly" says "annual" | `lexicon._SAME_AS` | national2 52 -> 53 ("I need my yearly physical"); no model +3 |
+| A spoken ordinal street ("second street") is a street word | `names.hear_place` | OpenAI street wrong 1 -> 0 |
+
+Reverted: dropping the specialty default before lexical verification existed ("talk to the bone
+doctor before my knee surgery" became a wrong commit). Every attempt, kept or not, is a row in the
+lead's `.kstack/log.tsv`.
+
+### The check, and how its thresholds were chosen
+
+A choice question over many types is overconfident on words that fit two visits alike and
+under-confident on clear symptoms: a live replay of the cached "my yearly exam" request put 0.80 on
+Annual Physical, while "my tummy's been hurting for weeks" got 0.55 for GI. After every choice,
+the front-runner and its rival (the runner-up, or the lexical match the choice overruled) are asked
+about alone, with their aliases and booking rules, plus "either: nothing the caller said tells these
+two visits apart". `CheckGate` settles it:
+
+- a confident choice stands unless "either" >= 0.8 or the rival leads the check by >= 0.2;
+- a choice that left two is settled only by a check leader >= 0.65 with "either" < 0.5;
+- an unanswered check asks (a confident choice is confirmed alone: "Is that a school physical?").
+
+(As of the review fixes below: a confident choice stands only if the check still prefers it, and a
+pair is settled only by a leader above 0.65.)
+
+Chosen on the dev sets, from an experiment over the 132 dev phrases that reach a model: twins the
+labels ask about scored "either" 0.92-0.98 ("checkup", "follow-up", "my yearly exam"), pairs the
+labels accept either way 0.29-0.52. The settle value is the least robust: h2-28 ("I can't hear well
+out of my left ear") settles at 0.65 exactly, h2-02 (labelled an either-or) has "either" 0.60.
+
+### Latency, requests per turn, cost
+
+A type decision is now two sequential requests (choice, then check). Measured live, production
+client settings, cache bypassed, after warm-up, on heldout, heldout2, tune, national and national2
+(197 turns, 125 with JEV): 193 requests, 0.98 per turn and 1.54 per JEV turn. All turns p50 523 ms,
+p95 1,314 ms, max 2,158 ms; JEV turns p50 974 ms, p95 1,390 ms. One request hit the 1.5 s cap and
+its turn asked. Live decisions: top-1 194/197, wrong commits 0/143 (misses: h2-14, nat2-sym-04 as
+offline, and nat-noloc-03, the capped request).
+
+With the old 1.2 s turn budget, 15 of 145 live requests on heldout2, tune and national2 ran out of
+budget and 14 turns asked instead of booking, so the agents' `resolver.timeout_ms` is now 2500 and
+one request may use at most 1.5 s of it. The voice path says "One moment." after 0.3 s.
+
+Resolver alone, no network (p95, `--jev off`): national 12.1 -> 11.9 ms, national2 8.2 -> 7.7 ms,
+street 18.0 -> 16.0 ms, SF main 5.9 -> 6.0 ms. p50 rose by 0.2-0.4 ms.
+
+JEV spend for the round: about $0.06 (measured: 143 eval-cache requests, 138,221 input tokens,
+$0.0055; 248 framing-experiment requests, 522,724 tokens, $0.021; estimated: 717 check and yes/no
+experiment requests and 483 live latency requests, about $0.035). OpenAI: 132 requests, 58,856
+input tokens, $0.0089.
+
+### Still missed with JEV (asks, not wrong commits)
+
+- h2-14 "a weird spot on my arm I want looked at" (expects Skin Cancer Screening): the choice says
+  Dermatology Consultation 0.97, the check says Skin Cancer Screening 0.35 against 0.13 (either
+  0.52). The two questions disagree, so the caller is asked between the two.
+- nat2-sym-04 "my thumb and fingers ... go numb and tingle, worse at night" (accepts either):
+  the choice says Hand and Wrist 0.94, the check says Neurology 0.59 against 0.18. Asked.
+
+Making either one book would mean committing while the model contradicts itself, which this round's
+priorities rule out.
+
+### Label corrections, round 3
+
+| case id | old | new | reason |
+|---|---|---|---|
+| h2-34 ("my annual") | ask between appt_002 (Annual Physical) and appt_003 (Annual Wellness Visit) | ask between appt_002, appt_003 and appt_041 (Annual Well-Woman Exam) | appt_041 is also an annual visit open to this returning patient (no referral), so "my annual" names it as much as the other two. |
+| h2-p01 ("Dr. Chen, the woman", cardiology) | offer prov_046 (Emily Chen) | ask provider, options [prov_046] ("Do you mean Dr. Emily Chen?") | **Policy change (pre-registered): inferred gender never commits alone.** Not a label error. Gender is the only evidence that singles out Emily Chen (David Chen p(woman) 0.09 is ruled out, Emily 0.83 is unknown), so the doctor is confirmed by name. |
+
+tune-p1 ("Dr. Chen, the guy") keeps its label (offer prov_000): under the policy it asks between both
+cardiology Chens, not a one-option confirmation, because Emily Chen's 0.83 is not sure enough to rule
+her out. It is counted as a miss.
+
+## Round 3 review fixes
+
+The round 3 review found commits on misread evidence. Each finding is one commit, measured on
+every dev set in both modes. Accuracy first: when in doubt the resolver asks.
+
+### Results (offline, from the committed caches)
+
+Wrong commits per commit; top-1 per evaluated turn. "Before" is the reviewed branch (8ae1e25).
+
+| set | JEV before | JEV after | no model before | no model after |
+|---|---|---|---|---|
+| main | 0/48; 105/105 | 0/48; 105/105 | 0/48; 105/105 | 0/48; 105/105 |
+| heldout | 0/6; 12/12 | 0/6; 12/12 | 1/5; 10/12 | 1/5; 10/12 |
+| heldout2 | 0/39; 48/49 | 0/36; 45/49 | 3/24; 28/49 | 3/24; 28/49 |
+| tune | 0/22; 26/26 | 0/21; 24/26 | 4/15; 14/26 | 4/15; 14/26 |
+| national | 0/39; 56/56 | 0/39; 56/56 | 1/35; 51/56 | 1/35; 51/56 |
+| national2 | 0/38; 53/54 | 0/38; 53/54 | 0/25; 40/54 | 0/25; 40/54 |
+| street | 0/25; 36/36 | 0/25; 36/36 | 0/25; 36/36 | 0/25; 36/36 |
+
+heldout2 "after" is scored with h2-p01's policy label (it passes); against its old label it would
+be 44/49. Turns that no longer book, and why:
+
+- h2-p07 "Dr. Nguyen, the lady doctor": asks among all three pulmonology Nguyens (label: the two
+  women). Jennifer 0.85 and Maria 0.87 are not sure enough to count, and Daniel 0.17 is not sure
+  enough to rule out.
+- h2-p08 "Dr. Nguyen, he speaks Spanish": the facts leave Jennifer and Daniel; neither gender
+  counts (0.82, 0.13), so it asks between them (label: Daniel).
+- tune-p1 "Dr. Chen, the guy": David 0.09 counts as male but Emily 0.83 is unknown, so nobody is
+  ruled out and it asks between both (label: David).
+- tune-p5 "Dr. Patel, a woman": no Patel's gender counts (0.12-0.89), so it asks for the first name
+  among four (label: the two women).
+- h2-28 "I can't hear well out of my left ear": the check's lead is 0.65, exactly the settle
+  threshold, which now takes the safe side (asks Hearing Test or ENT Consultation).
+
+None of these is a wrong commit. The no-model column is identical turn for turn.
+
+### What changed
+
+| finding | mechanism | where | measured |
+|---|---|---|---|
+| 1 (critical) | A provider site fact needs a site's own name word as said, or its street said as a street; gender and link words never reach site matching; a negation asks without narrowing or a model; kin words (son, daughter, child, kid, boy, girl, baby; "my kids") are no specialty | `names.read_provider_clues`, `names._sites_named`, `resolver._consult_provider` | the review's 7 probes and "my main doctor" ask in both modes (were 7 wrong commits); dev unchanged |
+| 2 | A confident choice stands only if the check still prefers it (chosen > rival); the conflict rule is gone (implied) | `decision.CheckGate` | stub 0.05 / 0.20 / 0.75 asks; dev unchanged |
+| 3 | An alias drops a named type only when it covers more than that type's evidence (strict subset) | `lexicon._drop_inside_aliases` | national "I need my a1c" -> A1C Test; upper endoscopy, tonsils, depression keep their named types; allergy shots still refused; dev unchanged |
+| 4 | Gender policy (below) | `decision.gender_of`, `resolver._consult_provider`, `resolver._confirmed_provider`, `names._said_gender`, `names.read_confirmation`, `names.match_providers` | see results |
+| 5 | A runner-up under 0.05 gives way to the choice's nearest neighbour as the check's rival | `resolver._rival`, `lexicon.nearest_type` | 20 of 68 dev checks got a new rival; 0 outcomes changed |
+| 6 | Sensitivity table (below); settle is strict at its boundary | `decision.CheckGate`, `eval/threshold_sensitivity.py` | h2-28 asks |
+| 7 | Time words, a catalog name after a title, a place after a preposition are explained; an answer to a type question is heard among the options asked | `lexicon.unexplained_words`, `request.TIME_WORDS`, `resolver._verify_types` | "a flu shot today / next week / with Dr. Chen / at Mission Bay": 2 requests -> 0 (SF and national); dev unchanged |
+| 8 | Check verdicts and final p in the Dev view; a gender verdict only when a question was asked; post-check type guard; miss printout shows checks and facts; no lock, 2-worker pool; `_SAME_AS` beside the word lists | `agent_tools/context.py`, `scheduling_tools._decision_event`, `jev.py`, `resolver._model_types`, `run_resolver_eval.py`, `lexicon.py` | dev unchanged |
+
+Requests and latency: checks per type-model turn unchanged (68 checks over 119 JEV type turns, 193
+requests over the dev sets), and the new rivals cost no outcome. Resolver alone, no network,
+p95 before -> after (same machine, run back to back): main 6.08 -> 6.31 ms, national 12.79 -> 12.17
+ms, national2 8.06 -> 8.38 ms, street 16.80 -> 16.68 ms.
+
+Other choosers (wrong commits; top-1), before -> after: OpenAI heldout2 3/35; 38/49 -> 3/35; 38/49,
+tune 1/20; 22/26 -> 1/21; 23/26, national2 1/35; 49/54 -> 1/36; 50/54; embeddings unchanged
+(heldout2 5/31; 31/49, tune 3/18; 17/26, national2 1/36; 50/54). OpenAI has no yes/no question,
+so it never narrows by gender.
+
+Spend for these fixes: JEV 19 requests (the new check rivals), 8,041 input tokens, $0.00032; OpenAI
+21 requests (the same rivals), 3,692 input tokens, $0.00057. Both caches are committed.
+
+### Gender policy (pre-registered before round 3 scoring)
+
+Inferred gender (JEV reads it off first names; the catalog has no gender field) may narrow the
+doctors but never books one on its own:
+
+- It counts only at p(woman) >= 0.9 (female) or <= 0.1 (male). Unknown is never ruled out.
+- A doctor that gender alone singles out is confirmed by full name: "Do you mean Dr. Emily
+  Chen?" (ask provider, one option). So is the one doctor the catalog facts leave when the model
+  cannot confirm they are the gender the caller said. A gender that rules out everyone the facts
+  left asks among all candidates.
+- Only words about the doctor count: woman, lady, female, man, male, guy, gentleman, and he / she
+  before any other person is mentioned ("she's the one at Mission Bay"). "her baby", "my
+  daughter's doctor, she ...", "women's health" are no evidence.
+- The answer: "yes" books that doctor; any "no" ("no", "not her", "the other one", "no, Lucas
+  Chen") asks about the other doctors of that surname, even when one is left; a name is matched as
+  a name, and a better match outside the options asked about wins ("David Chen" after "Do you mean
+  Dr. Emily Chen?").
+
+Dev name scores (p(woman), every gender request in the cache): David 0.09, Andre 0.12, Daniel
+0.13 / 0.17, Kenji 0.16, Jennifer 0.82 / 0.85 (with different other names in the request), Emily
+0.83, Olivia 0.85, Maria 0.87, Fatima 0.89. At 0.9 / 0.1 only David counts, so gender narrows
+almost nothing on the dev sets with the current single-request framing.
+
+### Threshold sensitivity (not re-tuned)
+
+The thresholds were not re-tuned on these dev sets. Each was moved by -0.05 and +0.05 with the
+others at their shipped values, over every dev set in JEV mode from the committed cache
+(`eval/threshold_sensitivity.py`; the same requests, so no request failed in any variant).
+Shipped: top-1 323/330 resolve turns (lookups excluded), 0 wrong commits.
+
+| threshold (shipped) | -0.05 | +0.05 |
+|---|---|---|
+| twins: "either" at or above it asks (0.80) | no flips | no flips |
+| act rule: a confident choice stands only if check chosen > rival (margin 0) | no flips | nat2-geo-06 offer -> ask (chosen 0.26, rival 0.24, either 0.50); top-1 -1 |
+| conflict: rival ahead by this much asks (was 0.20) | removed: implied by the act rule, no outcome can depend on it | removed |
+| settle: a pair is settled above it (0.65, strict) | h2-28 ask -> offer (lead 0.65); top-1 +1 | nat-sym-02 offer -> ask (lead 0.69); top-1 -1 |
+| settle_either: a pair is settled only with "either" under it (0.50) | no flips | no flips |
+| gender: p(woman) >= it is female, <= 1 - it male (0.90) | tune-p5 asks among 3 Patels instead of 4 (Andre 0.12 counts as male); still a miss | h2-p01 one-option confirm -> ask between both Chens (David 0.09 no longer counts); top-1 -1 |
+
+No variant adds or removes a wrong commit. Two thresholds sit next to a case: settle 0.65 sat
+exactly on h2-28 (check lead 0.65), which booked because the comparison was `>=`. It is now strict,
+so h2-28 asks between Hearing Test and ENT Consultation: the safe side, at a cost of one heldout2
+turn (46 -> 45/49). The act rule's thinnest lead is nat2-geo-06 at 0.02 (a 0.26 vs 0.24 check with
+"either" 0.50): it books, and would ask under any positive margin. Gender 0.9 has no dev name within
+0.01 (Fatima 0.89, David 0.09).

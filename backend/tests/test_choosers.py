@@ -103,13 +103,13 @@ def test_openai_verdict_then_cache_hit_without_network(sf, tmp_path):
     assert [c.source for c in again.calls] == ["cache"]
 
 
-def test_openai_timeout_declines(sf):
+def test_openai_timeout_is_a_failed_verdict(sf):
     fake = FakeOpenAI([("1", -0.01)], delay_s=1.0)
     client = OpenAIChoiceClient("k", mode="live", timeout_s=0.2, turn_budget_s=0.2, transport=httpx.MockTransport(fake))
     client.begin_turn()
     started = time.perf_counter()
     verdict = JevTypeDisambiguator(sf, client).pick_type("ringing in both my ears", None, pool(sf))
-    assert verdict == DECLINE
+    assert verdict.failed and not (verdict.act or verdict.ask)
     assert time.perf_counter() - started < 0.6
     assert [c.source for c in client.calls] == ["failed"]
     client.close()
@@ -158,7 +158,7 @@ def test_embed_chooser_probabilities_are_a_softmax_over_cosines(sf):
     sx, sy = x @ q, y @ q
     assert probs["x"] == pytest.approx(math.exp(sx / 0.5) / (math.exp(sx / 0.5) + math.exp(sy / 0.5)), rel=1e-6)
     assert sum(probs.values()) == pytest.approx(1.0)
-    assert [(c.key, c.source, c.usd) for c in client.calls] == [("type", "live", 0.0)]
+    assert [(c.purpose, c.source, c.usd) for c in client.calls] == [("type", "live", 0.0)]
 
 
 def test_a_broken_embedder_declines(sf):

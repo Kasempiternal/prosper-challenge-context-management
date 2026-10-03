@@ -32,6 +32,8 @@ from scheduling.openai_chooser import OpenAIChoiceClient
 from scheduling.resolver import NoDisambiguator
 
 EMBEDDINGS_AVAILABLE = importlib.util.find_spec("fastembed") is not None
+# A type decision is a choice and then a check, each ~0.55 s (p95 ~0.9 s) live.
+REQUEST_TIMEOUT_S = 1.5
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -152,11 +154,13 @@ class RecordingDisambiguator:
         self._types, self._providers = types, providers
         self._sites = sites or NoDisambiguator()
         self.verdicts: list[Verdict] = []
-        self.purposes: list[str] = []
         self.consulting = False  # a model hook is running right now (read from the event loop)
 
     def pick_type(self, phrase: str, hint: str | None, candidate_ids: list[str]) -> Verdict:
         return self._record(self._types.pick_type, phrase, hint, candidate_ids)
+
+    def check_type(self, phrase: str, hint: str | None, first: Verdict, rival: str) -> Verdict | None:
+        return self._record(self._types.check_type, phrase, hint, first, rival)
 
     def pick_provider(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
         return self._record(self._providers.pick_provider, phrase, type_id, candidate_ids)
@@ -164,14 +168,25 @@ class RecordingDisambiguator:
     def pick_site(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
         return self._record(self._sites.pick_site, phrase, type_id, candidate_ids)
 
-    def _record(self, hook, *args) -> Verdict:
+    def provider_genders(self, candidate_ids: list[str]) -> dict[str, float] | None:
+        """Recorded as a model verdict only when a question was asked (None: the chooser has none)."""
+        self.consulting = True
+        try:
+            p_woman = self._providers.provider_genders(candidate_ids)
+        finally:
+            self.consulting = False
+        if p_woman is not None:
+            self.verdicts.append(Verdict(called=True, failed=not p_woman))
+        return p_woman
+
+    def _record(self, hook, *args) -> Verdict | None:
         self.consulting = True
         try:
             verdict = hook(*args)
         finally:
             self.consulting = False
-        self.verdicts.append(verdict)
-        self.purposes.append(hook.__name__.removeprefix("pick_"))
+        if verdict is not None:
+            self.verdicts.append(verdict)
         return verdict
 
 
@@ -216,12 +231,15 @@ def make_context(catalog: str, *, speak_direct: bool, chooser: str = "none", tim
 
 
 def make_model_client(chooser: str, timeout_s: float) -> Any:
-    """Per call, not shared: a networked client carries this call's per-turn budget (begin_turn)."""
+    """Per call, not shared: a networked client carries this call's per-turn budget (begin_turn).
+    One request may use at most REQUEST_TIMEOUT_S of it, so a slow choice still leaves time for
+    its check."""
+    request_s = min(REQUEST_TIMEOUT_S, timeout_s)
     if chooser == "jev" and os.environ.get("CMD_API_KEY"):
-        return JevClient(os.environ["CMD_API_KEY"], mode="auto", timeout_s=timeout_s, retries=0,
+        return JevClient(os.environ["CMD_API_KEY"], mode="auto", timeout_s=request_s, retries=0,
                          turn_budget_s=timeout_s)
     if chooser == "openai" and os.environ.get("OPENAI_API_KEY"):
-        return OpenAIChoiceClient(os.environ["OPENAI_API_KEY"], mode="auto", timeout_s=timeout_s,
+        return OpenAIChoiceClient(os.environ["OPENAI_API_KEY"], mode="auto", timeout_s=request_s,
                                   turn_budget_s=timeout_s)
     if chooser == "embed" and EMBEDDINGS_AVAILABLE:
         return EmbedClient(shared_embedder())
