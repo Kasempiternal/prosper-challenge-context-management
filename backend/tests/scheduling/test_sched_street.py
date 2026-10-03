@@ -13,7 +13,7 @@ from scheduling.geo import resolve_place
 from scheduling.names import hear_place, match_locations, match_providers, street_of
 from scheduling.request import Request, Update, merge
 from scheduling.resolver import resolve
-from eval_cases import dev_case_files
+from eval_cases import EVAL, dev_case_files, eval_sets
 
 DATA = Path(__file__).resolve().parents[2] / "data"
 RETURNING = {"is_new": False, "has_referral": True}
@@ -155,8 +155,8 @@ def test_match_providers_still_hears_the_doctors_those_words_sound_like(nat):
 
 
 def _case_sets():
-    sf = [p for p in dev_case_files() if "national" not in p.name and "street" not in p.name]
-    national = [p for p in dev_case_files() if p not in sf]
+    national = [p for p in dev_case_files() if p in {EVAL / s.file for s in eval_sets.SETS.values() if s.national}]
+    sf = [p for p in dev_case_files() if p not in national]
     return [(p, DATA / "catalog.json") for p in sf] + [(p, DATA / "national" / "catalog.json") for p in national]
 
 

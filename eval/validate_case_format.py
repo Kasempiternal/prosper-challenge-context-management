@@ -24,7 +24,8 @@ from sets import BLIND_FILES, EXPECT_KEYS, SETS  # noqa: E402
 SF = ROOT / "backend" / "data" / "catalog.json"
 NATIONAL = ROOT / "backend" / "data" / "national" / "catalog.json"
 NATIONAL_META = ROOT / "backend" / "data" / "national" / "catalog.meta.json"
-TOP_KEYS = {"id", "category", "kind", "catalog_sha256", "patient", "turns", "expected", "phrasing_source"}
+TOP_KEYS = {"id", "category", "kind", "catalog_sha256", "patient", "turns", "expected", "phrasing_source",
+            "severity", "source", "also_ok"}  # the last three: the stress sets (eval/stress/README.md)
 STATUSES = {"offer", "ask", "refuse", "confirm"}
 
 
@@ -112,6 +113,10 @@ def validate(name: str, keys, update_keys) -> list[str]:
                     errs.append(f"{where}: last turn carries expect; use expected")
                 errs += check_expect(t["expect"], keys, cat, f"{where} turn {i}")
         errs += check_expect(c.get("expected", {}), keys, cat, where)
+        for j, alt in enumerate(c.get("also_ok", [])):
+            errs += check_expect(alt, keys, cat, f"{where} also_ok[{j}]")
+        if "severity" in c and c["severity"] not in ("critical", "hard"):
+            errs.append(f"{where}: severity {c['severity']!r}")
         if national and c.get("catalog_sha256") != pinned:
             errs.append(f"{where}: catalog_sha256 {c.get('catalog_sha256')!r} != pinned {pinned}")
     print(f"{name}: {path.name}, {len(lines)} cases, {'national' if national else 'SF'} catalog, "
