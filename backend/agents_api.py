@@ -167,6 +167,7 @@ def create_router(agents_dir: Optional[Path] = None, jev_transport: Optional[htt
                     "id": path.stem,
                     "name": agent.get("name", path.stem),
                     "node_count": len(agent.get("nodes", [])),
+                    "catalog": agent.get("catalog"),
                     "updated_at": datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat(),
                     "_mtime": mtime,
                 }

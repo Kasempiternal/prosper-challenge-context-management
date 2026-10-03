@@ -48,7 +48,9 @@ export const useAgents = create<AgentsState>()((set, get) => ({
     set({ status: 'loading' })
     const list = await get().refresh()
     const last = localStorage.getItem(LAST_AGENT)
-    const target = list.find((a) => a.id === last) ?? list[0]
+    // A first visit opens a scheduling agent: a fresh clone's file times would otherwise put the
+    // plain example first.
+    const target = list.find((a) => a.id === last) ?? list.find((a) => a.catalog) ?? list[0]
     if (target) await get().open(target.id)
   },
 

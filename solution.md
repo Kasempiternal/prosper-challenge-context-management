@@ -46,7 +46,7 @@ The guiding rule: **in healthcare a wrong booking is the costly error, and one m
 - **Modes compared** on every blind set: JEV has the fewest wrong commits on SF doctor descriptions; OpenAI matches or beats it on some national sets; Off is the rules path and asks more.
 - **88 hard cases** (the most critical and the ones that failed in earlier runs): 0 unsafe JEV outcomes.
 - **Live voice calls** found what offline cases cannot: the conversation model claimed a booking it never made, and it rewrote callers' answers ("Washington" into "Washington, DC", "the lady one" into "Dr. Emily Chen", a doubt into "scope"). Each became a code-level guard, not a prompt tweak. Booking moved into an edge action, and tool arguments are now checked against the caller's own words. Replaying those turns showed gpt-4.1 makes the same rewrites, so a stronger model was not the fix.
-- 1,314 backend and 123 frontend tests.
+- 1,314 backend and 125 frontend tests.
 
 Three integrity exposures are disclosed with the scores they could have affected: a test that resolved the blind files (it asserted nothing about them), a worker whose search previewed five blind cases, and three lines of round 4 results shown to the round 5 author after every case was final. Details in the README and [eval/README.md](eval/README.md).
 

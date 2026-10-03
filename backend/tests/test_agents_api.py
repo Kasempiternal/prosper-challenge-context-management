@@ -39,6 +39,7 @@ def test_list_agents(client):
         "id": "prosper-scheduler",
         "name": "Prosper Scheduler",
         "node_count": 4,
+        "catalog": None,
     }
 
 

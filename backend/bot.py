@@ -12,7 +12,7 @@
 # .env for this call only (call_key). The same process serves the agents REST API (agents_api.py)
 # and the API key endpoints (api_keys.py) on the runner's app.
 #
-# Run:  python bot.py   then open http://localhost:7860/client
+# Run:  python bot.py, then open Agent Studio (make start runs both; see the README)
 #
 
 import asyncio

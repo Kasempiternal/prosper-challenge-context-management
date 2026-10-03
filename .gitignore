@@ -35,3 +35,6 @@ Thumbs.db
 
 # ---- kstack working files ----
 .kstack/
+
+# scripts/studio.py start: backend and studio logs
+.studio/

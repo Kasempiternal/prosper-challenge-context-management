@@ -75,6 +75,8 @@ export interface AgentSummary {
   id: string
   name: string
   node_count: number
+  /** The catalog path of a scheduling agent; absent or null for a plain agent. */
+  catalog?: string | null
   updated_at: string
 }
 

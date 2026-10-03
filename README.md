@@ -13,29 +13,46 @@ All counts measured (tiktoken `o200k_base` on compact JSON).
 
 ## Quick start
 
-Needs Python 3.11 (tested on 3.11.8), Node 22 and pnpm 10. On macOS or Linux, `make install`, then `make run` and `make studio` in two terminals, does the same as the steps below.
+Needs Python 3.11 (3.12 also works; tested on 3.11.8) and Node 22. pnpm is optional: Node's bundled corepack provides it.
 
-1. **Backend.** Install once, then run from the repo root.
+```bash
+make setup    # once: backend virtualenv, studio dependencies, backend/.env; offers to take the API keys
+make start    # backend and studio together, opens the browser; Ctrl+C stops both
+```
 
-   ```powershell
-   cd backend
-   py -3.11 -m venv .venv          # macOS / Linux: python3.11 -m venv .venv
-   .venv\Scripts\python -m pip install -r requirements.txt -r requirements-dev.txt
-   cd ..
-   backend/.venv/Scripts/python backend/bot.py    # macOS / Linux: backend/.venv/bin/python
-   ```
+Without `make` (Windows): `python scripts/studio.py setup`, then `python scripts/studio.py start` (or `py` instead of `python`). `make start` also runs the setup if it was skipped.
 
-2. **Frontend.** `cd frontend`, then `pnpm install` and `pnpm dev`.
-3. **Keys.** Open http://localhost:5173 and click **Keys** in the top bar. Paste three keys: OpenAI, ElevenLabs and Command Code JEV. **Test** next to each key makes the cheapest real check.
-4. **Call.** Pick **Clinic Scheduler** (SF catalog) or **National Scheduler** (national catalog) in the sidebar. Open the Test call panel, choose a **Disambiguator** mode, and click **Call**.
+The studio opens on a scheduling agent. All agents ship in `backend/agents`, so there is nothing to create:
 
-The server preloads both catalog indexes at start (SF about 10 ms, national about 1 s, measured). Starting it is free. Money is spent only once a browser connects a call. Vite proxies `/api`, `/start`, `/sessions` and `/status` to the backend on :7860. **Prosper Scheduler** is the original Phase 1 example and uses no catalog.
+| Agent | Catalog |
+|---|---|
+| **Clinic Scheduler** | The provided SF sample, `backend/data/catalog.json` |
+| **National Scheduler** | The generated national catalog, `backend/data/national/` |
+| **Prosper Scheduler** | None: the original Phase 1 example |
+
+**Keys.** Paste them when `make setup` asks (hidden input, saved to the gitignored `backend/.env`), or later in the studio: **Keys** in the top bar. **Test** next to each key makes the cheapest real check. Then open the Test call panel, choose a **Disambiguator** mode and click **Call**.
+
+<details>
+<summary>The same steps by hand</summary>
+
+```bash
+cd backend
+python3.11 -m venv .venv                     # Windows: py -3.11 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt   # Windows: .venv\Scripts\python
+cd ..
+backend/.venv/bin/python backend/bot.py      # the backend on :7860
+cd frontend && pnpm install && pnpm dev      # the studio on http://localhost:5173
+```
+
+</details>
+
+The server preloads both catalog indexes at start (SF about 10 ms, national about 1 s, measured). Starting it is free. Money is spent only once a browser connects a call. Vite proxies `/api`, `/start`, `/sessions` and `/status` to the backend on :7860.
 
 On Windows, set `PYTHONIOENCODING=utf-8` before redirecting script output to a file. Pipecat's startup banner and some eval output are not cp1252-safe.
 
 ## API keys
 
-No key is in the repo. The studio's **Keys** sheet is the fastest path. Nothing is edited on disk.
+No key is in the repo. Two ways in: `make setup` asks for them and writes the gitignored `backend/.env`, or the studio's **Keys** sheet keeps them in the browser and edits nothing on disk.
 
 | Key | Needed for | Get one |
 |---|---|---|
@@ -360,7 +377,7 @@ cd frontend && pnpm test                                   # vitest
 cd frontend && pnpm typecheck && pnpm lint && pnpm build
 ```
 
-Last run: **1,314 backend tests passed, 1 live JEV smoke test skipped** (2026-10-03, after the live-call fixes). **123 frontend tests passed**, and the frontend production build passed.
+Last run: **1,314 backend tests passed, 1 live JEV smoke test skipped** (2026-10-03, after the live-call fixes). **125 frontend tests passed**, and the frontend production build passed.
 
 ## Final verification (2026-10-03, resolver frozen at `222eb22`)
 
