@@ -4,7 +4,8 @@ The catalog index is immutable and loaded once per process. Bookings (holds) are
 so two concurrent calls cannot book the same slot; the request (flow_manager.state["req"]) is
 per call. The agent's resolver.chooser picks the model behind the resolver's hooks
 (scheduling.choosers): JEV (needs CMD_API_KEY), OpenAI (OPENAI_API_KEY), local embeddings
-(fastembed installed) or none. A chooser whose key or package is missing runs as none.
+(fastembed installed) or none. A chooser whose key or package is missing runs as none. A call's
+api_keys (by env var name) override the environment for that call's client only.
 """
 
 from __future__ import annotations
@@ -16,13 +17,13 @@ import time
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Mapping, Optional
 
 from loguru import logger
 
 from scheduling.availability import Availability, Hold, MockAvailability, Slot
 from scheduling.catalog_index import CatalogIndex
-from scheduling.choosers import CHOOSERS, EMBEDDINGS_AVAILABLE
+from scheduling.choosers import CHOOSERS, EMBEDDINGS_AVAILABLE, NO_KEYS
 from scheduling.decision import Gate, Verdict
 from scheduling.embed_chooser import shared_embedder, warm_catalog
 from scheduling.model_client import REQUEST_TIMEOUT_S, TURN_BUDGET_MS
@@ -195,10 +196,10 @@ class ToolContext:
 
 
 def make_context(catalog: str, *, speak_direct: bool, chooser: str = "none", timeout_ms: int = TURN_BUDGET_MS,
-                 on_event: Optional[EventCallback] = None) -> ToolContext:
+                 on_event: Optional[EventCallback] = None, api_keys: Mapping[str, str] = NO_KEYS) -> ToolContext:
     catalog_path = resolve_catalog_path(catalog)
     index = load_index(catalog_path)
-    client = make_model_client(chooser, timeout_ms / 1000)
+    client = make_model_client(chooser, timeout_ms / 1000, api_keys)
     hooks = None
     if client is not None:
         h = CHOOSERS[chooser].hooks_for(index, client, Gate())
@@ -208,15 +209,16 @@ def make_context(catalog: str, *, speak_direct: bool, chooser: str = "none", tim
                        on_event=on_event)
 
 
-def make_model_client(chooser: str, timeout_s: float) -> Any:
-    """Per call, not shared: a networked client carries this call's per-turn budget (begin_turn).
-    One request may use at most REQUEST_TIMEOUT_S of it, so a slow choice still leaves time for
-    its check."""
+def make_model_client(chooser: str, timeout_s: float, api_keys: Mapping[str, str] = NO_KEYS) -> Any:
+    """Per call, not shared: a networked client carries this call's per-turn budget (begin_turn)
+    and this call's key. One request may use at most REQUEST_TIMEOUT_S of the budget, so a slow
+    choice still leaves time for its check."""
     spec = CHOOSERS.get(chooser)
-    if spec is None or not spec.available():
+    if spec is None or not spec.available(api_keys=api_keys):
         logger.warning(f"Chooser {chooser!r} is not available (missing key or package); resolving without a model")
         return None
-    return spec.make_client(mode="auto", timeout_s=min(REQUEST_TIMEOUT_S, timeout_s), turn_budget_s=timeout_s)
+    return spec.make_client(api_keys=api_keys, mode="auto", timeout_s=min(REQUEST_TIMEOUT_S, timeout_s),
+                            turn_budget_s=timeout_s)
 
 
 async def warm_up_model(ctx: ToolContext) -> None:

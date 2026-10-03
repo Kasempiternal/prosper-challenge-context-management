@@ -1,16 +1,18 @@
 import { RTVIEvent, type DeviceErrorReason } from '@pipecat-ai/client-js'
 import { usePipecatClient, usePipecatClientMicControl, useRTVIClientEvent } from '@pipecat-ai/client-react'
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform, type MotionValue } from 'motion/react'
-import { AlertTriangle, AudioLines, ChevronRight, Mic, MicOff, Phone, PhoneOff, RotateCcw } from 'lucide-react'
+import { AlertTriangle, AudioLines, ChevronRight, KeyRound, Mic, MicOff, Phone, PhoneOff, RotateCcw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { cn } from '../../lib/cn'
 import { callBlockedHint } from '../../lib/issues'
 import { softSpring, spring } from '../../lib/motion'
 import { clock } from '../../lib/time'
-import { isCallActive, useCall, type CallError, type CallStatus } from '../../store/call'
+import { isCallActive, startRequestData, useCall, type CallError, type CallStatus } from '../../store/call'
 import { useDevView } from '../../store/devView'
 import { useEditor } from '../../store/editor'
-import { IconButton } from '../ui/Button'
+import { callGate, useKeys } from '../../store/keys'
+import { KeysButton, MissingKeysNotice } from '../keys/KeysSheet'
+import { Button, IconButton } from '../ui/Button'
 import { PanelHeader } from '../inspector/Panel'
 import { Tabs } from '../ui/Tabs'
 import { CostPanel } from '../dev/CostPanel'
@@ -66,6 +68,14 @@ export function TestCallPanel() {
   const scheduling = useEditor((s) => typeof s.doc?.agent.catalog === 'string')
   const devView = useDevView((s) => s.on)
   const [picked, setTab] = useState<PanelTab>('transcript')
+  // No OpenAI or ElevenLabs key anywhere: Call opens the keys sheet. JEV picked with no key: Call
+  // asks before running on rules only.
+  const agent = useEditor((s) => s.doc?.agent)
+  const browserKeys = useKeys((s) => s.browser)
+  const serverKeys = useKeys((s) => s.server)
+  const gate = agent ? callGate({ browser: browserKeys, server: serverKeys }, agent) : ({ kind: 'ready' } as const)
+  const [askKey, setAskKey] = useState(false)
+  if (askKey && gate.kind !== 'keyless-jev') setAskKey(false)
   const showDecisions = scheduling || decisionCount > 0
   const tabs = [
     { value: 'transcript' as const, label: 'Transcript' },
@@ -96,11 +106,7 @@ export function TestCallPanel() {
     try {
       // The runner's /start returns {sessionId, iceConfig}; the transport then posts its
       // offer to /sessions/{sessionId}/api/offer (derived from this endpoint).
-      // JSON round-trip: a detached snapshot typed as the client's Serializable.
-      await client.startBotAndConnect({
-        endpoint: '/start',
-        requestData: { transport: 'webrtc', body: { agent: JSON.parse(JSON.stringify(agent)) } },
-      })
+      await client.startBotAndConnect({ endpoint: '/start', requestData: startRequestData(agent, useKeys.getState().browser) })
       // Hung up while the transport was still negotiating: make sure nothing stays connected.
       if (!isCallActive(useCall.getState().status)) void client.disconnect()
     } catch (err) {
@@ -108,6 +114,12 @@ export function TestCallPanel() {
       useCall.getState().end({ message: err instanceof Error ? err.message : 'Could not start the call.' })
       void client.disconnect()
     }
+  }
+
+  const call = () => {
+    if (gate.kind === 'missing') useKeys.getState().openSheet(gate.providers[0])
+    else if (gate.kind === 'keyless-jev') setAskKey(true)
+    else void start()
   }
 
   const hangUp = () => {
@@ -122,13 +134,14 @@ export function TestCallPanel() {
         eyebrow="Test call"
         title={<StatusLine status={status} />}
         onClose={() => setRightPanel('inspector')}
+        actions={<KeysButton compact />}
       />
       <div className="h-px bg-border-subtle" />
 
       <div className="flex flex-col items-center gap-5 px-5 pt-6 pb-5">
         <div className="flex w-full items-center justify-center gap-8">
           <LevelMeter label="You" level={userLevel} active={status === 'live'} />
-          <CallButton status={status} blocked={blocked} onStart={start} onHangUp={hangUp} />
+          <CallButton status={status} blocked={blocked} onStart={call} onHangUp={hangUp} />
           <LevelMeter label="Agent" level={botLevel} active={status === 'live'} accent />
         </div>
         {blocked ? (
@@ -141,6 +154,20 @@ export function TestCallPanel() {
             {callBlockedHint(issueCount)}
             <ChevronRight className="size-3.5" aria-hidden />
           </button>
+        ) : askKey ? (
+          <NoKeyConfirm
+            onAddKey={() => {
+              setAskKey(false)
+              document.getElementById('call-chooser-key')?.focus()
+            }}
+            onCallAnyway={() => {
+              setAskKey(false)
+              void start()
+            }}
+            onDismiss={() => setAskKey(false)}
+          />
+        ) : gate.kind === 'missing' && !isCallActive(status) ? (
+          <MissingKeysNotice providers={gate.providers} />
         ) : (
           <CallCaption status={status} error={error} />
         )}
@@ -295,6 +322,35 @@ function CallCaption({ status, error }: { status: CallStatus; error: CallError |
         {error?.hint && <p className="text-[12px] leading-snug text-muted">{error.hint}</p>}
       </motion.div>
     </AnimatePresence>
+  )
+}
+
+function NoKeyConfirm({ onAddKey, onCallAnyway, onDismiss }: { onAddKey: () => void; onCallAnyway: () => void; onDismiss: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={softSpring}
+      role="group"
+      aria-labelledby="no-key-text"
+      onKeyDown={(e) => e.key === 'Escape' && onDismiss()}
+      className="flex w-full flex-col gap-2.5 rounded-[12px] border border-warning/25 bg-warning-soft px-3.5 py-3"
+    >
+      <p id="no-key-text" role="alert" className="flex items-start gap-2 text-[12.5px] leading-snug text-ink-soft">
+        <KeyRound className="mt-px size-3.5 shrink-0 text-warning" aria-hidden />
+        <span>
+          JEV has no key, so this call would use <span className="font-medium text-ink">rules only</span>.
+        </span>
+      </p>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button size="sm" variant="secondary" className="h-7 px-3 text-[12.5px]" onClick={onCallAnyway}>
+          Call with rules only
+        </Button>
+        <Button size="sm" variant="primary" className="h-7 px-3 text-[12.5px]" onClick={onAddKey} autoFocus>
+          Add key
+        </Button>
+      </div>
+    </motion.div>
   )
 }
 

@@ -1,4 +1,5 @@
 import type { AgentConfig, AgentNode, AgentSummary, CatalogSummary, ValidationIssue, Voice } from '../types/agent'
+import type { Provider } from './keyProviders'
 import type { CheckName, GradeOutcome, GradeRequest, GradeResult } from '../types/grade'
 
 export class ApiError extends Error {
@@ -106,6 +107,30 @@ export function parseCatalogs(raw: unknown): CatalogSummary[] {
 
 export type SaveResult = { ok: true } | { ok: false; errors: ValidationIssue[] }
 
+/** The header that carries a key to test (backend api_keys.HEADER). */
+export const KEY_HEADER = 'X-Api-Key'
+/** The header that carries the browser's JEV key to the grader (backend api_keys.JEV_HEADER). */
+export const JEV_KEY_HEADER = 'X-CMD-API-Key'
+
+/**
+ * POST /api/keys/test. `limited`: the provider knows the key but it lacks a permission the check
+ * reads with. `error` is the backend's ("invalid key", "network", "busy", "unexpected response",
+ * "missing key"), or "backend" when the local backend did not answer.
+ */
+export type KeyTestResult = { ok: true; ms: number; limited: boolean } | { ok: false; error: string }
+
+export function parseKeyTest(raw: unknown): KeyTestResult {
+  if (!isRecord(raw)) return { ok: false, error: 'backend' }
+  if (raw.ok === true && typeof raw.ms === 'number') return { ok: true, ms: raw.ms, limited: raw.limited === true }
+  return { ok: false, error: typeof raw.error === 'string' ? raw.error : 'backend' }
+}
+
+/** GET /api/keys/status: whether the backend has each key. Anything but `true` is no key. */
+export function parseKeyStatus(raw: unknown): Record<Provider, boolean> {
+  const has = (p: Provider) => isRecord(raw) && isRecord(raw[p]) && raw[p].server_key === true
+  return { openai: has('openai'), elevenlabs: has('elevenlabs'), jev: has('jev') }
+}
+
 export const api = {
   async listAgents(): Promise<AgentSummary[]> {
     return (await request('/api/agents')).json()
@@ -148,9 +173,24 @@ export const api = {
   async listCatalogs(): Promise<CatalogSummary[]> {
     return parseCatalogs(await (await request('/api/catalogs')).json())
   },
-  /** Errors carry the backend's `reason` (e.g. "JEV not configured") as the message. */
-  async grade(body: GradeRequest): Promise<GradeResult> {
-    const res = await fetch('/api/grade', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: json(body) })
+  /** Whether the backend has its own key, per provider. Never a key. */
+  async keyStatus(): Promise<Record<Provider, boolean>> {
+    return parseKeyStatus(await (await request('/api/keys/status')).json())
+  },
+  /** One free or tiny request to `provider` with `key`, made by the backend. Never rejects. */
+  async testKey(provider: Provider, key: string): Promise<KeyTestResult> {
+    try {
+      const res = await fetch(`/api/keys/test?provider=${provider}`, { method: 'POST', headers: { [KEY_HEADER]: key } })
+      return parseKeyTest(await res.json())
+    } catch {
+      return { ok: false, error: 'backend' }
+    }
+  },
+  /** Errors carry the backend's `reason` (e.g. "JEV not configured") as the message. `jevKey` overrides the server's. */
+  async grade(body: GradeRequest, jevKey?: string | null): Promise<GradeResult> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (jevKey) headers[JEV_KEY_HEADER] = jevKey
+    const res = await fetch('/api/grade', { method: 'POST', headers, body: json(body) })
     const payload: unknown = await res.json().catch(() => null)
     if (!res.ok) {
       const reason = isRecord(payload) && typeof payload.reason === 'string' ? payload.reason : `Grading failed (${res.status})`

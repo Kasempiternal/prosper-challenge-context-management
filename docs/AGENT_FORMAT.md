@@ -115,6 +115,8 @@ Served by the Pipecat runner's FastAPI app on port 7860.
 | `POST /api/agents/validate` | `{ok, errors}`. No LLM call. |
 | `GET /api/catalogs` | Every `backend/data/**/catalog.json`, shallowest first: `[{path, label, locations, providers, appointment_types, metros, naive_tokens}]`. Counts come from the `catalog.meta.json` sidecar when present. |
 | `POST /api/grade` | Post-call grade. See below. |
+| `GET /api/keys/status` | `{openai, elevenlabs, jev: {server_key: bool}}`: whether the server has each key. Never a key, a part of one or its length. |
+| `POST /api/keys/test?provider=openai\|elevenlabs\|jev` | Checks the key in the `X-Api-Key` header. See below. |
 | `GET /api/voices` | Fixed list of six ElevenLabs voices |
 | `GET /api/models` | `gpt-4o`, `gpt-4o-mini`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` |
 
@@ -134,11 +136,29 @@ One JEV request with five questions. The response is `{ok: true, scores, usage: 
 
 Errors return `{ok: false, reason}`: 422 for a bad body or unknown `agent_id`, 503 when JEV is not configured or rejects the key, 504 on timeout (8 s, one retry), 502 for other JEV failures.
 
+An `X-CMD-API-Key` header carries the browser's JEV key; it wins over the server's `CMD_API_KEY` for this request.
+
+### API keys
+
+A key the browser sends overrides the server's `.env` for that one call or request (`call_key` in `backend/scheduling/choosers.py`). The backend never writes a key to disk or sends one back, and blanks key fields, key headers (`X-Api-Key`, `X-CMD-API-Key`, `xi-api-key`, `Authorization`) and bearer tokens in every log line.
+
+`POST /api/keys/test?provider=...` makes the cheapest real request with the key in `X-Api-Key`:
+
+| Provider | Request |
+|---|---|
+| `openai` | `GET https://api.openai.com/v1/models` (free) |
+| `elevenlabs` | `GET https://api.elevenlabs.io/v1/user` (free). A restricted key without that permission falls back to `GET /v1/models` and is valid with `limited: true`, not rejected. |
+| `jev` | One two-option JEV choice, about the smallest request JEV answers |
+
+It answers 200 `{ok: true, ms}` (plus `limited: true` for a restricted ElevenLabs key) or `{ok: false, ms, error}` with `error` one of `invalid key`, `network`, `unexpected response`. 400 `missing key` or `unknown provider`; 429 `busy` while another test of the same provider runs. Without `provider` it tests JEV, and `X-CMD-API-Key` is accepted in place of `X-Api-Key`.
+
 ## Test call
 
-The browser calls the runner's `POST /start` with `{"transport": "webrtc", "body": {"agent": <editor agent>}}`. Unsaved edits are included. The WebRTC offer then goes to `/sessions/{sessionId}/api/offer`.
+The browser calls the runner's `POST /start` with `{"transport": "webrtc", "body": {"agent": <editor agent>, "api_keys": {...}}}`. Unsaved edits are included. The WebRTC offer then goes to `/sessions/{sessionId}/api/offer`.
 
-`bot()` in `backend/bot.py` picks the agent from `body.agent`, else `body.agent_id` (loaded from `backend/agents/`), else `example_flow.json`. An invalid agent is logged and the session ends cleanly.
+`api_keys` is optional and holds only the keys pasted in the studio, by env var name: `OPENAI_API_KEY` (the LLM and the OpenAI disambiguator), `ELEVENLABS_API_KEY` (STT and TTS), `CMD_API_KEY` (JEV; sent only when the call consults JEV). Each wins over the server's `.env` for this call only. The older `cmd_api_key` field (the JEV key alone) is still accepted. `bot()` pops both fields before anything else, since the runner keeps the body as its session record.
+
+`bot()` in `backend/bot.py` picks the agent from `body.agent`, else `body.agent_id` (loaded from `backend/agents/`), else `example_flow.json`. An invalid agent, or no OpenAI or ElevenLabs key in either the request or `.env`, is logged and the session ends cleanly.
 
 ## Live call events
 

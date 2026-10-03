@@ -43,7 +43,7 @@ Windows (PowerShell):
 cd backend
 py -3.11 -m venv .venv                 # or: uv venv .venv --python 3.11
 .venv\Scripts\python -m pip install -r requirements.txt -r requirements-dev.txt
-copy .env.example .env
+copy .env.example .env                 # optional: keys can be pasted in the studio instead
 ```
 
 macOS / Linux:
@@ -52,16 +52,8 @@ macOS / Linux:
 cd backend
 python3.11 -m venv .venv               # or: uv venv .venv --python 3.11
 .venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt
-cp .env.example .env
+cp .env.example .env                   # optional: keys can be pasted in the studio instead
 ```
-
-Fill `backend/.env`:
-
-| Key | Needed for |
-|---|---|
-| `OPENAI_API_KEY` | The LLM. Required for a call. |
-| `ELEVENLABS_API_KEY` | STT and TTS. Required for a call. |
-| `CMD_API_KEY` | Optional. Enables JEV (Command Code decision model) for the resolver and the post-call grader. Without it the resolver never consults a model and asks the caller instead, and the call review reports that JEV is not configured. |
 
 Run from the repo root, with the venv's Python:
 
@@ -83,6 +75,26 @@ pnpm dev
 ```
 
 Open http://localhost:5173. Vite proxies `/api`, `/start`, `/sessions` and `/status` to the backend on :7860. In the sidebar, pick **Clinic Scheduler** (SF catalog) or **National Scheduler** (national catalog). **Prosper Scheduler** is the original Phase 1 example and uses no catalog.
+
+Click **Keys** in the top bar and paste your OpenAI and ElevenLabs keys; Command Code JEV is optional. Nothing to edit on disk. See [API keys](#api-keys).
+
+## API keys
+
+No key is in the repo. The fastest path: start the backend and the frontend, open the studio, click **Keys** in the top bar, paste three keys, and call. **Test** next to a key makes the cheapest real check: OpenAI's model list, the ElevenLabs account (free), one tiny JEV choice.
+
+| Key | Needed for | Get one |
+|---|---|---|
+| OpenAI (`OPENAI_API_KEY`) | The conversation (the agent's model), and the OpenAI disambiguator. Required for a call. | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| ElevenLabs (`ELEVENLABS_API_KEY`) | Speech to text and the agent's voice. Required for a call. | [elevenlabs.io/app/settings/api-keys](https://elevenlabs.io/app/settings/api-keys) |
+| Command Code JEV (`CMD_API_KEY`) | Optional. The JEV disambiguator and the post-call review. Without it the resolver never consults a model and asks the caller instead, and the call review reports that JEV is not configured. | [commandcode.ai](https://commandcode.ai) |
+
+The sheet shows where each key comes from: **Server key**, **This browser** or **Missing**. The dot on the **Keys** button is green with all three, amber without JEV, and red when a call cannot start; Call then says which keys to add and opens the sheet. The OpenAI and JEV rows also sit under the Disambiguator switch when that chooser is picked.
+
+The alternative is `backend/.env`: copy `backend/.env.example`, which lists every variable the backend reads, and fill it. `AGENTS_DIR` (optional) sets where agent JSON files live; default `backend/agents`. A key pasted in the studio wins over `.env` for that one call or request.
+
+How a pasted key travels. The browser keeps it in `localStorage` (`agent-studio:openai-key`, `agent-studio:elevenlabs-key`, `agent-studio:jev-key`) and sends it only to the local backend: in the `/start` body as `api_keys` (the JEV key only for a call that consults JEV), as an `X-CMD-API-Key` header for the call review, and as an `X-Api-Key` header for a key test. The backend uses it for that call or request only, never writes it to disk and never sends it back: `GET /api/keys/status` tells the studio only whether the server has each key. Log lines blank every key field, key header and bearer token (the Pipecat runner logs every `/start` body).
+
+Any script running on the studio's origin can read `localStorage`. That is fine for a local demo, but don't paste a key into a studio served to other people.
 
 ## Phase 1: Agent Studio
 
@@ -310,6 +322,7 @@ python backend/tools/text_sim.py N3     # one beat: replays the second live call
 | `backend/bot.py` | Voice pipeline. Loads an agent from the `/start` body and runs it. Serves the API. One tool call per LLM turn. |
 | `backend/agents_api.py` | REST API over `backend/agents/*.json`, `/api/catalogs`, `/api/grade` |
 | `backend/grader.py` | JEV post-call grader |
+| `backend/api_keys.py` | The browser's keys over `.env` per call or request (read through `call_key` in `scheduling/choosers.py`), `/api/keys/status`, `/api/keys/test`, log redaction |
 | `backend/agent_builder/` | `schema.py` (agent shape), `validation.py` (the one rule set), `builder.py` (JSON to Pipecat Flows, live events, edge preconditions and actions) |
 | `backend/agent_tools/` | Tool, guard and action registry, scheduling tools, per-call context, STT keyterms, JEV warm-up |
 | `backend/scheduling/` | Resolver: `catalog_index`, `policy`, `geo`, `request`, `resolver`, `lexicon`, `names`, `text`, `templates`, `lookup`, `availability`, `decision`, `jev` |
@@ -329,7 +342,7 @@ cd frontend && pnpm test                                   # vitest
 cd frontend && pnpm typecheck && pnpm lint && pnpm build
 ```
 
-Last run: 424 backend tests passed (1 live JEV smoke test skipped), 53 frontend tests passed.
+Last run: 636 backend tests passed (1 live JEV smoke test skipped), 83 frontend tests passed.
 
 ## Known limitations
 

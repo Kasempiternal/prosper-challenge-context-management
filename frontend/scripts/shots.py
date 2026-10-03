@@ -22,9 +22,9 @@ def base_url(default: str) -> str:
     return sys.argv[1] if len(sys.argv) > 1 else default
 
 
-def new_page(browser: Browser, theme: str, errors: list[str], dev_view: bool | None = None) -> Page:
+def new_page(browser: Browser, theme: str, errors: list[str], dev_view: bool | None = None, scale: int = 1) -> Page:
     """A fresh 1600x960 context in `theme` (dev_view pins the Dev view toggle), collecting console errors."""
-    context = browser.new_context(viewport={"width": 1600, "height": 960}, device_scale_factor=1)
+    context = browser.new_context(viewport={"width": 1600, "height": 960}, device_scale_factor=scale)
     init = f"localStorage.setItem('agent-studio:theme', '{theme}')"
     if dev_view is not None:
         init += f"; localStorage.setItem('agent-studio:dev-view', '{int(dev_view)}')"

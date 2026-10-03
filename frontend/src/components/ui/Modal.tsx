@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { fade, softSpring } from '../../lib/motion'
 import { Button } from './Button'
+import { useModalFocus } from './useModalFocus'
 
 interface ModalProps {
   open: boolean
@@ -15,20 +16,7 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, description, children, footer }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onClose()
-      }
-    }
-    window.addEventListener('keydown', onKey, true)
-    const focusable = panelRef.current?.querySelector<HTMLElement>('input, textarea, [data-autofocus]')
-    focusable?.focus()
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [open, onClose])
+  useModalFocus(open, panelRef, onClose)
 
   return createPortal(
     <AnimatePresence>

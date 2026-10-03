@@ -2,11 +2,13 @@ import { CHOOSERS, effectiveChooser, modeLabel, type Chooser } from '../../lib/c
 import { isCallActive, useCall } from '../../store/call'
 import { useEditor } from '../../store/editor'
 import { useTelemetry } from '../../store/telemetry'
+import { KeyRow } from '../keys/KeyRow'
 import { Segmented } from '../ui/Segmented'
 
 /**
  * "Disambiguator: JEV / OpenAI / Embeddings / Off" for the agent being edited. Writes
  * resolver.chooser into the draft, which is what the next test call sends; locked while a call runs.
+ * With JEV or OpenAI picked, that provider's key row sits under the switch.
  */
 export function ChooserControl({ id }: { id: string }) {
   const resolver = useEditor((s) => s.doc?.agent.resolver)
@@ -33,6 +35,7 @@ export function ChooserControl({ id }: { id: string }) {
         options={CHOOSERS.map((c) => ({ value: c.value, label: c.label, title: c.hint }))}
       />
       <p className="text-[12px] leading-snug text-muted">{CHOOSERS.find((c) => c.value === chooser)?.hint}</p>
+      {(chooser === 'jev' || chooser === 'openai') && <KeyRow key={chooser} provider={chooser} id={id} variant="inline" locked={locked} />}
     </div>
   )
 }

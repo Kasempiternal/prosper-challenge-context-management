@@ -1,14 +1,15 @@
 import json
 import os
+from pathlib import Path
 
 import httpx
 import pytest
+from dotenv import dotenv_values
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import grader
 from agents_api import create_router
-from scheduling.jev import JevClient
 
 TRANSCRIPT = [
     {"role": "user", "text": "Hi, I'm a new patient with a referral. I need a cardiology consultation with Dr. Chen, soonest you have."},
@@ -43,22 +44,28 @@ JEV_RESPONSE = {
 }
 
 
-def make_client(tmp_path, handler, key="test-key"):
-    jev = JevClient(key, mode="live", timeout_s=grader.TIMEOUT_S, retries=grader.RETRIES,
-                    turn_budget_s=None, transport=httpx.MockTransport(handler))
-    app = FastAPI()
-    app.include_router(create_router(tmp_path / "agents", jev=jev))
-    return TestClient(app)
+@pytest.fixture
+def make_client(tmp_path, monkeypatch):
+    """A test client whose JEV is `handler`, with `key` as the server's CMD_API_KEY."""
+    def make(handler, key="test-key"):
+        if key:
+            monkeypatch.setenv("CMD_API_KEY", key)
+        else:
+            monkeypatch.delenv("CMD_API_KEY", raising=False)
+        app = FastAPI()
+        app.include_router(create_router(tmp_path / "agents", jev_transport=httpx.MockTransport(handler)))
+        return TestClient(app)
+    return make
 
 
-def test_grade_success_sends_one_request_with_five_questions(tmp_path):
+def test_grade_success_sends_one_request_with_five_questions(make_client):
     seen = []
 
     def handler(request):
         seen.append(json.loads(request.content))
         return httpx.Response(200, json=JEV_RESPONSE)
 
-    res = make_client(tmp_path, handler).post("/api/grade", json={**BODY, "agent_id": "prosper-scheduler"})
+    res = make_client(handler).post("/api/grade", json={**BODY, "agent_id": "prosper-scheduler"})
 
     assert res.status_code == 200
     out = res.json()
@@ -91,30 +98,30 @@ def test_grade_success_sends_one_request_with_five_questions(tmp_path):
     assert 'COLLECTED DATA: {"visit":"Cardiology Consultation"}' in sent["state"]
 
 
-def test_missing_key_is_503_without_network(tmp_path):
+def test_missing_key_is_503_without_network(make_client):
     def handler(request):
         raise AssertionError("must not call JEV without a key")
 
-    res = make_client(tmp_path, handler, key=None).post("/api/grade", json=BODY)
+    res = make_client(handler, key=None).post("/api/grade", json=BODY)
     assert res.status_code == 503
     assert res.json() == {"ok": False, "reason": "JEV not configured"}
 
 
-def test_timeout_retries_once_then_504(tmp_path):
+def test_timeout_retries_once_then_504(make_client):
     calls = []
 
     def handler(request):
         calls.append(1)
         raise httpx.ReadTimeout("slow", request=request)
 
-    res = make_client(tmp_path, handler).post("/api/grade", json=BODY)
+    res = make_client(handler).post("/api/grade", json=BODY)
     assert res.status_code == 504
     assert res.json() == {"ok": False, "reason": "JEV timed out after 8 s"}
     assert len(calls) == 2
 
 
-def test_malformed_jev_answer_is_502(tmp_path):
-    res = make_client(tmp_path, lambda r: httpx.Response(200, json={"answers": {"outcome": {}}})).post("/api/grade", json=BODY)
+def test_malformed_jev_answer_is_502(make_client):
+    res = make_client(lambda r: httpx.Response(200, json={"answers": {"outcome": {}}})).post("/api/grade", json=BODY)
     assert res.status_code == 502
     assert res.json()["ok"] is False
 
@@ -129,17 +136,17 @@ def test_malformed_jev_answer_is_502(tmp_path):
     ({**BODY, "agent_id": "nope"}, "agent_id: agent 'nope' not found"),
     ({**BODY, "agent_id": "../etc"}, "agent_id: agent '../etc' not found"),
 ])
-def test_bad_input_is_422_with_message(tmp_path, body, reason):
+def test_bad_input_is_422_with_message(make_client, body, reason):
     def handler(request):
         raise AssertionError("must not call JEV on bad input")
 
-    res = make_client(tmp_path, handler).post("/api/grade", json=body)
+    res = make_client(handler).post("/api/grade", json=body)
     assert res.status_code == 422
     assert res.json() == {"ok": False, "reason": reason}
 
 
-def test_non_json_body_is_422(tmp_path):
-    res = make_client(tmp_path, lambda r: httpx.Response(500)).post(
+def test_non_json_body_is_422(make_client):
+    res = make_client(lambda r: httpx.Response(500)).post(
         "/api/grade", content=b"not json", headers={"Content-Type": "application/json"})
     assert res.status_code == 422
 
@@ -156,7 +163,7 @@ def test_transcript_keeps_the_latest_turns_within_budget():
 
 @pytest.mark.skipif(os.environ.get("RUN_JEV_LIVE") != "1", reason="live JEV call; set RUN_JEV_LIVE=1")
 def test_live_smoke():
-    jev = grader.client_from_env()
+    jev = grader.client(dotenv_values(Path(grader.__file__).with_name(".env")).get("CMD_API_KEY"))
     assert jev.api_key, "CMD_API_KEY missing from backend/.env"
     out = grader.grade(jev, grader.parse_request(BODY))
     print(json.dumps(out, indent=1))

@@ -29,3 +29,8 @@ export const DEFAULT_TIMEOUT_MS = 2500
 export function effectiveChooser(resolver: ResolverConfig | undefined): Chooser {
   return isChooser(resolver?.chooser) ? resolver.chooser : 'jev'
 }
+
+/** A call of this agent consults JEV: it schedules from a catalog and its chooser is JEV. */
+export function usesJev(agent: { catalog?: unknown; resolver?: ResolverConfig }): boolean {
+  return typeof agent.catalog === 'string' && effectiveChooser(agent.resolver) === 'jev'
+}

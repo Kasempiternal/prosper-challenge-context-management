@@ -15,7 +15,7 @@
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import Awaitable, Callable, Optional, Union
+from typing import Awaitable, Callable, Mapping, Optional, Union
 
 from loguru import logger
 from pipecat.flows import (
@@ -28,6 +28,7 @@ from pipecat.flows import (
 )
 
 from agent_tools import EDGE_ACTIONS, EDGE_GUARDS, ToolContext, build_tool, make_context, today_phrase
+from scheduling.choosers import NO_KEYS
 
 from .schema import AgentConfig, Edge, Node
 from .validation import AgentValidationError, validate_agent
@@ -38,7 +39,9 @@ EventCallback = Callable[[dict], Awaitable[None]]
 class AgentBuilder:
     """Builds a runnable Pipecat Flows graph from a declarative AgentConfig."""
 
-    def __init__(self, config: AgentConfig, on_event: Optional[EventCallback] = None):
+    def __init__(self, config: AgentConfig, on_event: Optional[EventCallback] = None,
+                 api_keys: Mapping[str, str] = NO_KEYS):
+        """api_keys: this call's API keys by env var name, over the environment (scheduling.choosers)."""
         self.config = config
         self._on_event = on_event
         self._nodes_by_name = {n.name: n for n in config.nodes}
@@ -51,6 +54,7 @@ class AgentBuilder:
                 chooser=config.resolver.chooser,
                 timeout_ms=config.resolver.timeout_ms,
                 on_event=self._emit,
+                api_keys=api_keys,
             )
 
     # ---- loading -----------------------------------------------------------

@@ -7,6 +7,7 @@ import { fieldErrors } from '../../lib/issues'
 import { useEditor } from '../../store/editor'
 import type { AgentConfig, ResolverConfig, Voice } from '../../types/agent'
 import { ChooserControl } from '../call/ChooserControl'
+import { KeysButton } from '../keys/KeysSheet'
 import { Field, FieldErrors, Input, Select, Textarea } from '../ui/Field'
 import { Toggle } from '../ui/Toggle'
 import { PanelBody, PanelHeader, Section } from './Panel'
@@ -47,7 +48,13 @@ export function AgentSettings() {
 
   return (
     <>
-      <PanelHeader icon={<Settings2 className="size-4" />} eyebrow="Agent" title="Settings" onClose={() => select(null)} />
+      <PanelHeader
+        icon={<Settings2 className="size-4" />}
+        eyebrow="Agent"
+        title="Settings"
+        onClose={() => select(null)}
+        actions={<KeysButton compact />}
+      />
       <div className="h-px bg-border-subtle" />
       <PanelBody>
         <div className="flex flex-col gap-5">

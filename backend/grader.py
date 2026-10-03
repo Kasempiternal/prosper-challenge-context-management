@@ -212,5 +212,6 @@ def _prob(v: Any) -> float:
     return round(p, 4)
 
 
-def client_from_env() -> JevClient:
-    return JevClient.from_env(mode="live", timeout_s=TIMEOUT_S, retries=RETRIES, turn_budget_s=None)
+def client(api_key: Optional[str], transport: Optional[httpx.BaseTransport] = None) -> JevClient:
+    return JevClient(api_key, mode="live", timeout_s=TIMEOUT_S, retries=RETRIES, turn_budget_s=None,
+                     transport=transport)

@@ -5,6 +5,7 @@ import { Toaster } from 'sonner'
 import { CallProvider } from './components/call/CallProvider'
 import { Canvas } from './components/canvas/Canvas'
 import { RightPanel } from './components/inspector/RightPanel'
+import { KeysSheet } from './components/keys/KeysSheet'
 import { Sidebar } from './components/sidebar/Sidebar'
 import { TopBar } from './components/topbar/TopBar'
 import { ConfirmDialog } from './components/ui/Modal'
@@ -25,6 +26,7 @@ export default function App() {
           </ReactFlowProvider>
         </div>
         <SwitchGuard />
+        <KeysSheet />
         <ThemedToaster />
       </CallProvider>
     </MotionConfig>

@@ -15,14 +15,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Response
+import httpx
+from fastapi import APIRouter, Body, Header, HTTPException, Response
 from fastapi.responses import JSONResponse
 from loguru import logger
 
+import api_keys
 import grader
 from agent_builder import validate_agent
 from agent_builder.schema import DEFAULT_MODEL, DEFAULT_VOICE_ID
-from scheduling.jev import JevClient
 
 BACKEND_DIR = Path(__file__).parent
 DEFAULT_AGENTS_DIR = BACKEND_DIR / "agents"
@@ -133,7 +134,7 @@ def catalog_lister(backend_dir: Path):
     return list_catalogs
 
 
-def create_router(agents_dir: Optional[Path] = None, jev: Optional[JevClient] = None,
+def create_router(agents_dir: Optional[Path] = None, jev_transport: Optional[httpx.BaseTransport] = None,
                   backend_dir: Path = BACKEND_DIR) -> APIRouter:
     agents_dir = Path(agents_dir) if agents_dir else agents_dir_from_env()
     seed_agents_dir(agents_dir)
@@ -254,8 +255,7 @@ def create_router(agents_dir: Optional[Path] = None, jev: Optional[JevClient] = 
         return {"ok": not errors, "errors": errors}
 
     @router.post("/grade")
-    def grade(payload: Any = Body(...)):
-        nonlocal jev
+    def grade(payload: Any = Body(...), key: Optional[str] = Header(default=None, alias=api_keys.JEV_HEADER)):
         try:
             req = grader.parse_request(payload)
             agent = req.agent
@@ -263,8 +263,11 @@ def create_router(agents_dir: Optional[Path] = None, jev: Optional[JevClient] = 
                 if not ID_RE.match(req.agent_id) or not agent_path(req.agent_id).is_file():
                     raise grader.GradeError(422, f"agent_id: agent '{req.agent_id}' not found")
                 agent = read_agent(req.agent_id)
-            jev = jev or grader.client_from_env()
-            return grader.grade(jev, req, agent)
+            jev = grader.client(api_keys.call_key(api_keys.JEV_ENV, {api_keys.JEV_ENV: key or ""}), jev_transport)
+            try:
+                return grader.grade(jev, req, agent)
+            finally:
+                jev.close()
         except grader.GradeError as e:
             return JSONResponse(status_code=e.status, content={"ok": False, "reason": e.reason})
 

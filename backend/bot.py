@@ -6,17 +6,19 @@
 # definition (JSON) via AgentBuilder and runs it. Swapping the agent is a data
 # change, not a code change.
 #
-#   /start body {agent | agent_id}  ->  AgentBuilder  ->  Pipecat Flows graph  ->  FlowManager
+#   /start body {agent | agent_id, api_keys?}  ->  AgentBuilder  ->  Pipecat Flows graph  ->  FlowManager
 #
-# The same process serves the agents REST API (agents_api.py) on the runner's app.
+# api_keys (OPENAI_API_KEY, ELEVENLABS_API_KEY, CMD_API_KEY) are the browser's keys: each overrides
+# .env for this call only (call_key). The same process serves the agents REST API (agents_api.py)
+# and the API key endpoints (api_keys.py) on the runner's app.
 #
 # Run:  python bot.py   then open http://localhost:7860/client
 #
 
 import asyncio
 import json
-import os
 from pathlib import Path
+from typing import Mapping
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -50,6 +52,15 @@ from agent_builder import AgentBuilder, AgentConfig, validate_agent
 from agent_tools import resolver_mode_event, stt_keyterms, warm_up_model
 from agent_tools.context import preload_catalogs
 from agents_api import ID_RE, agents_dir_from_env, create_router
+from api_keys import (
+    CALL_ENVS,
+    ELEVENLABS_ENV,
+    OPENAI_ENV,
+    call_key,
+    create_keys_router,
+    install_log_redaction,
+    take_start_keys,
+)
 
 # Load .env next to this file, so the bot runs the same from the repo root or backend/.
 load_dotenv(Path(__file__).parent / ".env", override=True)
@@ -57,7 +68,9 @@ load_dotenv(Path(__file__).parent / ".env", override=True)
 # Fallback agent when the /start body names none.
 AGENT_FLOW = Path(__file__).parent / "example_flow.json"
 
+install_log_redaction()
 app.include_router(create_router())
+app.include_router(create_keys_router())
 preload_catalogs(agents_dir_from_env())
 
 
@@ -95,11 +108,22 @@ def user_aggregator_params() -> LLMUserAggregatorParams:
     )
 
 
-def make_stt(api_key: str, keyterms: list[str] | None) -> ElevenLabsRealtimeSTTService:
-    return ElevenLabsRealtimeSTTService(
-        api_key=api_key,
+def make_services(config: AgentConfig, api_keys: Mapping[str, str], keyterms: list[str] | None):
+    """The call's STT, TTS and LLM, each with this call's key over .env (call_key)."""
+    elevenlabs_key = call_key(ELEVENLABS_ENV, api_keys)
+    stt = ElevenLabsRealtimeSTTService(
+        api_key=elevenlabs_key,
         settings=ElevenLabsRealtimeSTTService.Settings(keyterms=keyterms),
     )
+    tts = ElevenLabsTTSService(
+        api_key=elevenlabs_key,
+        settings=ElevenLabsTTSService.Settings(voice=config.voice_id),
+    )
+    llm = SerialToolCallsLLMService(
+        api_key=call_key(OPENAI_ENV, api_keys),
+        settings=SerialToolCallsLLMService.Settings(model=config.model),
+    )
+    return stt, tts, llm
 
 
 def load_agent_data(body: dict | None) -> dict:
@@ -116,25 +140,18 @@ def load_agent_data(body: dict | None) -> dict:
     return json.loads(AGENT_FLOW.read_text(encoding="utf-8"))
 
 
-async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_data: dict) -> None:
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_data: dict,
+                  api_keys: Mapping[str, str]) -> None:
     config = AgentConfig.from_dict(agent_data)
     logger.info(f"Starting '{config.name}' with {len(config.nodes)} nodes")
 
     async def send_event(event: dict) -> None:
         await worker.queue_frame(RTVIServerMessageFrame(data=event))
 
-    builder = AgentBuilder(config, on_event=send_event)
+    builder = AgentBuilder(config, on_event=send_event, api_keys=api_keys)
     keyterms = stt_keyterms(builder.tool_context.index) if builder.tool_context else None
 
-    stt = make_stt(os.environ["ELEVENLABS_API_KEY"], keyterms)
-    tts = ElevenLabsTTSService(
-        api_key=os.environ["ELEVENLABS_API_KEY"],
-        settings=ElevenLabsTTSService.Settings(voice=config.voice_id),
-    )
-    llm = SerialToolCallsLLMService(
-        api_key=os.environ["OPENAI_API_KEY"],
-        settings=SerialToolCallsLLMService.Settings(model=config.model),
-    )
+    stt, tts, llm = make_services(config, api_keys, keyterms)
 
     context = LLMContext()
     context_aggregator = LLMContextAggregatorPair(
@@ -202,20 +219,24 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
 
 async def bot(runner_args: RunnerArguments):
     """Entry point invoked by the Pipecat dev runner (and Pipecat Cloud)."""
+    api_keys = take_start_keys(runner_args.body)
+    missing = [env for env in CALL_ENVS if not call_key(env, api_keys)]
     try:
         agent_data = load_agent_data(runner_args.body)
         errors = validate_agent(agent_data)
     except (OSError, ValueError) as e:
         errors = [{"path": "", "message": str(e)}]
-    if errors:
-        logger.error(f"Not starting session {runner_args.session_id}: invalid agent: {errors}")
+    reason = (f"no {' or '.join(missing)} in .env or the request" if missing
+              else f"invalid agent: {errors}" if errors else "")
+    if reason:
+        logger.error(f"Not starting session {runner_args.session_id}: {reason}")
         connection = getattr(runner_args, "webrtc_connection", None)
         if connection is not None:
             await connection.disconnect()
         return
 
     transport = await create_transport(runner_args, transport_params)
-    await run_bot(transport, runner_args, agent_data)
+    await run_bot(transport, runner_args, agent_data, api_keys)
 
 
 if __name__ == "__main__":

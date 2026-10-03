@@ -10,6 +10,7 @@ import { isCallActive, useCall } from '../../store/call'
 import { cn } from '../../lib/cn'
 import { useDevView } from '../../store/devView'
 import { useEditor } from '../../store/editor'
+import { KeysButton } from '../keys/KeysSheet'
 import { Button, IconButton } from '../ui/Button'
 import { Kbd, Popover } from '../ui/Popover'
 import { AgentNameInput } from './AgentNameInput'
@@ -94,7 +95,10 @@ export function TopBar({ helpOpen, setHelpOpen }: { helpOpen: boolean; setHelpOp
           </ul>
         </Popover>
         <ThemeMenu />
-        <DevViewToggle />
+        <div className="ml-1 flex items-center gap-1.5">
+          <KeysButton />
+          <DevViewToggle />
+        </div>
       </div>
 
       <div className="mx-1 h-5 w-px bg-border" />
@@ -131,7 +135,7 @@ function DevViewToggle() {
       aria-pressed={on}
       title="Dev view: live pipeline telemetry (D)"
       className={cn(
-        'ml-1 flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors duration-200 ease-out-soft',
+        'flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors duration-200 ease-out-soft',
         on ? 'border-accent/40 bg-accent-soft text-accent' : 'border-border text-ink-soft hover:border-border-strong hover:text-ink',
       )}
     >

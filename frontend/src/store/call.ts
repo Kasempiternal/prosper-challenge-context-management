@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import { api } from '../lib/api'
 import { isChooser, type Chooser } from '../lib/chooser'
+import type { AgentConfig } from '../types/agent'
 import type { GradeResult, GradeTurn } from '../types/grade'
+import { callKeys, useKeys, type PerProvider } from './keys'
 
 export type CallStatus = 'idle' | 'connecting' | 'live' | 'ended'
 
@@ -145,12 +147,15 @@ export const useCall = create<CallState>()((set, get) => ({
     const current = () => seq === gradeSeq && get().attempt === attempt && get().status === 'ended'
     set({ review: { status: 'grading' } })
     try {
-      const result = await api.grade({
-        agent,
-        transcript,
-        decisions: decisions.map((d) => ({ status: d.status, say: d.say, offers: d.offers, reason: d.reason })),
-        collected,
-      })
+      const result = await api.grade(
+        {
+          agent,
+          transcript,
+          decisions: decisions.map((d) => ({ status: d.status, say: d.say, offers: d.offers, reason: d.reason })),
+          collected,
+        },
+        useKeys.getState().browser.jev,
+      )
       if (current()) set({ review: { status: 'done', result } })
     } catch (err) {
       if (current()) set({ review: { status: 'error', message: err instanceof Error ? err.message : 'Grading failed.' } })
@@ -160,6 +165,19 @@ export const useCall = create<CallState>()((set, get) => ({
 
 export function isCallActive(status: CallStatus): boolean {
   return status === 'connecting' || status === 'live'
+}
+
+type Json = string | number | boolean | null | Json[] | { [key: string]: Json }
+
+/**
+ * The runner's /start request for a call of `agent` (a detached JSON snapshot, unsaved edits
+ * included). The browser's keys ride along as api_keys (callKeys); the server's never leave it.
+ */
+export function startRequestData(agent: AgentConfig, browser: PerProvider<string | null>) {
+  const body: { [key: string]: Json } = { agent: JSON.parse(JSON.stringify(agent)) as Json }
+  const keys = callKeys(browser, agent)
+  if (Object.keys(keys).length) body.api_keys = keys
+  return { transport: 'webrtc', body }
 }
 
 export function parseFlowEvent(raw: unknown): FlowEvent | null {
