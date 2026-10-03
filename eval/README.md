@@ -659,3 +659,60 @@ so h2-28 asks between Hearing Test and ENT Consultation: the safe side, at a cos
 turn (46 -> 45/49). The act rule's thinnest lead is nat2-geo-06 at 0.02 (a 0.26 vs 0.24 check with
 "either" 0.50): it books, and would ask under any positive margin. Gender 0.9 has no dev name within
 0.01 (Fatima 0.89, David 0.09).
+
+## Held-out round 3: scored once (2026-10-03)
+
+`heldout3` and `national3` were frozen in commit `778f6c3` before any round 3 resolver change
+landed. They were scored once, after the review fixes and the cleanup, with every chooser. JEV and
+OpenAI ran live (`--live`). Raw outputs are in `eval/results/round3_*.txt`. Nothing below was tuned
+on these sets.
+
+| set | mode | wrong commits | top-1 | questions per booking |
+|---|---|---|---|---|
+| heldout3 (SF, 54 turns) | no model | 18/29 (62.1%) | 20/54 | 0.38 |
+| | embeddings | 16/36 (44.4%) | 29/54 | 0.18 |
+| | OpenAI gpt-4o-mini | 8/40 (20.0%) | 42/54 | 0.08 |
+| | **JEV** | **7/42 (16.7%)** | **42/54** | 0.05 |
+| national3 (56 turns) | no model | 5/19 (26.3%) | 28/56 | 0.67 |
+| | embeddings | 5/31 (16.1%) | 41/56 | 0.33 |
+| | OpenAI gpt-4o-mini | 3/31 (9.7%) | 43/56 | 0.38 |
+| | **JEV** | **3/35 (8.6%)** | **46/56** | 0.26 |
+
+The dev sets read 0 wrong commits in JEV mode, so the held-out sets show a real generalization gap.
+The JEV-mode wrong commits fall into general failure classes, not one-offs:
+
+- **The check committed while its own top answer was "either"** (h3-32, "my yearly all-over skin
+  check to look for skin cancer": chosen 0.34, rival 0.25, either 0.41). The rule required only
+  chosen > rival. nat2-geo-06 on dev passes the same way, at chosen 0.26, rival 0.24, either 0.50.
+- **The caller said they did not know, and the resolver still chose** (h3-31, a scope where the
+  caller does not remember "if it goes down my throat or up from below").
+- **A service the clinics do not offer was replaced by a related one** (h3-34, "start PT after my
+  shoulder surgery" offered an orthopedic consultation instead of refusing).
+- **A named provider excluded by policy was replaced by another** (h3-p04, a new patient asking for
+  "the nurse practitioner, Dr. Hernandez" was offered a different Dr. Hernandez instead of being told
+  the nurse practitioner is not taking new patients).
+- **A clinic named to pick the doctor did not also limit where** (h3-p11, h3-p14, "Dr. Michael
+  Sato, the one at the Sunset clinic" offered Sato at North Gate too).
+- **Alternatives skipped closer clinics** (nat3-geo-10: Rockridge drug test offered Santa Clara
+  and Evergreen, about 40 miles away, while San Francisco sites within 13 miles qualify).
+- **Type choice errors the check confirmed** (nat3-sym-05: perimenopause symptoms offered an OB/GYN
+  new patient visit).
+- **A habitual two-visit phrase** (h3-33, "regular six-month dental checkup" chose Dental Exam over
+  Dental Cleaning). Its author marked this label as uncertain before scoring.
+
+Other misses are asks, not wrong commits. They include two policy-driven ones:
+- h3-p08 ("Dr. Garcia, the male one" asks, because p(woman) for Carlos is 0.16, above the
+  pre-registered 0.1).
+- h3-p09 (asks for the first name; the label expects a two-option provider ask, an ask-field
+  convention the author flagged before scoring).
+
+**Integrity notes.**
+1. A unit test iterated over every `eval/cases*.jsonl`, so two pytest runs resolved the blind
+   sets. They asserted only that no spoken text contains "None", passed silently, and printed
+   nothing. Tests now read dev sets only (`c802930`).
+2. A cleanup worker's code search previewed h3-01 to h3-05 (phrases and expected types). That
+   worker changed no decision logic: dev decisions were identical before and after its commits in
+   all four modes. Excluding h3-01 to h3-05, heldout3 reads: no model 15/25 wrong, top-1 19/49;
+   embeddings 14/32, 27/49; OpenAI 7/36, 39/49; JEV 7/37 (18.9%), 38/49.
+
+From here on, `heldout3` and `national3` are dev sets. A fresh blind round judges the next fixes.

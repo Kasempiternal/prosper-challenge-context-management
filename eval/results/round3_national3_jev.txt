@@ -1,0 +1,163 @@
+Resolver eval (o200k_base tokenizer); chooser jev (LIVE network)
+
+=== national3: no model ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   48 / 56
+WRONG-COMMIT rate per commit (headline)   5/19 = 26.3%  (over 56 resolve turns)
+top-1 (turn fully correct)                28/56 = 50.0%
+ask precision (field-level)               9/27 = 33.3%
+ask recall (field-level)                  9/9 = 100.0%
+mean questions per booking                0.67 over 39 bookings
+refusal correctness                       5/8 = 62.5%
+resolver latency p50 / p95 (no network)   0.61 ms / 4.96 ms  (n=1120)
+Plan.say tokens  mean / p95 / max         25 / 55 / 70
+Plan.summary tokens mean / p95 / max      56 / 91 / 106
+tool result tokens mean / p95 / max       90 / 145 / 160
+  ... speak-direct (no say) mean/p95/max  62 / 88 / 104
+model requests; turns where a hook fired  0; 0 of 56 turns
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       4/5
+  dup_name_metro         5/6
+  geo                    2/18
+  new_patient            4/5
+  no_location            0/3
+  ring                   1/1
+  symptom                2/8
+  unoffered              2/2
+MISSES (28):
+  nat3-geo-01 turn 1: status ask != offer
+      said: Is that an ultrasound - pelvic or an ultrasound?
+  nat3-geo-02 turn 1: status ask != offer
+      said: Is that a spine x-ray or an x-ray?
+  nat3-geo-03 turn 1: status ask != offer
+      said: Is that an x-ray or a spine x-ray?
+  nat3-geo-05 turn 1: status ask != offer
+      said: That's not available at Fort Lauderdale. There's nothing closer to Fort Lauderdale; the nearest is 20 miles away, in Hialeah. Is that an ultrasound - pelvic or an ultrasound?
+  nat3-geo-06 turn 1: status ask != offer
+      said: Is that a spine x-ray or an x-ray?
+  nat3-geo-07 turn 1: types ['appt_138'] not within ['appt_062', 'appt_220']; locations ['loc_150', 'loc_155', 'loc_156'] not within ['loc_153', 'loc_154', 'loc_155', 'loc_157']
+      said: For a spine consultation, Dr. Ervin Dudek has today at 11:20 at River North or Friday at 7:30 at Chinatown and Dr. Arjun Agrawal has tomorrow at 8 at Pilsen. Which works best?
+  nat3-geo-08 turn 1: status ask != offer
+      said: There's nothing closer to 60501; the nearest is 27 miles away, in Pilsen. What's the visit for?
+  nat3-geo-09 turn 1: types ['appt_057'] not within ['appt_072', 'appt_232']; locations ['loc_078', 'loc_080'] not within ['loc_081', 'loc_082']
+      said: For a diabetes management, Dr. Ananya Arora has today at 11 or Friday at 8 at Cherry Creek and Dr. Shaun Ransom has Tuesday at 8 at Downtown. Which works best?
+  nat3-geo-10 turn 1: locations ['loc_005', 'loc_015', 'loc_017'] not within ['loc_000', 'loc_008', 'loc_011']; locations ['loc_005', 'loc_015', 'loc_017'] farther than 10 mi
+      said: There's nothing closer to Rockridge; the nearest is 13 miles away, in San Francisco. For a drug screening, Dr. Billie Chuang has today at 11 at Midtown in Midtown Terrace and Dr. Jennifer Malabanan has tomorrow at 7:30 at Santa Clara or Friday at 7:15 at Evergreen. Which works best?
+  nat3-geo-11 turn 1: status ask != offer
+      said: Is that a CT scan or a CT - head?
+  nat3-geo-12 turn 1: status ask != offer
+      said: Is that an ultrasound - pelvic or an ultrasound?
+  nat3-geo-14 turn 2: status ask != offer
+      said: That's not available at Glendale. Is that a CT scan or a CT - head?
+  nat3-geo-15 turn 2: status refuse != offer; alternative locations ['loc_217'] not within ['loc_246', 'loc_250']
+      said: We don't offer a diabetes management in Virginia. The nearest is Chapel Hill in Raleigh, about 110 miles away. Want me to look there?
+  nat3-geo-16 turn 1: alternative locations ['loc_147'] not within ['loc_141', 'loc_143']
+      said: We don't offer a drug screening in North Dakota. The nearest is Como in St. Paul, about 392 miles away. Want me to look there?
+  nat3-geo-17 turn 1: status ask != offer
+      said: Is that a spine x-ray or an x-ray?
+  nat3-geo-18 turn 1: status ask != offer
+      said: Is that a CT scan or a CT - head?
+  nat3-sym-01 turn 1: status refuse != offer; alternative locations ['loc_154'] not within ['loc_176', 'loc_178', 'loc_180']
+      said: We don't offer a podiatry consultation within 50 miles of Indianapolis. The nearest is Hyde Park in Chicago, about 159 miles away. Want me to look there?
+  nat3-sym-02 turn 1: status ask != offer
+      said: What's the visit for?
+  nat3-sym-03 turn 1: status ask != offer
+      said: What's the visit for?
+  nat3-sym-04 turn 1: status ask != offer
+      said: What's the visit for?
+  nat3-sym-05 turn 1: status ask != offer
+      said: What's the visit for?
+  nat3-sym-06 turn 1: status ask != offer
+      said: What's the visit for?
+  nat3-dup-06 turn 1: status refuse != offer; alternative locations [] not within ['loc_213']
+      said: Dr. Joseph White isn't at any of our clinics within 50 miles of Raleigh.
+  nat3-cap-05 turn 1: status offer != refuse; locations ['loc_150'] not within ['loc_153', 'loc_154', 'loc_157', 'loc_159']; refusal None != location_type; WRONG COMMIT: offered when it should not
+      said: For a thyroid follow-up, Dr. Gabriel Hartman has today at 11, Friday at 8, or Monday at 8 at River North. Which works best?
+  nat3-new-03 turn 1: refusal none_nearby != new_patient_provider
+      said: That doctor isn't at any of our clinics within 50 miles of Phoenix. The nearest is West End in Atlanta, about 1588 miles away. Want me to look there?
+  nat3-noloc-01 turn 2: types ['appt_057'] not within ['appt_072', 'appt_232']; locations ['loc_062', 'loc_063'] not within ['loc_063', 'loc_066']
+      said: For a diabetes management, Dr. Malcolm Scott has today at 11 at Downtown and Dr. Jonathan Waldron has tomorrow at 8 or Friday at 8 at Arcadia. Which works best?
+  nat3-noloc-02 turn 2: status ask != offer
+      said: Is that an ultrasound - pelvic or an ultrasound?
+  nat3-noloc-03 turn 2: status ask != offer
+      said: Is that a CT scan or a CT - head?
+
+=== national3: JEV ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   48 / 56
+WRONG-COMMIT rate per commit (headline)   3/35 = 8.6%  (over 56 resolve turns)
+top-1 (turn fully correct)                46/56 = 82.1%
+ask precision (field-level)               8/11 = 72.7%
+ask recall (field-level)                  8/9 = 88.9%
+mean questions per booking                0.26 over 39 bookings
+refusal correctness                       6/8 = 75.0%
+resolver latency p50 / p95 (no network)   1.28 ms / 5.22 ms  (n=1120)
+Plan.say tokens  mean / p95 / max         37 / 65 / 83
+Plan.summary tokens mean / p95 / max      71 / 94 / 106
+tool result tokens mean / p95 / max       112 / 156 / 166
+  ... speak-direct (no say) mean/p95/max  72 / 92 / 104
+model requests (rate per resolve turn)    64 (114.3%); live 62, disk cache 0, failed 2
+model latency p50 / p95 / max (live)      537 / 985 / 2064 ms
+  ... over the 1.5 s request timeout      2 of 62
+  ... turns past the 2.5 s turn budget    1 of 38 (summed request time)
+model input tokens total / per request    59430 / 959
+model cost if every request were live     $0.00238
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       5/5
+  dup_name_metro         6/6
+  geo                    12/18
+  new_patient            4/5
+  no_location            3/3
+  ring                   1/1
+  symptom                5/8
+  unoffered              2/2
+MISSES (10):
+  nat3-geo-05 turn 1: locations ['loc_223', 'loc_224'] not within ['loc_221', 'loc_224']; locations ['loc_223'] farther than 25 mi
+      said: That's not available at Fort Lauderdale. There's nothing closer to Fort Lauderdale; the nearest is 20 miles away, in Hialeah. For an ultrasound - pelvic, Dr. Beatriz Perez has today at 11 at Coral Gables, Dr. Clarence Owens has tomorrow at 8 at Hialeah, and Dr. Michael Smith has Friday at 8:30 at Hialeah. Which works best?
+      type disambiguator: act appt_214 [appt_214=1.00 appt_001=0.00 appt_002=0.00]
+      type check appt_214 vs appt_067: act appt_214 [appt_214=0.92 appt_067=0.01 either=0.07]
+  nat3-geo-09 turn 1: status ask != offer
+      said: Is that a diabetes management?
+      type disambiguator: no answer
+  nat3-geo-10 turn 1: locations ['loc_005', 'loc_015', 'loc_017'] not within ['loc_000', 'loc_008', 'loc_011']; locations ['loc_005', 'loc_015', 'loc_017'] farther than 10 mi
+      said: There's nothing closer to Rockridge; the nearest is 13 miles away, in San Francisco. For a drug screening, Dr. Billie Chuang has today at 11 at Midtown in Midtown Terrace and Dr. Jennifer Malabanan has tomorrow at 7:30 at Santa Clara or Friday at 7:15 at Evergreen. Which works best?
+      type disambiguator: act appt_233 [appt_233=1.00 appt_000=0.00 appt_001=0.00]
+  nat3-geo-13 turn 1: ask service != metro
+      said: Is that a CT scan or a CT - head?
+      type disambiguator: no answer
+  nat3-geo-15 turn 2: status refuse != offer
+      said: We don't offer an A1C test in Virginia. The nearest is Capitol Hill in Washington, about 141 miles away. Want me to look there?
+      type disambiguator: act appt_232 [appt_232=1.00 appt_001=0.00 appt_002=0.00]
+      type check appt_232 vs appt_057: act appt_232 [appt_232=0.80 appt_057=0.02 either=0.17]
+  nat3-geo-16 turn 1: alternative locations ['loc_147'] not within ['loc_141', 'loc_143']
+      said: We don't offer a drug screening in North Dakota. The nearest is Como in St. Paul, about 392 miles away. Want me to look there?
+      type disambiguator: act appt_233 [appt_233=1.00 appt_000=0.00 appt_001=0.00]
+  nat3-sym-01 turn 1: status refuse != offer; alternative locations ['loc_154'] not within ['loc_176', 'loc_178', 'loc_180']
+      said: We don't offer a podiatry consultation within 50 miles of Indianapolis. The nearest is Hyde Park in Chicago, about 159 miles away. Want me to look there?
+      type disambiguator: open [appt_259=0.52 appt_001=0.25 appt_032=0.22]
+  nat3-sym-05 turn 1: types ['appt_040'] not within ['appt_096', 'appt_161']
+      said: For an OB/GYN new patient visit, Dr. Emilie Mizuno has today at 11 at Marietta, Dr. Diann Leon has tomorrow at 7 at Marietta, and Dr. Raina Daly has Friday at 7 at Buckhead. Which works best?
+      type disambiguator: act appt_040 [appt_040=0.97 appt_056=0.02 appt_001=0.01]
+      type check appt_040 vs appt_056: act appt_040 [appt_040=0.82 appt_056=0.02 either=0.16]
+  nat3-sym-08 turn 1: status ask != offer
+      said: Is that a cardiology consultation or an arrhythmia consultation?
+      type disambiguator: act appt_114 [appt_114=0.90 appt_020=0.08 appt_001=0.01]
+      type check appt_114 vs appt_020: ask ('appt_114', 'appt_020') [appt_114=0.12 appt_020=0.58 either=0.30]
+  nat3-new-03 turn 1: refusal none_nearby != new_patient_provider
+      said: That doctor isn't at any of our clinics within 50 miles of Phoenix. The nearest is West End in Atlanta, about 1588 miles away. Want me to look there?
+
+--- national3: no model vs JEV ---
+metric                          off                             on
+wrong-commit (per commit)       5/19 = 26.3%                    3/35 = 8.6%
+top-1                           28/56 (50.0%)                   46/56 (82.1%)
+questions per booking           0.67                            0.26
+model requests (rate)           0 (0%)                          64 (114%)
+model latency p50/p95/max       -                               537/985/2064 ms
+model $ per run (per 1k turns)  $0.00000 ($0.0000/1k turns)     $0.00238 ($0.0424/1k turns)
+
+LIVE this run: 65 requests, 62611 input tokens, $0.00250
+
+=== HEADLINE: wrong commits per commit; top-1 per evaluated turn ===
+set                           no model                            JEV
