@@ -15,7 +15,7 @@ An agent is one JSON file in `backend/agents/<id>.json`. Field names follow Pipe
   "voice_id": "21m00Tcm4TlvDq8ikWAM",  // ElevenLabs voice
   "model": "gpt-4o",                   // OpenAI model
   "catalog": "data/national/catalog.json",  // Phase 2, optional; path inside backend/
-  "resolver": { "speak_direct": true, "chooser": "openai", "timeout_ms": 1200 }, // Phase 2, optional
+  "resolver": { "speak_direct": true, "chooser": "jev", "timeout_ms": 2500 },   // Phase 2, optional
   "nodes": [
     {
       "name": "schedule",
