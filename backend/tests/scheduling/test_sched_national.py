@@ -4,12 +4,13 @@ imaging, and a dentist only reachable by widening the search."""
 
 from dataclasses import replace
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 
 from fake_models import RandomHooks
 from scheduling.availability import MockAvailability, Slot as TimeSlot
-from scheduling.catalog_index import build_index
+from scheduling.catalog_index import CatalogIndex, build_index
 from scheduling.decision import DECLINE, Verdict
 from scheduling.lexicon import SHORTLIST_SIZE, match_types, type_shortlist
 from scheduling.names import match_providers
@@ -539,6 +540,23 @@ def test_every_specialty_stays_reachable_when_nothing_lexical_matched():
     ix = build_index(raw, {**ALIASES, "specialty_default": {**ALIASES["specialty_default"], **defaults}})
     assert set(defaults.values()) <= set(type_shortlist(ix, "my wrists ache when it rains", None))
     assert len(type_shortlist(ix, "specialty 7", None)) <= SHORTLIST_SIZE + len(ix.specialty_default)
+
+
+def test_the_sick_visit_is_a_choice_for_a_problem_no_word_reaches():
+    """Round 4 (nat4-sym-03): "it burns when I pee ... since yesterday" could only reach Urology's
+    default; Family Medicine's default is the Annual Physical, so a sick visit was no option."""
+    sick = {"appt_105": 1.0, "appt_106": 0.6}
+    ix = build_index(_many_types_raw(), {**ALIASES, "aliases": {**ALIASES["aliases"], "sick": sick}})
+    pool = type_shortlist(ix, "my zorbly thing", None)
+    assert "appt_105" in pool and "appt_106" not in pool
+    assert "appt_105" not in type_shortlist(build_index(_many_types_raw(), ALIASES), "my zorbly thing", None)
+
+
+def test_the_real_national_shortlist_offers_the_sick_visit_beside_the_specialists():
+    ix = CatalogIndex.load(Path(__file__).resolve().parents[2] / "data" / "national" / "catalog.json")
+    pool = type_shortlist(ix, "it burns when I pee and I gotta go all the time, since yesterday", None,
+                          frozenset({"houston-tx"}))
+    assert {"appt_007", "appt_077", "appt_002"} <= set(pool)
 
 
 # ---- lexicon: specificity -------------------------------------------------------------------

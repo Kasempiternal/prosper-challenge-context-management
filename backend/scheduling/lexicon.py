@@ -478,7 +478,9 @@ def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
     """Offered types (offered in `metros`, when given) for a model to choose among: at most
     SHORTLIST_SIZE lexical candidates at any score and types of the specialties the hint or a lay
     term names, plus every specialty's default, so a symptom no word of ours reaches ("swollen
-    stiff fingers") can still land in any specialty. Sorted by id, like the full request."""
+    stiff fingers") can still land in any specialty, and the sick visit, so a new problem can land
+    in primary care: its default is a routine visit (Annual Physical). Sorted by id, like the full
+    request."""
     def offered(tid: str) -> bool:
         return tid in index.types and tid not in index.unoffered_types and (
             metros is None or bool(index.metros_by_type[tid] & metros))
@@ -488,8 +490,22 @@ def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
         default = index.specialty_default.get(spec)
         ranked += ([default] if default else []) + sorted(t.id for t in index.types.values() if t.specialty == spec)
     evidence = [tid for tid in dict.fromkeys(ranked) if offered(tid)][:SHORTLIST_SIZE]
-    defaults = [index.specialty_default[s] for s in sorted(index.specialty_default)]
+    defaults = [index.specialty_default[s] for s in sorted(index.specialty_default)] + list(_sick_visits(index))
     return sorted(set(evidence) | {tid for tid in defaults if offered(tid)})
+
+
+# The catalog's alias for being sick names the visit a new problem goes to ("sick": Sick Visit).
+_SICK = "sick"
+
+
+@per_index
+def _sick_visits(index: CatalogIndex) -> tuple[str, ...]:
+    """The visits the alias "sick" lists at its top weight; () if the catalog has no such alias."""
+    alias = next((a for a in index.aliases if a.phrase == _SICK), None)
+    if alias is None:
+        return ()
+    top = max(w for _, w in alias.weights)
+    return tuple(sorted(t for t, w in alias.weights if w >= top))
 
 
 # Filler that carries no meaning about which visit is wanted (contractions arrive split: "i m").
