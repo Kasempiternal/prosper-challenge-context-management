@@ -12,7 +12,7 @@ from typing import Callable, Mapping
 
 import jellyfish
 
-from .catalog_index import CatalogIndex
+from .catalog_index import Alias, CatalogIndex
 from .names import is_catalog_name
 from .per_index import per_index
 from .request import TIME_WORDS
@@ -172,19 +172,7 @@ def _score_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | 
         for tid in vocab.by_name.get(" ".join(words), ()):
             offer(tid, 1.0, "name")
 
-        hit = vocab.matched(words)
-        # An alias can span the phrase only if each of its words matched some phrase word.
-        maybe = sorted({i for w in hit for i in vocab.aliases_by_word.get(w, ()) if vocab.alias_words[i] <= hit})
-        spans = []
-        for i in maybe:
-            alias = index.aliases[i]
-            a_words = alias.phrase.split()
-            start = _find_span(words, a_words)
-            if start >= 0:
-                spans.append((start, start + len(a_words), alias))
-        kept = [s for s in spans
-                if not any(o is not s and o[0] <= s[0] and s[1] <= o[1] and (o[1] - o[0]) > (s[1] - s[0]) for o in spans)]
-        for start, end, alias in kept:
+        for start, end, alias in _said_aliases(index, words):
             coverage = (end - start) / len(words)
             for tid, w in alias.weights:
                 offer(tid, w * (0.6 + 0.4 * coverage), "alias")
@@ -232,6 +220,24 @@ def _score_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | 
         if default and not named_in_specialty and not names_unoffered:
             offer(default, _SPECIALTY_DEFAULT_SCORE, "specialty")
     return best
+
+
+def _said_aliases(index: CatalogIndex, words: list[str]) -> list[tuple[int, int, Alias]]:
+    """(start, end, alias) for each alias said in the phrase, except one inside a longer said alias
+    ("physical therapy" hides "physical")."""
+    vocab = _vocab(index)
+    hit = vocab.matched(words)
+    # An alias can span the phrase only if each of its words matched some phrase word.
+    maybe = sorted({i for w in hit for i in vocab.aliases_by_word.get(w, ()) if vocab.alias_words[i] <= hit})
+    spans = []
+    for i in maybe:
+        alias = index.aliases[i]
+        a_words = alias.phrase.split()
+        start = _find_span(words, a_words)
+        if start >= 0:
+            spans.append((start, start + len(a_words), alias))
+    return [s for s in spans
+            if not any(o is not s and o[0] <= s[0] and s[1] <= o[1] and (o[1] - o[0]) > (s[1] - s[0]) for o in spans)]
 
 
 def _pointed_specialty(index: CatalogIndex, words: list[str], hint: str | None) -> str | None:
@@ -372,6 +378,101 @@ def nearest_type(index: CatalogIndex, chosen: str, pool: list[str], phrase: str 
     return min(near, key=lambda t: (rank.get(t, len(rank)), t != default, t))
 
 
+@per_index
+def _attachments(index: CatalogIndex) -> dict[str, frozenset[str]]:
+    """Vocabulary word -> the offered types it attaches to: a word of the type's name, or of any
+    alias that lists the type, at any weight ("blood work" lists Fasting Blood Test at 0.7). A
+    visit noun ("test", "visit") attaches by names only: it says what kind of visit."""
+    offered = {t for t in index.types if t not in index.unoffered_types}
+    out: dict[str, set[str]] = defaultdict(set)
+    for tid in offered:
+        for w in tokens(index.types[tid].name):
+            if w not in _NAME_STOP:
+                out[w].add(tid)
+    for a in index.aliases:
+        for w in a.phrase.split():
+            if w not in _FILLER and w not in _VISIT_NOUNS and w not in _TITLES:
+                out[w].update(t for t, _ in a.weights if t in offered)
+    return {w: frozenset(ts) for w, ts in out.items()}
+
+
+@per_index
+def _name_tails(index: CatalogIndex) -> tuple[tuple[str, frozenset[str]], ...]:
+    """Each distinctive name word of an offered type, with the types whose names carry it."""
+    by_word: dict[str, set[str]] = defaultdict(set)
+    for tid, t in index.types.items():
+        if tid not in index.unoffered_types:
+            for w in tokens(t.name):
+                if w not in _GENERIC and w not in _NAME_STOP:
+                    by_word[w].add(tid)
+    return tuple((w, frozenset(ts)) for w, ts in sorted(by_word.items()))
+
+
+def _attached(index: CatalogIndex, word: str) -> frozenset[str]:
+    """The offered types a caller's word attaches to: by the vocabulary words it matches, or as the
+    combining form that ends a compound name word ("scope": Colonoscopy, Endoscopy)."""
+    att = _attachments(index)
+    out = set().union(*(att.get(v, ()) for v in _word_hits(_vocab(index), word)))
+    root = stem(word)
+    if len(root) >= _ROOT_MIN:
+        for name_word, tids in _name_tails(index):
+            at = name_word.find(root)
+            if at >= _ROOT_PREFIX_MIN and len(name_word) - at - len(root) <= _ROOT_ENDING_MAX:
+                out |= tids
+    return frozenset(out)
+
+
+def umbrella(index: CatalogIndex, phrase: str | None, type_id: str, within: tuple[str, ...] = ()) -> tuple[str, ...]:
+    """The offered visits the caller's words fit exactly as well as `type_id`, sorted; () when the
+    words tell `type_id` apart. "my baby's checkup": "baby" and "checkup" attach to Well-Child
+    Visit and Newborn Visit alike ("well baby", "kid checkup", "newborn checkup"). A visit named
+    outright ("flu shot", "newborn visit") is told apart; so is one whose words a caller said in
+    full when the others' are not ("fasting blood test"). Words that say who sent the caller
+    ("my doctor said") and words that only name the visit's specialty ("my stomach doctor") tell
+    nothing apart. Any other word no visit's name or alias carries ("down the throat", "two weeks
+    old") may, so only a model can weigh it: ()."""
+    words = tokens(phrase or "")
+    vocab = _vocab(index)
+    kept = [w for w in words if w not in _NAME_STOP]
+    if not words or any(_find_spans(kept, list(part)) for part in vocab.name_parts[type_id]):
+        return ()
+    spec = index.types[type_id].specialty
+    offered = set(index.types) - index.unoffered_types
+    elsewhere = _parsed_elsewhere(index, words)
+    # A said alias of several words is one term ("lung doctor" is a pulmonology consultation, not
+    # every visit "lung" attaches to); the other words count one by one.
+    multi = [(start, end, alias) for start, end, alias in _said_aliases(index, words) if end - start > 1]
+    terms: list[tuple[str, frozenset[str]]] = [
+        (alias.phrase, frozenset(t for t, _ in alias.weights if t in offered)) for _, _, alias in multi]
+    covered = {i for start, end, _ in multi for i in range(start, end)}
+    terms += [(w, _attached(index, w)) for i, w in enumerate(words)
+              if i not in covered and i not in elsewhere and w not in TIME_WORDS and w not in _NO_VISIT
+              and (w not in _FILLER or w in _VISIT_NOUNS)]
+    fit: set[str] | None = None
+    names_specialty = False
+    for w, tids in terms:
+        if type_id in tids:
+            fit = set(tids) if fit is None else fit & tids
+            continue
+        specialties = {index.types[t].specialty for t in tids} | (
+            {index.lay_terms[w]} if w in index.lay_terms else set())
+        if not specialties or not specialties <= {spec}:
+            return ()
+        names_specialty = True
+    if fit is None:
+        return ()
+    if names_specialty:
+        # "my stomach doctor said I need a scope": the scopes of that specialty.
+        fit = {t for t in fit if index.types[t].specialty == spec}
+    heard = vocab.matched(words)
+
+    def said_in_full(tid: str) -> bool:
+        return all(nw in heard for nw in vocab.name_words[tid])
+    full = said_in_full(type_id)
+    out = sorted(t for t in fit if said_in_full(t) == full and (not within or t in within))
+    return tuple(out) if len(out) > 1 else ()
+
+
 def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
                    metros: frozenset[str] | None = None) -> list[str]:
     """Offered types (offered in `metros`, when given) for a model to choose among: at most
@@ -397,6 +498,16 @@ _FILLER = _GENERIC | {"m", "s", "ve", "d", "ll", "t", "is", "be", "it", "this", 
                       "one", "up", "done", "book", "schedule", "make", "set", "as"}
 _TITLES = frozenset({"dr", "doctor", "doc"})
 _PLACE_PREPOSITIONS = frozenset({"at", "in", "near", "by", "around"})
+# What kind of visit a type is ("Lung Function Test" is a test, "Pulmonology Consultation" is not).
+_VISIT_NOUNS = frozenset({"consultation", "consult", "visit", "exam", "test", "session", "evaluation", "screening"})
+# Who sent the caller, never which visit: "my doctor sent me over for", "my stomach doctor said".
+_NO_VISIT = _TITLES | frozenset({"said", "says", "told", "tells", "sent", "sends", "ordered", "orders", "wants",
+                                 "wanted", "referred", "recommended", "suggested", "asked", "over"})
+# A combining form ("scope", "gram") ends a compound name word: a root of at least _ROOT_MIN letters
+# after a prefix of at least _ROOT_PREFIX_MIN ("colono-scop-y", "mammo-gram").
+_ROOT_MIN = 4
+_ROOT_PREFIX_MIN = 3
+_ROOT_ENDING_MAX = 2
 
 
 def unexplained_words(index: CatalogIndex, phrase: str | None, type_ids: list[str]) -> tuple[str, ...]:

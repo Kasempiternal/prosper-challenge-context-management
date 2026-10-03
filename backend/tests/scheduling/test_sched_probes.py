@@ -12,10 +12,11 @@ import pytest
 
 from scheduling.availability import MockAvailability
 from scheduling.catalog_index import CatalogIndex
-from scheduling.decision import Verdict
 from scheduling.lexicon import stated_doubt
 from scheduling.request import Request, Update, merge
-from scheduling.resolver import NoDisambiguator, resolve
+from scheduling.resolver import resolve
+
+from fake_models import Sure
 
 DATA = Path(__file__).resolve().parents[2] / "data"
 RETURNING = {"is_new": False, "has_referral": True}
@@ -29,23 +30,6 @@ def sf() -> CatalogIndex:
 @pytest.fixture(scope="module")
 def nat() -> CatalogIndex:
     return CatalogIndex.load(DATA / "national" / "catalog.json")
-
-
-class Sure(NoDisambiguator):
-    """Picks the first visit of `prefer` the question offers (else the first offered), sure of
-    it; `by_word` maps a word of the phrase to the visit picked instead. Every check confirms."""
-
-    def __init__(self, prefer=(), by_word=None):
-        self.prefer, self.by_word = prefer, by_word or {}
-
-    def pick_type(self, phrase, hint, candidate_ids):
-        worded = [t for w, t in self.by_word.items() if w in phrase and t in candidate_ids]
-        pick = next(iter(worded), next((t for t in self.prefer if t in candidate_ids), candidate_ids[0]))
-        return Verdict(act=pick, top=((pick, 0.97),), called=True)
-
-    def check_type(self, phrase, hint, first, rival):
-        chosen = first.act or first.ask[0]
-        return Verdict(act=chosen, top=((chosen, 0.95), (rival, 0.03), ("either", 0.02)), called=True)
 
 
 def _talk(ix, *updates, model=None):

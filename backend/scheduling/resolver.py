@@ -22,7 +22,7 @@ from .catalog_index import BookableRow, CatalogIndex
 from .decision import DECLINE, Verdict, gender_of, unanswered
 from .geo import RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, over_state_line, resolve_place
 from .lexicon import (SHORTLIST_ABOVE, Doubt, TypeCandidate, match_types, nearest_type, pointed_default,
-                      stated_doubt, type_shortlist, types_named, unexplained_words)
+                      stated_doubt, type_shortlist, types_named, umbrella, unexplained_words)
 from .names import (STREET_TYPES, ProviderClues, hear_place, match_locations, match_providers, only_no,
                     read_confirmation, read_provider_clues)
 from .policy import IssueKind, Rule, Violation, check, has_violation
@@ -319,6 +319,13 @@ class _Resolution:
                 # The words needed the model and its answer never came: say what we understood.
                 return self._ask_type(sorted(verdict.ask or [c.type_id for c in offered]), True)
             offered = _model_candidates(verdict) or offered
+            s = self.slots["service"]
+            alike = umbrella(self.ix, s.heard, offered[0].type_id, s.within) if len(offered) == 1 and not s.exact else ()
+            if alike:
+                # "my baby's checkup": the words fit Well-Child and Newborn Visit alike, so which
+                # one a model or an alias weight prefers is a prior. The caller is asked.
+                self.notes.append(f"umbrella: {list(alike)} fit the words alike")
+                offered = [TypeCandidate(t, 1.0, "umbrella") for t in alike]
             type_ids = [c.type_id for c in offered]
             self.scores = {c.type_id: c.score for c in offered}
             if len(type_ids) == 1:
