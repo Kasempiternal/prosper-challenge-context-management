@@ -20,7 +20,8 @@ import jellyfish
 from .availability import Availability, Slot as TimeSlot
 from .catalog_index import BookableRow, CatalogIndex
 from .decision import DECLINE, Verdict, gender_of, unanswered
-from .geo import RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, over_state_line, resolve_place
+from .geo import (RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, option_named, over_state_line,
+                  resolve_place)
 from .lexicon import (SHORTLIST_ABOVE, Doubt, TypeCandidate, match_types, nearest_type, pointed_default,
                       stated_doubt, type_shortlist, types_named, unexplained_words)
 from .names import (STREET_TYPES, ProviderClues, hear_place, match_locations, match_providers, only_no,
@@ -652,6 +653,14 @@ class _Resolution:
     def _ask_metro(self, metros: frozenset[str], state: str | None = None) -> Plan:
         ids = sorted(metros, key=lambda m: (self.ix.metros[m].name, self.ix.metros[m].state))
         if 1 < len(ids) <= MAX_OPTIONS:
+            s = self.slots["location"]
+            if s.region and set(ids) == set(s.within):
+                # The answer to this very question named both cities, or neither: asked once more in
+                # other words, then handed off, never the same question again.
+                self.slots["location"] = replace(s, asks=s.asks + 1)
+                if s.asks + 1 >= 2:
+                    return self._refuse("handoff")
+                return self._ask("metro_again", options=tuple(ids))
             return self._ask("metro", options=tuple(ids))
         return self._ask("metro", context=state)
 
@@ -691,7 +700,8 @@ class _Resolution:
                 answer = resolve_place(ix, s.region)
                 # "Yes" to "Did you mean Renton, Washington?", the one city asked about.
                 said_yes = len(options) == 1 and bool(read_confirmation(s.region))
-                chosen = options if said_yes else answer.metro_ids(ix)
+                picked = option_named(ix, s.region, tuple(w for w in s.within if w in ix.metros))
+                chosen = options if said_yes else frozenset({picked}) if picked else answer.metro_ids(ix)
                 if options & chosen:
                     chosen &= options
                 narrowed = self._narrow(m, chosen) if chosen else PlaceMatch()
@@ -1265,7 +1275,7 @@ class _Resolution:
                 refusal: Refusal | None = None, confirm: Offer | None = None, keep_pick: bool = False) -> Plan:
         pending_field = {"provider_retry": "provider", "provider_spelling": "provider",
                          "provider_first_name": "provider", "location_retry": "location",
-                         "location_open": "location", "service_open": "service"}
+                         "location_open": "location", "service_open": "service", "metro_again": "metro"}
         new_req = replace(
             self.req,
             service=self.slots["service"], provider=self.slots["provider"], location=self.slots["location"],
@@ -1355,7 +1365,7 @@ def _alternative_labels(ix: CatalogIndex, alts: tuple[AltRef, ...]) -> list[str]
 
 
 def _option_labels(ix: CatalogIndex, field: str, options: tuple[str, ...]) -> list[str]:
-    if field in ("metro", "place_confirm"):
+    if field in ("metro", "metro_again", "place_confirm"):
         return T.metro_labels(ix, list(options))
     return [_option_label(ix, field, o) for o in options]
 

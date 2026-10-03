@@ -1,6 +1,7 @@
-"""Real US cities the national catalog has no clinic in, said alone, as "City, ST" and as "City,
-State": the resolver asks, refuses naming a clinic and its city with a true distance (if any), or
-offers clinics near the real city. A silent offer far from where the caller is never passes."""
+"""Real US cities the national catalog has no clinic in, said alone, as "City, ST", as "City,
+State", as "closest city to City" and as "near City": the resolver asks, refuses naming a clinic and
+its city with a true distance (if any), or offers clinics near the real city. A silent offer far
+from where the caller is never passes."""
 
 import re
 from pathlib import Path
@@ -48,7 +49,8 @@ CITIES = [
     ("Chattanooga", "TN", 35.0456, -85.3097), ("Fort Wayne", "IN", 41.0793, -85.1394),
 ]
 PHRASES = [(phrase, lat, lon) for city, st, lat, lon in CITIES
-           for phrase in (city, f"{city}, {st}", f"{city}, {STATE_NAMES[st]}")]
+           for phrase in (city, f"{city}, {st}", f"{city}, {STATE_NAMES[st]}", f"closest city to {city}",
+                          f"near {city}")]
 
 
 @pytest.fixture(scope="module")

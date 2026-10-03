@@ -121,10 +121,20 @@ def state_name(abbrev: str) -> str:
 
 
 def metro_labels(index: CatalogIndex, ids: list[str]) -> list[str]:
-    """"Austin", or "Portland, Oregon" when two metros share a name."""
+    """"Austin or Dallas"; every city with its state when one name is also another place's:
+    "Seattle, Washington or Washington, DC", "Portland, Oregon or Portland, Maine". A bare
+    "Washington" could be the state or the city, and the caller's answer would be just as unclear."""
     names = [index.metros[m].name for m in ids]
-    return [f"{n}, {state_name(index.metros[m].state)}" if names.count(n) > 1 else n
+    if not any(_names_another_place(index, m) for m in ids):
+        return names
+    return [f"{n}, {'DC' if index.metros[m].state == 'DC' else state_name(index.metros[m].state)}"
             for n, m in zip(names, ids)]
+
+
+def _names_another_place(index: CatalogIndex, metro_id: str) -> bool:
+    name = normalize(index.metros[metro_id].name)
+    return (name in {normalize(n) for n in _STATE_NAMES.values()}
+            or any(normalize(m.name) == name for mid, m in index.metros.items() if mid != metro_id))
 
 
 def miles(d: float) -> str:
@@ -230,6 +240,8 @@ def say_ask(index: CatalogIndex, field: str, options: list[str], context: str | 
         return f"Did you mean {context}?"
     if field == "metro" and options:
         return f"Is that {join_or(metro_labels(index, options))}?"
+    if field == "metro_again":
+        return f"Sorry, I still need to know which one: {join_or(metro_labels(index, options))}? Or tell me your ZIP code."
     if field == "metro":
         return f"Which city in {context} are you in?" if context else "Which city are you in?"
     if field == "is_new":

@@ -231,7 +231,10 @@ def merge(req: Request, update: Update) -> Request:
         changes["time_pref"] = update.time_pref
 
     for name in update.clear:
-        changes[name] = TimePref() if name == "time_pref" else Slot(turn=turn)
+        # "Yes" to "Did you mean Renton, Washington?" came as location "Renton" plus clear location:
+        # what the same turn says wins over its own clear.
+        if name not in changes:
+            changes[name] = TimePref() if name == "time_pref" else Slot(turn=turn)
 
     patient = req.patient
     if update.is_new is not None or update.has_referral is not None:

@@ -151,6 +151,93 @@ def test_a_guess_turned_down_with_the_real_place_searches_that_place(nat):
                         "Want me to look there?")
 
 
+@pytest.mark.parametrize("place", ["closest city to Trenton", "near Trenton", "the nearest city to Trenton",
+                                   "closest town to Trenton"])
+def test_a_place_heard_only_by_sound_is_never_an_either_or_option(nat, place):
+    """Live call: "flu shot in the closest city to Trenton" asked "Is that Philadelphia or Seattle?":
+    Philadelphia because "city" named its Center City clinic, Seattle because Trenton sounds like
+    Renton. "Washington" then booked Renton, Washington for a caller in New Jersey."""
+    for model in (None, Sure()):
+        plan = _talk(nat, {"service_phrase": "flu shot", "location_phrase": place}, model=model)
+        assert (plan.status, plan.ask.field, plan.ask.options, plan.say) == (
+            "ask", "place_confirm", ("seattle-wa",), "Did you mean Renton, Washington?")
+
+
+@pytest.mark.parametrize("place", ["city Trenton", "closest city Trenton"])
+def test_a_sound_alike_beside_a_clinic_the_words_name_is_dropped_not_asked_about(nat, place):
+    """Without the "closest city to" lead the words still reach Center City (by "city") and Renton (by
+    sound), in two cities: only Center City is left, never "Philadelphia or Seattle"."""
+    from scheduling.geo import resolve_place
+    match = resolve_place(nat, place)
+    assert [nat.locations[c.id].short_name for c in match.sites] == ["Center City"] and not match.anchors
+
+
+def test_trenton_new_jersey_still_names_the_state_s_clinic(nat):
+    plan = _talk(nat, {"service_phrase": "flu shot", "location_phrase": "Trenton, New Jersey"})
+    assert plan.say == ("Our nearest clinic in New Jersey for a flu shot is Cherry Hill, near Philadelphia. "
+                        "Want me to look there?")
+
+
+# ---- answers to "which city?" -----------------------------------------------------------------
+
+WASHINGTON = "Is that Seattle, Washington or Washington, DC?"
+
+
+def test_a_city_that_is_also_a_state_is_asked_about_with_states(nat):
+    plan = _talk(nat, {"service_phrase": "flu shot", "location_phrase": "Washington"})
+    assert (plan.ask.field, plan.ask.options, plan.say) == ("metro", ("seattle-wa", "washington-dc"), WASHINGTON)
+
+
+@pytest.mark.parametrize("answer, metro", [
+    ("Washington, DC", "washington-dc"), ("DC", "washington-dc"), ("the second one", "washington-dc"),
+    ("Seattle", "seattle-wa"), ("the first one", "seattle-wa"), ("Washington state", "seattle-wa"),
+    ("98101", "seattle-wa"),
+])
+def test_an_answer_naming_one_option_picks_it(nat, answer, metro):
+    plan = _talk(nat, {"service_phrase": "flu shot", "location_phrase": "Washington"}, {"location_phrase": answer})
+    assert plan.status == "offer" and {nat.locations[o.location_id].metro_id for o in plan.offers} == {metro}
+
+
+def test_an_answer_naming_both_options_never_gets_the_same_question_twice(nat):
+    """Second live call: "Washington" to "Is that Seattle or Washington?" got that question again,
+    every time, until the caller gave up."""
+    turns = [{"service_phrase": "flu shot", "location_phrase": "Washington"}] + [{"location_phrase": "Washington"}] * 3
+    plans = [_talk(nat, *turns[:n]) for n in range(1, len(turns) + 1)]
+    said = [p.say for p in plans]
+    assert said[:2] == [WASHINGTON, "Sorry, I still need to know which one: Seattle, Washington or Washington, DC? "
+                                    "Or tell me your ZIP code."]
+    assert (plans[2].status, plans[2].refusal.code) == ("refuse", "handoff")
+    assert all(a != b for a, b in zip(said, said[1:]))
+
+
+def test_a_yes_sent_as_the_place_and_a_clear_keeps_the_place(nat):
+    """Second live call: "Yes." to "Did you mean Renton, Washington?" reached update_request as
+    location "Renton" plus clear location, and the clear wiped it: "Which city are you in?"."""
+    plan = _talk(nat, {"service_phrase": "a flu shot", "location_phrase": "Trenton"},
+                 {"location_phrase": "Renton", "clear": ["location"]})
+    assert plan.status == "offer" and {o.location_id for o in plan.offers} == {"loc_055"}
+
+
+@pytest.mark.parametrize("catalog", ["catalog.json", "national/catalog.json"])
+def test_no_which_city_question_has_a_label_that_names_another_place(catalog):
+    """Every pair of cities a question could ask between, in both catalogs: no two labels alike, and a
+    label without its state is no state's name and no other city's name."""
+    from scheduling.geo import US_STATES
+    from scheduling.templates import metro_labels
+    from scheduling.text import normalize
+    ix = CatalogIndex.load(DATA / catalog)
+    states = {normalize(name) for _, name, _, _ in US_STATES}
+    for a in ix.metros:
+        for b in ix.metros:
+            if a >= b:
+                continue
+            labels = metro_labels(ix, [a, b])
+            assert len(set(labels)) == 2, labels
+            for mid, label in zip((a, b), labels):
+                others = {normalize(m.name) for k, m in ix.metros.items() if k != mid}
+                assert "," in label or normalize(label) not in states | others, labels
+
+
 @pytest.mark.parametrize("place, metro", [
     ("Cleaveland", "cleveland-oh"), ("Philedelphia", "philadelphia-pa"), ("San Antonyo", "san-antonio-tx"),
     ("Minneapolous", "minneapolis-mn"), ("Hueston", "houston-tx"), ("Sacremento", "sacramento-ca"),

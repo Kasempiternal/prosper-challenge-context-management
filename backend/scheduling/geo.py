@@ -59,7 +59,9 @@ US_STATES: tuple[tuple[str, str, float, float], ...] = (
 # Two-letter state codes that are also everyday words; alone they are never a state.
 _WORD_ABBREVS = {"in", "me", "or", "hi", "ok", "oh", "pa", "de", "la", "co", "id", "ma", "al", "md", "ne", "mt"}
 
+# "closest city to Trenton" is near Trenton; left in, "city" named the Center City clinic.
 _NEAR_PREFIXES = (("close", "to"), ("closest", "to"), ("nearest", "to"), ("next", "to"), ("near", "to"),
+                  *((sup, place, "to") for sup in ("closest", "nearest") for place in ("city", "town")),
                   ("near",), ("nearby",), ("around",), ("by",))
 _LEAD_FILLER = {"i", "m", "am", "im", "we", "re", "live", "living", "work", "stay", "staying", "located",
                 "based", "in", "at", "from", "um", "uh", "so", "well", "the", "over", "out", "here",
@@ -248,6 +250,29 @@ def _inside(ix: CatalogIndex, found: PlaceMatch, region: tuple[Place, ...]) -> b
             and all(inside(p.state, p.metro_ids) for p in found.anchors))
 
 
+_ORDER_WORDS = {"first": 0, "1st": 0, "former": 0, "second": 1, "2nd": 1, "third": 2, "3rd": 2,
+                "latter": -1, "last": -1}
+_STATE_OF = {abbrev: name for abbrev, name, _, _ in US_STATES}
+
+
+def option_named(ix: CatalogIndex, answer: str | None, options: tuple[str, ...]) -> str | None:
+    """The one metro of a "which city?" question the answer picks by its place in the question
+    ("the second one") or as the state, not a city of that name ("Washington state" is Seattle,
+    not Washington, DC). None when it picks no single option that way."""
+    if len(options) < 2:
+        return None
+    words = tokens(answer or "")
+    by_order = {options[i] for w in words if (i := _ORDER_WORDS.get(w)) is not None and -len(options) <= i < len(options)}
+    if len(by_order) == 1:
+        return by_order.pop()
+    if "state" in words:
+        in_state = [m for m in options if ix.metros[m].state in _STATE_OF and ix.metros[m].state != "DC"
+                    and set(tokens(_STATE_OF[ix.metros[m].state])) <= set(words)]
+        if len(in_state) == 1:
+            return in_state[0]
+    return None
+
+
 def names_own_area(ix: CatalogIndex, phrase: str | None, location_id: str) -> bool:
     """The phrase is just the name of the neighborhood or suburb the clinic is in ("Lakewood" for
     Lakewood Family Clinic, in Lakewood): the caller may mean the clinic or the place."""
@@ -345,7 +370,7 @@ def _resolve_head(ix: CatalogIndex, words: list[str], near: bool, within: frozen
     if regions:
         return PlaceMatch(anchors=_prefer_metros(regions))
 
-    sites = _sites(ix, text, within)
+    sites = _either_or_spelled(ix, text, _sites(ix, text, within))
     # A clinic's name, "Market Street" or "3330 Market" named the site outright.
     strong = bool(sites) and sites[0].score >= STRONG_SITE_SCORE
     by_street = strong and sites[0].by_street
@@ -354,7 +379,7 @@ def _resolve_head(ix: CatalogIndex, words: list[str], near: bool, within: frozen
         # names merely share some of its words.
         misheard, sure = _fuzzy_areas(gz, text, keep)
         if misheard and all(p.kind in ("metro", "state") for p in misheard):
-            return _heard_areas(misheard, sure)
+            return _heard_areas(misheard, sure, text)
     # "Brooklyn" is a place of ours by that very name, so its clinics are never a guess.
     guess_sites = not exact and all(_site_guessed(ix, text, c, bare=within is None) for c in sites)
     if strong:
@@ -364,22 +389,45 @@ def _resolve_head(ix: CatalogIndex, words: list[str], near: bool, within: frozen
         return PlaceMatch(anchors=tuple(neighborhoods))
     fuzzy, sure = _fuzzy_areas(gz, text, keep)
     if fuzzy:
-        return _heard_areas(fuzzy, sure)
+        return _heard_areas(fuzzy, sure, text)
     if sites:
         return _named_sites(ix, sites, near, guess_sites)
     return PlaceMatch()
 
 
-def _heard_areas(places: list[Place], sure: bool) -> PlaceMatch:
+def _heard_areas(places: list[Place], sure: bool, text: str) -> PlaceMatch:
     """Areas the phrase sounds or is spelled like. Unsure, a city is a guess to confirm; a state
     ("Virginia Beach" ~ Virginia) only bounds where the caller is, as with a city we do not know:
-    it is never narrowed to one of its cities, and the refusal or question that follows names it."""
+    it is never narrowed to one of its cities, and the refusal or question that follows names it.
+    Guesses in several cities are asked between only if each is a misspelling of what was said."""
     anchors = _prefer_metros(places)
     if sure:
         return PlaceMatch(anchors=anchors)
     if all(p.kind == "state" for p in anchors):
         return PlaceMatch(anchors=anchors, unknown_city=True)
+    if len({m for p in anchors for m in p.metro_ids}) > 1:
+        anchors = tuple(p for p in anchors if _spelled(text, normalize(p.label)))
+        if not anchors:
+            return PlaceMatch()
     return PlaceMatch(anchors=anchors, guess=True)
+
+
+def _either_or_spelled(ix: CatalogIndex, text: str, sites: tuple[NameCandidate, ...]) -> tuple[NameCandidate, ...]:
+    """Clinics in several cities become "Is that A or B?". A clinic the phrase reaches only by
+    sound, past a misspelling ("Trenton" ~ Renton), is never one of those options: it is dropped
+    beside clinics the words do spell, and several of them alone are no place understood. Alone,
+    in one city, it is still confirmed by name."""
+    if len({ix.locations[c.id].metro_id for c in sites}) < 2:
+        return sites
+    return tuple(c for c in sites if not _only_by_sound(ix, text, c))
+
+
+def _only_by_sound(ix: CatalogIndex, text: str, site: NameCandidate) -> bool:
+    if site.by_street:
+        return False
+    name = _location_words(ix.locations[site.id])
+    return any(not any(_misspelled(w, n) for n in name) and any(_same_word(w, n) for n in name)
+               for w in hear_place(text).words)
 
 
 def _nearest_zip3(gz: Gazetteer, zip_code: str) -> Place | None:
