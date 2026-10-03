@@ -2,7 +2,10 @@
 
 Usage:
   backend/.venv/Scripts/python eval/run_resolver_eval.py [--set main|heldout|heldout2|tune|all|national|national2|street]
-                                                        [--catalog PATH] [--jev off|on] [--live|--fill] [--verbose]
+                                                        [--catalog PATH] [--jev off|on] [--live|--fill] [--verbose] [--gate]
+
+--set stress_sf|stress is the stress suite (eval/stress/README.md): after the usual tables it prints UNSAFE /
+SAFE-BUT-ASKED / CORRECT per case; --gate exits 1 if the chosen model leaves an UNSAFE case.
 
 Every set, its file and its catalog are in eval/sets.py. A national set runs against the national
 catalog and refuses to run unless the catalog's sha256 equals the one pinned in every case. `all`
@@ -406,6 +409,77 @@ def print_comparison(name: str, off: dict, on: dict, chooser: str = "jev") -> No
         print(f"{label:<32}{x:<32}{y}")
 
 
+# ---- stress report (eval/stress/README.md) -------------------------------------------------------
+# The metric for the stress sets is not top-1. A turn is CORRECT (matches the expectation or one of the
+# case's `also_ok` alternatives), SAFE-BUT-ASKED (asked where an offer was expected), SAFE-OTHER (no
+# commit, but not what the case wanted: another question, another refusal code), or UNSAFE (it
+# committed something the case does not allow, or refused what it must offer: a false refusal).
+STRESS_SETS = tuple(n for n in SETS if n.startswith("stress"))
+SPEECH_ONLY = ("spoke a Python None", "spoke an empty site phrase")
+STRESS_ORDER = ("CORRECT", "SAFE-BUT-ASKED", "SAFE-OTHER", "UNSAFE")
+
+
+def _structural(plan: Plan, exp: dict, index) -> list[str]:
+    return [e for e in check_plan(plan, exp, index) if not e.startswith(SPEECH_ONLY)]
+
+
+def classify_turn(plan: Plan, exp: dict, also_ok: list[dict], index) -> tuple[str, list[str]]:
+    errs = _structural(plan, exp, index)
+    if not errs or any(not _structural(plan, alt, index) for alt in also_ok):
+        return "CORRECT", []
+    if plan.status in COMMIT:
+        return "UNSAFE", errs
+    if exp["status"] in COMMIT:
+        return ("SAFE-BUT-ASKED" if plan.status == "ask" else "UNSAFE"), errs
+    return "SAFE-OTHER", errs
+
+
+def stress_classify(index, cases: list[dict], hooks: dict, client) -> list[dict]:
+    """One row per case: its worst scored turn. `phrase` is what the caller said, turn by turn."""
+    rows = []
+    for case in cases:
+        also_ok = case.get("also_ok", [])
+        worst = {"class": "CORRECT", "errs": [], "said": "", "turn": 0}
+        spoken = []
+        for i, t in enumerate(run_case(index, case, hooks, client=client)):
+            spoken.append(" + ".join(v for v in case["turns"][i]["update"].values() if isinstance(v, str)))
+            if t["kind"] != "resolve" or t["exp"] is None:
+                continue
+            last = i == len(case["turns"]) - 1
+            cls, errs = classify_turn(t["plan"], t["exp"], also_ok if last else [], index)
+            if STRESS_ORDER.index(cls) > STRESS_ORDER.index(worst["class"]):
+                worst = {"class": cls, "errs": errs, "said": t["plan"].say, "turn": i + 1}
+        rows.append({"case": case, "phrase": " -> ".join(spoken), **worst})
+    return rows
+
+
+def print_stress(title: str, rows: list[dict]) -> int:
+    """Prints the stress report; returns the UNSAFE count."""
+    counts = {k: sum(r["class"] == k for r in rows) for k in STRESS_ORDER}
+    unsafe = [r for r in rows if r["class"] == "UNSAFE"]
+
+    def sev(r):
+        return r["case"].get("severity", "hard")
+
+    print(f"\n=== STRESS: {title} ({len(rows)} cases) ===")
+    print("  ".join(f"{k} {counts[k]}" for k in STRESS_ORDER)
+          + f"   | UNSAFE critical {sum(sev(r) == 'critical' for r in unsafe)}, hard {sum(sev(r) == 'hard' for r in unsafe)}")
+    for label in ("critical", "hard"):
+        group = [r for r in unsafe if sev(r) == label]
+        print(f"UNSAFE, {label} cases ({len(group)} of {sum(sev(r) == label for r in rows)}):")
+        for r in group:
+            print(f"  {r['case']['id']} turn {r['turn']}: \"{r['phrase']}\"\n      said: {r['said']}\n"
+                  f"      why unsafe: {'; '.join(r['errs'])}")
+    asked = [r for r in rows if r["class"] == "SAFE-BUT-ASKED"]
+    other = [r for r in rows if r["class"] == "SAFE-OTHER"]
+    print(f"SAFE-BUT-ASKED ({len(asked)}): " + (", ".join(r["case"]["id"] for r in asked) or "-"))
+    print(f"SAFE-OTHER ({len(other)}): " + (", ".join(r["case"]["id"] for r in other) or "-"))
+    for r in other:
+        print(f"  {r['case']['id']}: {'; '.join(r['errs'])}")
+    print(f"GATE (UNSAFE == 0): {'PASS' if not unsafe else 'FAIL'}")
+    return len(unsafe)
+
+
 def make_client(chooser: str, live: bool = False, openai_model: str = OPENAI_MODEL, fill: bool = False):
     """Offline settings: patient timeout, no per-turn budget, so the cache gets filled. The live
     call path uses each client's call defaults; see "over the request timeout"."""
@@ -427,6 +501,8 @@ def main() -> None:
     ap.add_argument("--live", action="store_true")
     ap.add_argument("--fill", action="store_true")
     ap.add_argument("--verbose", action="store_true")
+    ap.add_argument("--gate", action="store_true",
+                    help="stress sets: exit 1 if the chosen model leaves any UNSAFE case")
     args = ap.parse_args()
     if args.jev and args.chooser and args.chooser != {"on": "jev", "off": "none"}[args.jev]:
         ap.error("--jev and --chooser disagree")
@@ -447,6 +523,7 @@ def main() -> None:
              else " (disk cache only)" if chooser in ("jev", "openai") else ""))
 
     results = {}
+    unsafe: dict[tuple[str, str], int] = {}
     try:
         for name, cases in sets.items():
             off = evaluate(index, cases, {}, None)
@@ -455,6 +532,11 @@ def main() -> None:
             print_table(f"{name}: no model", off)
             if on:
                 print_table(f"{name}: {CHOOSER_LABEL[chooser]}", on)
+            if name in STRESS_SETS:
+                unsafe[name, "no model"] = print_stress(f"{name}: no model", stress_classify(index, cases, {}, None))
+                if client:
+                    unsafe[name, CHOOSER_LABEL[chooser]] = print_stress(
+                        f"{name}: {CHOOSER_LABEL[chooser]}", stress_classify(index, cases, hooks, client))
             if args.verbose:
                 for case in cases:
                     for i, t in enumerate(run_case(index, case, hooks)):
@@ -473,6 +555,10 @@ def main() -> None:
             spent = sum(c.input_tokens for c in live)
             print(f"\nLIVE this run: {len(live)} requests, {spent} input tokens, ${sum(c.usd for c in live):.5f}")
     print_headline(results, CHOOSER_LABEL[chooser])
+    if args.gate:
+        bad = {k: v for k, v in unsafe.items() if k[1] != "no model" and v}
+        if bad:
+            sys.exit(f"STRESS GATE FAILED: {bad}")
 
 
 if __name__ == "__main__":
