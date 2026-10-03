@@ -33,6 +33,15 @@ const ASK = {
 describe('resolver_decision', () => {
   beforeEach(() => useCall.getState().reset())
 
+  it("shows when the handler kept the caller's words over the model's", () => {
+    useCall.getState().begin()
+    ingestRaw({ ...ASK, kept_words: { model: ['Washington, DC'], caller: 'Washington.' } })
+    ingestRaw(ASK)
+    const [kept, plain] = useCall.getState().decisions
+    expect(kept.kept).toEqual({ model: ['Washington, DC'], caller: 'Washington.' })
+    expect(plain.kept).toBeUndefined()
+  })
+
   it('appends parsed decisions in arrival order', () => {
     useCall.getState().begin()
     ingestRaw(OFFER)

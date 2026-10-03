@@ -622,3 +622,13 @@ def test_the_first_update_after_a_context_reset_is_checked_against_the_start_wor
 def test_the_doctor_keeps_how_the_caller_described_them(phrase, said, sent):
     from agent_tools.scheduling_tools import with_dropped_description
     assert with_dropped_description(phrase, said) == sent
+
+
+def test_the_decision_event_shows_the_words_kept_over_the_models(make_ctx, events):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    call(ctx, fm, "update_request", {**BEAT_1, "is_new": False})
+    assert "kept_words" not in [e for e in events if e["type"] == "resolver_decision"][-1]
+    fm.messages = turn("The lady one.")
+    call(ctx, fm, "update_request", {"provider_phrase": "Dr. Emily Chen"})
+    last = [e for e in events if e["type"] == "resolver_decision"][-1]
+    assert last["kept_words"] == {"model": ["Dr. Emily Chen"], "caller": "The lady one."}

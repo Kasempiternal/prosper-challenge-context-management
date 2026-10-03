@@ -84,7 +84,7 @@ The alternative is `backend/.env`: copy `backend/.env.example`, which lists ever
 | JSON round-trip | A raw JSON view per node and edge. Keys the UI does not know survive load and save. |
 | Test call | WebRTC call from the browser with the current draft, unsaved edits included. The canvas highlights the live node and the visited path. The panel shows the transcript, latency, cost, collected flow state and the **Disambiguator** switch. |
 | Keys | The API keys sheet described above. |
-| Decisions tab | One row per resolver decision: status, what was said, policy notes, the model's probability and latency, tool-result tokens. |
+| Decisions tab | One row per resolver decision: status, what was said, the offers or the question asked, the refusal reason, the model's probability and latency, tool-result tokens, and any caller words the handler kept over the conversation model's. |
 | Call review | After hang-up, `POST /api/grade` sends the transcript and decisions to JEV once. It returns five scores: booked correctly, unnecessary questions, unsupported claims, caller effort (1-5) and outcome. Cost about $0.00004 per call (measured). |
 | Dev view | Press D. Live pipeline strip (mic, STT, LLM, tools, TTS, speaker) with the latest latency per stage, a per-turn voice-to-voice waterfall, a streaming transcript, tool and model bubbles on the live node, running cost by provider (prices editable), and prompt tokens per LLM call against the catalog's naive size. |
 | Themes | Light, dark, or follow the system. |
@@ -295,7 +295,7 @@ Other limits:
 
 Trade-offs we accepted:
 
-- **Hand-written aliases.** SF has 237 aliases and 47 lay terms, national 426 and 80. They are cheap and auditable, but cover only phrasings someone wrote down. The disambiguator covers the rest.
+- **Hand-written aliases.** SF has 237 aliases and 47 lay terms, national 426 and 80. They are cheap and auditable, but cover only phrasings someone wrote down. The disambiguator covers the rest. Measured with all of them removed (a new client on day one): JEV loses 3-4 correct turns per set and stays at 0-1 wrong commits; Off loses up to 15 on SF. Details in eval/README.md.
 - **A model adds latency on the turns that use it.** The 2.5 s turn budget bounds the worst case.
 - **Speak-direct trades variety for safety.** `resolver.speak_direct: false` turns it off per agent.
 - **Node transitions cost a hop.** That is why the graph has five nodes and the work lives in tools.
@@ -321,12 +321,14 @@ Trade-offs we accepted:
 Open the agent in Agent Studio, start a test call, and keep the Decisions tab open (or press D for Dev view). The lines below were checked offline against the real resolver.
 
 1. **New patient with a referral** (Clinic Scheduler). "I'm a new patient and I have a referral. I need a cardiology consultation with Dr. Chen, soonest you have." Policy removes David Chen. The agent offers Dr. Emily Chen's times with no question. Pick a time, hear the read-back, say yes, and hear the confirmation reference.
-2. **Established patient, same request.** Both Chens are valid now, so the agent asks "Do you mean Dr. David Chen or Dr. Emily Chen?"
+2. **Established patient, same request.** Both Chens are valid now, so the agent asks "Do you mean Dr. David Chen or Dr. Emily Chen?" Answer "the lady one". With JEV the agent asks "Do you mean Dr. Emily Chen?": gender is inferred from the first name and confirmed by name, never booked on its own. With the Disambiguator Off it asks between both again, because the catalog has no gender field.
 3. **Street level** (National Scheduler). "I need a sick visit at the clinic on Market Street in San Jose." Agent: "Is that Downtown at 1812 Market or Willow Glen at 3330 Market?" Say "thirty-three thirty." The agent offers times at Willow Glen. Then "a sick visit at the one on Lincoln Avenue in Salt Lake" gets times at Sugar House (4821 Lincoln Ave). "Avenue" is not taken as The Avenues Family Clinic.
 4. **A place heard by sound.** "I need a flu shot, I'm in Trenton." Agent: "Did you mean Renton, Washington?" Say "No, Trenton, New Jersey." Agent: "Our nearest clinic in New Jersey for a flu shot is Cherry Hill, near Philadelphia. Want me to look there?"
 5. **The switch** (Clinic Scheduler, new call). With JEV, "something for my back pain" is read as an orthopedic consultation, and the agent asks "Do you have a referral for an orthopedic consultation?". Flip the Disambiguator to **Off** and call again: the same words get "What's the visit for?". That is the rules path, with no model.
 6. **Consent guard.** After an offer, say "Sure, book it" without picking a time. `confirm_booking` is refused, and the agent asks which time first.
-7. **Nothing nearby** (National Scheduler). "I need a dental cleaning, I live in Maine." The agent offers the nearest Boston site.
+7. **Nothing nearby** (National Scheduler). "I need a dental cleaning, I live in Maine." The agent says there is none in Maine, names the nearest Boston site and asks before looking there.
+8. **Questions** (Clinic Scheduler, new call, as the first words). "What are the hours at the Mission Bay clinic?" gets Monday to Friday, 8 to 5. "Does anyone at Mission Bay speak Spanish?" gets the two doctors there who do. "Do I need a referral for an MRI?" gets yes, and established patients only. Each answer comes from `lookup` facts, then the agent offers to book.
+9. **The model cannot answer for the caller** (National Scheduler). "A flu shot in Washington." Agent: "Is that Seattle, Washington or Washington, DC?" Say only "Washington." The agent asks again, with a ZIP code as a way out. The Decisions tab shows the row: "kept the caller's words: model sent “Washington, DC”, caller said “Washington.”"
 
 Replay beats offline, with no LLM, audio or network: `python backend/tools/text_sim.py` (all beats) or `python backend/tools/text_sim.py N3` (the second live call).
 
@@ -358,7 +360,7 @@ cd frontend && pnpm test                                   # vitest
 cd frontend && pnpm typecheck && pnpm lint && pnpm build
 ```
 
-Last run: **1,313 backend tests passed, 1 live JEV smoke test skipped** (2026-10-03, after the live-call fixes). **122 frontend tests passed**, and the frontend production build passed.
+Last run: **1,314 backend tests passed, 1 live JEV smoke test skipped** (2026-10-03, after the live-call fixes). **123 frontend tests passed**, and the frontend production build passed.
 
 ## Final verification (2026-10-03, resolver frozen at `222eb22`)
 

@@ -1284,3 +1284,27 @@ Dev and stress sets after these fixes, JEV live: 0 wrong commits on all 13 sets,
 ### Third live round
 
 Five calls, all on the intended agent (the header fix worked). Scope doubt on both agents, "Upper endoscopy." and Trenton passed. The logs showed the dropped-clause check never ran on the first update after `start`: the schedule node resets its context on entry, so that update had no caller message to check against. `start` now keeps the caller's words for that one update. In this round JEV still caught the bare "the GI doc wants a scope", and "physical and form signed" for a 10-year-old asked "annual physical or school physical?".
+
+## Round 5 re-run after the live-call fixes, and a new-client ablation (2026-10-04)
+
+**Round 5 sets, re-run.** `heldout5` and `national5` were scored once at `222eb22`. The live-call fixes came after that and were not tuned on them, so re-running them shows whether those fixes broke anything. They are no longer blind. JEV, live:
+
+| Set | Scored at `222eb22` | After the live-call fixes |
+|---|---|---|
+| heldout5 | 4/38 wrong (10.5%), 52/64 | 3/36 wrong (8.3%), 52/64 |
+| national5 | 1/35 wrong (2.9%), 51/59 | 0/36 wrong, 53/59 |
+
+Fixed: h5-26 ("a scan of my lower back, not sure what kind" now asks), nat5-sym-02 (the neck lump in Indianapolis gets a local visit instead of a refusal pointing to Chicago), nat5-sym-03 (a wrong visit type now asks), nat5-sym-06. New over-ask: h5-18 asks where it booked. Still wrong: h5-m07 ("my next usual appointment with my psychiatrist") and h5-m08 (a child's physical with a form). Off is unchanged on both sets. Results: `eval/results/round5_after_live_fixes_*_jev.txt`.
+
+**A new client on day one.** The hand-written vocabulary (aliases and lay terms) is the per-catalog part. Removing it shows what a new client gets before anyone writes one. Development sets, so the as-shipped rows are optimistic: some aliases were written for them.
+
+| Set | Vocabulary | Off: wrong, correct turns | JEV: wrong, correct turns |
+|---|---|---|---|
+| heldout4, SF (62) | as shipped | 5/26, 37 | 0/39, 60 |
+| | no aliases | 9/24, 26 | 0/36, 57 |
+| | no aliases, no lay terms | 1/13, 22 | 1/38, 56 |
+| national4 (56) | as shipped | 0/31, 47 | 0/33, 50 |
+| | no aliases | 2/30, 44 | 0/32, 49 |
+| | no aliases, no lay terms | 2/28, 42 | 1/31, 47 |
+
+With JEV, losing all hand-written vocabulary costs 3-4 correct turns per set and adds at most one wrong commit. Without a model it costs up to 15 correct turns on SF. The vocabulary mainly serves the rules-only path; the disambiguator is what makes a new catalog usable on day one. `specialty_default` (one default visit per specialty) was kept in every run.

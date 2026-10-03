@@ -144,6 +144,12 @@ function DecisionCard({ decision: d, elapsed }: { decision: TimedDecision; elaps
           </div>
         )}
 
+        {d.kept && (
+          <p className="text-[11.5px] leading-snug text-ink-soft" title="The conversation model's tool arguments were checked against the transcript">
+            <span className="font-mono text-[11px] text-info">kept the caller's words:</span> model sent{' '}
+            {d.kept.model.map((m) => `“${m}”`).join(', ')}, caller said “{d.kept.caller}”
+          </p>
+        )}
         {d.reason && <p className="font-mono text-[11px] text-danger">reason: {d.reason}</p>}
         {d.model && <ModelChip {...d.model} />}
       </article>

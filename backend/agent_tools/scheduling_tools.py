@@ -123,9 +123,13 @@ def _update_request_properties(ctx: ToolContext) -> dict:
     }
 
 
-def _decision_event(ctx: ToolContext, plan: Plan, result: dict, elapsed_ms: float) -> dict:
+def _decision_event(ctx: ToolContext, plan: Plan, result: dict, elapsed_ms: float,
+                    kept: dict | None = None) -> dict:
     event = {"type": "resolver_decision", "status": plan.status, "say": plan.say,
              "summary": plan.summary, "notes": list(plan.notes), "valid_rows": plan.valid_rows}
+    if kept:
+        # What the conversation model sent in place of the caller's words, for the Decisions tab.
+        event["kept_words"] = kept
     if "offers" in result:
         event["offers"] = result["offers"]
     if "ask" in result:
@@ -208,7 +212,7 @@ async def _resolve(ctx: ToolContext, req: Request, flow_manager: FlowManager) ->
 
 
 async def _apply_plan(ctx: ToolContext, flow_manager: FlowManager, plan: Plan, elapsed_ms: float,
-                      preface: str = "") -> tuple[dict, bool]:
+                      preface: str = "", kept: dict | None = None) -> tuple[dict, bool]:
     """Store the plan as the call's state, speak it when speak-direct applies, and report it.
     Returns the tool result and whether it was spoken."""
     flow_manager.state["req"] = plan.req.to_dict()
@@ -225,7 +229,7 @@ async def _apply_plan(ctx: ToolContext, flow_manager: FlowManager, plan: Plan, e
         result["say"] = preface + result["say"]
     if plan.refusal:
         result["reason"] = plan.refusal.code
-    await ctx.emit(_decision_event(ctx, plan, result, elapsed_ms))
+    await ctx.emit(_decision_event(ctx, plan, result, elapsed_ms, kept))
     if speak:
         await flow_manager.worker.queue_frame(TTSSpeakFrame(text=result["spoken"]))
     return result, speak
@@ -364,7 +368,8 @@ def update_request_tool(ctx: ToolContext) -> FlowsFunctionSchema:
             return _error(f"could not process that request: {e}"), None
         elapsed_ms = (time.perf_counter() - started) * 1000
         logger.info(f"update_request {args} -> {plan.status}: {plan.say!r} ({elapsed_ms:.0f} ms)")
-        result, spoken = await _apply_plan(ctx, flow_manager, plan, elapsed_ms)
+        kept = {"model": replaced, "caller": said} if replaced else None
+        result, spoken = await _apply_plan(ctx, flow_manager, plan, elapsed_ms, kept=kept)
         return result, NO_RESPONSE if spoken else None
 
     return FlowsFunctionSchema(
@@ -398,7 +403,9 @@ def lookup_tool(ctx: ToolContext) -> FlowsFunctionSchema:
         description=(
             "Answer a caller's question from the clinic catalog: a location's address, hours or phone "
             "(location_info), a doctor's specialty, sites, languages or whether they take new patients "
-            "(provider_info), or whether we offer a kind of visit (do_you_offer). Only for a question that asks for "
+            "(provider_info), or a kind of visit: whether we offer it, how long it takes, whether it needs a referral "
+            "and whether new patients can book it (do_you_offer, with the visit's name; for \"that\" or \"it\", the visit "
+            "being booked). Only for a question that asks for "
             "information: a request to book something, even asked as \"do you have X in Y?\", is not a question for "
             "lookup. Say only what the facts state; never say whether something is or is not available in a place "
             "they do not name."

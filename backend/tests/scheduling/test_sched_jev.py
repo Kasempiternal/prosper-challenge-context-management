@@ -6,7 +6,7 @@ import time
 import httpx
 import pytest
 
-from scheduling.decision import DECLINE, Check, CheckGate, Gate, Verdict, gender_of
+from scheduling.decision import Check, CheckGate, Gate, Verdict, gender_of
 from scheduling.jev import JevClient, JevProviderChooser, JevTypeDisambiguator
 from scheduling.lexicon import nearest_type, unexplained_words
 from scheduling.names import clue_words, match_providers

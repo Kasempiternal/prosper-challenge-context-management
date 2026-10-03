@@ -128,12 +128,26 @@ Per-mode results on every blind set are in the README's evidence section and in 
 - A strict `service_name` enum of every type name was measured and not shipped: it costs 799 tok of schema on SF and 2,006 on national, against 422 and 472 for the lean schemas (M).
 - **Speak-direct**: offers, questions, refusals and the booking confirmation come from templates. The handler queues the text to TTS and returns `NO_RESPONSE`, which skips the second LLM round trip. Names, times and confirmation references are never paraphrased, so they cannot be invented. Requires `parallel_tool_calls=False`.
 
+## Checking the LLM's extraction
+
+The tool schema asks for the caller's own words. Live calls showed the conversation model does not always pass them: it answers for the caller and trims what it thinks is noise. A prompt instruction did not stop it, and replaying the same turns through gpt-4.1 gave the same rewrites. So the `update_request` handler checks the arguments against the caller's transcript before the resolver sees them (`grounded` in `agent_tools/scheduling_tools.py`):
+
+| The model sent | The caller said | Rule |
+|---|---|---|
+| `Washington, DC`, answering "Seattle, Washington or Washington, DC?" | "Washington." | While a doctor, place or visit question is open, an answer with a word the caller did not say is replaced by the caller's words. The resolver then asks again. |
+| `Dr. Emily Chen`, answering "Dr. David Chen or Dr. Emily Chen?" | "The lady one." | Same rule. The gender policy then confirms her by name. |
+| `scope` | "I don't remember if it goes down my throat or up from below" | Sentences that state a doubt or say whom the visit is for ("my 10-year-old") are restored into the visit phrase. |
+| `Doctor Chen` | "the lady one. Doctor Chen" | Sentences that describe the doctor (gender, language) are restored into the doctor phrase. |
+| `time_pref.day = wednesday` | "Day of checkup." | A day the caller did not say is dropped. |
+
+The first `update_request` after `start` has no caller message in context, because `schedule` resets it, so the handler checks it against the words `start` received. A one-option question ("Do you mean Dr. Emily Chen?") is a yes/no, where the model naming the option is the expected answer. Every replacement is logged.
+
 ## Conversation graph
 
 Five nodes, on purpose. Every transition costs an LLM round trip (live: a transition turn takes about 2-3 s against 1.1-1.3 s in-node, M), so the work lives in tools.
 
 ```
-greeting --start(request) [action: new_request]--> schedule   (tools: update_request, lookup; context reset)
+greeting (tools: lookup) --start(request) [action: new_request]--> schedule   (tools: update_request, lookup; context reset)
 schedule --confirm_booking [precondition: offer_confirmed, action: book_confirmed]--> booked   (tools: lookup)
 booked   --finish--> done (end)
 booked   --book_another(request) [action: new_request]--> schedule
@@ -167,6 +181,7 @@ Full contract: [AGENT_FORMAT.md](AGENT_FORMAT.md).
 - **Nothing nearby**: `none_nearby` past 50 miles, with the nearest valid clinic as an alternative.
 - **Referral**: asked only when every remaining option requires one.
 - **Booking fails at the last step** (policy or slot taken): the agent says so and offers fresh times without leaving `schedule`.
+- **The conversation model rewrites the caller**: the handler checks its arguments against the transcript (see "Checking the LLM's extraction").
 - **Model slow, down or unsure**: 2.5 s per turn, 1.5 s per request, no retry. A timeout or error is never committed on: the caller is asked. A low-confidence answer gives the no-model behavior.
 
 ## Evaluation methodology
@@ -242,6 +257,9 @@ EHR integration, identity verification, real reschedule and cancel (they go to h
 | 100× synthetic catalog scale test (`eval/scale_catalog.py`) | National v2 generator (`backend/tools/gen_national_catalog.py`) with real metros and geography, plus dev and blind eval sets | A national catalog needs geography: at 299 sites, "near me" is the hard part (I). |
 | `service_name` enum compared in the eval | Not shipped | It costs 799 tok of schema on SF and 2,006 on national (M). |
 | JEV eval judge and paid dialog simulation | Not built | Costs money. Needs approval. |
+| The LLM passes the caller's words; the prompt says so | The handler checks the arguments against the transcript and restores or replaces what the model changed | About 35 live calls on 2026-10-03: the model answered "Seattle or DC?" for the caller, turned "the lady one" into a name, and reduced a stated doubt to "scope". gpt-4.1 did the same on replay. |
+| `greeting` routes to `start` or `transfer_to_staff` | `greeting` also has `lookup` | A caller whose first words were "What are the hours at Mission Bay?" was transferred to staff. Replayed through gpt-4o: 9/9 questions went to `lookup`, 6/6 booking requests to `start`. |
+| `provider_info` matches doctor names | It also answers "who speaks Spanish?" with the doctors who do, narrowed by a clinic or city | Name matching alone heard "Spanish" as Dr. Spain, who speaks Korean. |
 
 ## Final verification (2026-10-03, resolver frozen at `222eb22`)
 

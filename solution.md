@@ -42,13 +42,13 @@ The guiding rule: **in healthcare a wrong booking is the costly error, and one m
 
 ## Evidence
 
-- **Blind rounds.** Case sets written without seeing the code, frozen in a commit before the fixes they judge, scored once. Latest (round 5, JEV): SF 4 wrong commits in 38 (10.5%), national 1 in 35 (2.9%). Dev sets read 0 wrong commits; that gap is the honest measure.
+- **Blind rounds.** Case sets written without seeing the code, frozen in a commit before the fixes they judge, scored once. Latest (round 5, JEV): SF 4 wrong commits in 38 (10.5%), national 1 in 35 (2.9%). Dev sets read 0 wrong commits; that gap is the honest measure. Re-run after the later live-call fixes (no longer blind, not tuned on): SF 3 in 36, national 0 in 36, so those fixes broke nothing there.
 - **Modes compared** on every blind set: JEV has the fewest wrong commits on SF doctor descriptions; OpenAI matches or beats it on some national sets; Off is the rules path and asks more.
 - **88 hard cases** (the most critical and the ones that failed in earlier runs): 0 unsafe JEV outcomes.
 - **Live voice calls** found what offline cases cannot: the conversation model claimed a booking it never made, and it rewrote callers' answers ("Washington" into "Washington, DC", "the lady one" into "Dr. Emily Chen", a doubt into "scope"). Each became a code-level guard, not a prompt tweak. Booking moved into an edge action, and tool arguments are now checked against the caller's own words. Replaying those turns showed gpt-4.1 makes the same rewrites, so a stronger model was not the fix.
-- 1,313 backend and 122 frontend tests.
+- 1,314 backend and 123 frontend tests.
 
-Integrity incidents (a test that touched blind files, a worker that previewed five blind cases) are disclosed with the scores they could have affected, in the README.
+Three integrity exposures are disclosed with the scores they could have affected: a test that resolved the blind files (it asserted nothing about them), a worker whose search previewed five blind cases, and three lines of round 4 results shown to the round 5 author after every case was final. Details in the README and [eval/README.md](eval/README.md).
 
 ## Trade-offs accepted
 
@@ -70,10 +70,11 @@ Rejected alternatives: catalog in the prompt (does not fit, cannot apply policy 
 
 ## Known limits
 
-- Underspecified requests can still get a confident answer in blind tests: "a scan of my lower back" offers a spine MRI without asking which scan, and a child's physical gets a school physical without asking school or sports. These were left unfixed on purpose: fixing them on the scored cases would make the blind score meaningless.
+- Underspecified requests can still get a confident answer in blind tests: "my next usual appointment with my psychiatrist" gets medication management without asking which visit, and a child's physical gets a school physical without asking school or sports. They were left unfixed on purpose: fixing them on the scored cases would make the blind score meaningless.
 - The offline eval feeds tool arguments, not audio. Speech recognition and LLM extraction are covered only by live calls.
 - JEV probabilities move by 0.02-0.08 between identical requests, so a case near a threshold can flip between runs.
+- A new client's catalog needs its own aliases and lay terms. They are data, not code (SF has 237 and 47); the resolver, policy table, geography and disambiguator carry over unchanged. Measured with all of it removed: with JEV, SF drops from 60/62 to 56/62 correct turns and national from 50/56 to 47/56, with at most one wrong booking per set. Without a model, SF drops from 37/62 to 22/62. Drafting the vocabulary offline with an LLM and having a person review it is the next step; it is not built.
 
 ## Demo
 
-The README's demo script lists seven checked beats, among them: policy picking the right Dr. Chen, a street and house number deciding the clinic, "Trenton" heard as "Renton", the Disambiguator switch flipped from JEV to Off on the same sentence, and the booking guard refusing "sure, book it" before a time is chosen.
+The README's demo script lists nine checked beats, among them: policy picking the right Dr. Chen, "the lady one" confirmed by name, a street and house number deciding the clinic, "Trenton" heard as "Renton", the Disambiguator switch flipped from JEV to Off on the same sentence, questions answered from the catalog, the booking guard refusing "sure, book it" before a time is chosen, and the Decisions tab showing the moment the conversation model tried to answer for the caller.

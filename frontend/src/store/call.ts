@@ -32,6 +32,8 @@ export interface Decision {
   model: { provider: Chooser | null; p: number | null; ms: number } | null
   /** Tokens in the tool result the LLM saw. */
   tokens: number | null
+  /** What the conversation model sent in place of the caller's words, and what the caller said; the handler kept the caller's. */
+  kept?: { model: string[]; caller: string }
 }
 
 export interface TimedDecision extends Decision {
@@ -217,5 +219,8 @@ function parseDecision(raw: Record<string, unknown>): Decision | null {
     reason: typeof raw.reason === 'string' ? raw.reason : null,
     model,
     tokens: isRecord(raw.tokens) ? num(raw.tokens.result) : null,
+    ...(isRecord(raw.kept_words) && typeof raw.kept_words.caller === 'string'
+      ? { kept: { model: strings(raw.kept_words.model), caller: raw.kept_words.caller } }
+      : {}),
   }
 }
