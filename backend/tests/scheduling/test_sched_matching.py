@@ -229,7 +229,16 @@ def _oracle_match_providers(index, phrase, within=None):
                 tier = named
     if within:
         anywhere = _oracle_match_providers(index, phrase)
-        return anywhere if not tier or (anywhere and anywhere[0].score > tier[0].score) else tier
+        # Intentional safety change: descriptions answer within the asked roster.
+        from scheduling.names import _TITLE_CLUES, _CLUE_LINKS
+        attributes = {w for p in index.providers.values() for lang in p.languages for w in tokens(lang)}
+        attributes |= set(_TITLE_CLUES) | _CLUE_LINKS
+        from scheduling.names import _NO, _YES
+        lead = {"actually", "instead", "rather", "sorry", "wait"} | _NO | _YES | _HONORIFICS
+        start = next((w for w in tokens(phrase or "") if w not in lead), None)
+        named = (anywhere and start and start not in attributes and
+                 _oracle_is_name_word(index, start, [c.id for c in anywhere]))
+        return anywhere if named and (not tier or anywhere[0].score > tier[0].score) else tier
     if not tier and len(words) > 1:
         names = [w for w in words if _oracle_is_name_word(index, w)]
         if names and names != words:
@@ -251,7 +260,8 @@ def _oracle_tier(index, words, within):
                 scored.append(NameCandidate(prov.id, round(s_last, 3), via_last))
         else:
             s_last, via = _oracle_word_score(words[-1], last)
-            s_first, _ = _oracle_word_score(words[0], first)
+            # Intentional correction handling: the first name immediately precedes the surname.
+            s_first, _ = _oracle_word_score(words[-2], first)
             joined, _ = _oracle_word_score("".join(words), last)
             if joined > s_last:
                 scored.append(NameCandidate(prov.id, round(joined, 3), "fuzzy"))

@@ -237,6 +237,10 @@ class _Resolution:
             self.preface = "That time doesn't match what you just asked for, so I looked again. "
             return None
         row = self.ix.row(offer.type_id, offer.provider_id, offer.location_id)
+        anchors = self._offer_anchors()
+        if row is not None and anchors and self._anchor_miles(anchors, offer.location_id) > FINAL_RING_MI:
+            self.notes.append("picked offer is beyond the place anchor: searching again")
+            return None
         issues = check(row, self.patient) if row else []
         if row is None or has_violation(issues):
             self.notes.append("picked offer no longer passes policy")
@@ -494,6 +498,21 @@ class _Resolution:
             if len(locs) > 1:
                 return self._ask_location(locs)
             self.slots["location"] = replace(self.slots["location"], resolved_id=locs[0])
+
+        anchors = self._offer_anchors()
+        if anchors:
+            near = [r for r in ok if self._anchor_miles(anchors, r.location.id) <= FINAL_RING_MI]
+            if len(near) < len(ok):
+                self.notes.append(f"place anchor kept {len(near)} of {len(ok)} rows within "
+                                  f"{FINAL_RING_MI:g} mi of {'/'.join(a.key for a in anchors)}")
+                if not near:
+                    place = self._place()
+                    if place is not None and place.guess:
+                        return self._confirm_place(place)
+                    return self._none_nearby(anchors, FINAL_RING_MI, [type_id],
+                                             set(provider_ids) if provider_ids is not None else None,
+                                             rows_p if provider_ids is not None else None, svc is not None)
+                ok = near
 
         found = self._nearest_first(ok) if self.widened else self.av.find(ok, self.req.time_pref, MAX_OPTIONS)
         if not found:
@@ -817,6 +836,25 @@ class _Resolution:
                 m = narrowed if narrowed.sites or narrowed.anchors else m
         self.place_memo = m
         return m
+
+    def _offer_anchors(self) -> tuple[Place, ...]:
+        """The places the caller said, as points an offer must stay within FINAL_RING_MI of: an
+        area's anchors, or the clinic named outright. Empty when no place was said, or none has
+        coordinates — nothing else to measure a "far" offer against."""
+        if not self.geo:
+            return ()
+        place = self._place()
+        if place is None:
+            return ()
+        anchors = list(place.anchors)
+        anchors += (self.ix.gazetteer.sites[c.id] for c in place.sites if c.id in self.ix.gazetteer.sites)
+        return tuple(a for a in anchors if a.lat is not None and a.lon is not None)
+
+    def _anchor_miles(self, anchors: tuple[Place, ...], location_id: str) -> float:
+        loc = self.ix.locations[location_id]
+        if loc.lat is None or loc.lon is None:
+            return math.inf
+        return min(haversine(a.lat, a.lon, loc.lat, loc.lon) for a in anchors)
 
     def _place_ids(self) -> list[str] | None:
         """Locations a picked offer may be at, for _fits_change."""

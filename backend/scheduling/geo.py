@@ -20,7 +20,8 @@ from typing import TYPE_CHECKING, Callable, Iterable, Mapping
 
 import jellyfish
 
-from .names import NameCandidate, _location_words, _same_word, hear_place, match_locations
+from .names import (NameCandidate, STRONG_LOCATION_SCORE, _location_words, _same_word, hear_place,
+                    match_locations)
 from .text import normalize, phonetic_keys, tokens
 
 if TYPE_CHECKING:
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
 EARTH_RADIUS_MI = 3958.8
 RADIUS_MI = {"site": 5.0, "neighborhood": 5.0, "zip": 5.0, "zip3": 15.0, "metro": 25.0, "state": 150.0}
 # A site match at least this good means every distinctive word named the clinic itself.
-STRONG_SITE_SCORE = 0.7
+STRONG_SITE_SCORE = STRONG_LOCATION_SCORE
 _FUZZY_SPELLING = 0.9
 _FUZZY_WITH_SOUND = 0.8
 
@@ -66,7 +67,11 @@ _NEAR_PREFIXES = (("close", "to"), ("closest", "to"), ("nearest", "to"), ("next"
 _LEAD_FILLER = {"i", "m", "am", "im", "we", "re", "live", "living", "work", "stay", "staying", "located",
                 "based", "in", "at", "from", "um", "uh", "so", "well", "the", "over", "out", "here",
                 "somewhere", "anywhere", "just", "a", "s", "it", "one", "of", "my", "is", "zip", "zipcode",
-                "code", "postal"}
+                "code", "postal",
+                # Question scaffolding precedes a proximity request; it supplies no place name.
+                "what", "whats", "which", "where", "wheres", "how", "are", "there", "do", "does", "you",
+                "your", "know", "tell", "me", "can", "could", "would", "please", "about", "any", "got",
+                "have", "find", "show"}
 _TRAILING_FILLER = {"area", "please", "neighborhood", "region", "metro", "city"}
 _CLINIC_WORDS = frozenset({"clinic", "clinics", "center", "centre", "office"})
 _ZIP = re.compile(r"^\d{5}$")

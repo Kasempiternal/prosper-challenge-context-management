@@ -31,6 +31,9 @@ STREET_TYPE_NAMES = {
 STREET_TYPES = frozenset(STREET_TYPE_NAMES)
 MIN_PROVIDER_SCORE = 0.78
 MIN_LOCATION_SCORE = 0.4
+# The score that names a site outright, not a word of it: an answer to "which clinic?" that
+# strongly names a different site is a new choice; anything weaker only describes the options.
+STRONG_LOCATION_SCORE = 0.7
 TIE_GAP = 0.08
 _SOUNDALIKE_HIT = 0.9
 
@@ -149,10 +152,23 @@ def match_providers(index: CatalogIndex, phrase: str | None, within: Iterable[st
             if named and (not tier or named[0].score > tier[0].score):
                 tier = named
     if within:
-        # An answer to "Do you mean Dr. Emily Chen?" may name someone else ("Lucas Chen"): a
-        # better match outside the options asked about wins.
+        # An answer to a provider confirmation may name someone else: a
+        # better match outside the options asked about wins, but only when the answer actually
+        # says that provider's name. Describing the options instead ("the one who speaks
+        # another language") names nobody outside them, and a fuzzy echo of a description never widens.
         anywhere = match_providers(index, phrase)
-        return anywhere if not tier or (anywhere and anywhere[0].score > tier[0].score) else tier
+        # A catalog language or credential is an attribute even if its sound collides with a name.
+        raw = tokens(phrase or "")
+        # A new name starts the answer, possibly after a correction or honorific. Words later
+        # in "the one at ..." or "the one who speaks ..." remain descriptions, even when fuzzy
+        # name matching gives those words a high score.
+        lead = {"actually", "instead", "rather", "sorry", "wait"} | _NO | _YES | _HONORIFICS
+        start = next((w for w in raw if w not in lead), None)
+        named = (anywhere and start and start not in _provider_attributes(index)
+                 and _is_name_word(index, start, [c.id for c in anywhere]))
+        if named and (not tier or anywhere[0].score > tier[0].score):
+            return anywhere
+        return tier
     if not tier and len(words) > 1:
         # "Dr. Chen, the heart doctor": retry on the words that sound like a name, so the
         # clue words do not break the match. The clue itself is read by clue_words().
@@ -160,6 +176,12 @@ def match_providers(index: CatalogIndex, phrase: str | None, within: Iterable[st
         if names and names != words:
             return match_providers(index, " ".join(names), within)
     return tier
+
+
+@per_index
+def _provider_attributes(index: CatalogIndex) -> set[str]:
+    return ({w for p in index.providers.values() for lang in p.languages for w in tokens(lang)}
+            | set(_TITLE_CLUES) | _CLUE_LINKS)
 
 
 def _names_said(index: CatalogIndex, phrase: str | None) -> list[list[str]]:
@@ -639,7 +661,10 @@ def match_locations(index: CatalogIndex, phrase: str | None, within: Iterable[st
     pinned = _by_house_number(on_street, heard.number) if heard.number is not None else []
     tier = [NameCandidate(l, 1.0, "address") for l in pinned] or _top_tier(scored, MIN_LOCATION_SCORE)
     if within and not tier:
-        return match_locations(index, phrase)
+        # Answering "which clinic?" may name a different one outright; words that describe rather
+        # than name ("the closer one") reach nobody past the options, and the question is repeated.
+        widened = match_locations(index, phrase)
+        return widened if widened and widened[0].score >= STRONG_LOCATION_SCORE else []
     return tier
 
 
