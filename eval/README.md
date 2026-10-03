@@ -756,3 +756,168 @@ backend/.venv/Scripts/python eval/validate_case_format.py heldout4 national4   #
 
 DeepSeek calls: 10, none of them failed. heldout4 took 5 batches plus 1 repair call covering 4
 scenarios; national4 took 4 batches. After the repair, the leak checks dropped no cases.
+
+## Round 4 fixes: the round 3 failure classes
+
+`heldout3` and `national3` are dev sets now (`eval/sets.py`), so tests and the sensitivity sweep
+read them. Every fix below was written after reading their failures, so these numbers show that the
+fixes work on the cases they were written for. Only the round 4 blind sets can show whether they
+generalize. Each fix is a general mechanism, unit-tested with wording that is not in any set. No
+threshold was re-tuned. The check gate's margin is new, and its value is explained below.
+
+### Results (offline, from the committed caches)
+
+Wrong commits per commit; top-1 per evaluated turn. "Before" is `phase1-ui` (aa00deb), replayed from
+the same caches. heldout3 JEV before reads 43/54 here: in the scored-once live run one request failed
+(42/54).
+
+| set | JEV before | JEV after | no model before | no model after |
+|---|---|---|---|---|
+| main | 0/48; 105/105 | 0/48; 105/105 | 0/48; 105/105 | 0/48; 105/105 |
+| heldout | 0/6; 12/12 | 0/6; 12/12 | 1/5; 10/12 | 1/5; 10/12 |
+| heldout2 | 0/36; 45/49 | 0/36; 45/49 | 3/24; 28/49 | 3/24; 28/49 |
+| tune | 0/21; 24/26 | 0/21; 24/26 | 4/15; 14/26 | 4/15; 14/26 |
+| heldout3 | 7/42; 43/54 | **1/38; 50/54** | 18/29; 20/54 | **13/26; 24/54** |
+| national | 0/39; 56/56 | 0/35; 52/56 | 1/35; 51/56 | 1/35; 51/56 |
+| national2 | 0/38; 53/54 | 0/36; 51/54 | 0/25; 40/54 | 0/25; 40/54 |
+| street | 0/25; 36/36 | 0/25; 36/36 | 0/25; 36/36 | 0/25; 36/36 |
+| national3 | 3/36; 48/56 | **0/37; 54/56** | 5/19; 28/56 | **4/19; 32/56** |
+
+national3 "after" uses the two label corrections below. Against the old labels it reads JEV
+1/37; 52/56 and no model 5/19; 30/56.
+
+The one JEV wrong commit left is h3-33 (class 7 below). The no-model wrong-commit count never rose.
+The JEV top-1 losses are all new questions: nat2-geo-06, nat-sym-05 and nat-sym-07 (the check's
+margin), and nat-sym-04, nat-sym-08 and nat2-sym-05 (the specialty re-ask).
+
+Other choosers, after, from the caches (wrong commits; top-1):
+
+| set | OpenAI gpt-4o-mini | embeddings |
+|---|---|---|
+| main | 0/48; 105/105 | 0/48; 105/105 |
+| heldout | 0/5; 11/12 | 0/5; 11/12 |
+| heldout2 | 3/35; 38/49 | 5/31; 31/49 |
+| tune | 1/20; 22/26 | 3/18; 17/26 |
+| heldout3 | 2/36; 47/54 (round 3 live: 8/40; 42/54) | 10/32; 34/54 (16/36; 29/54) |
+| national | 0/38; 55/56 | 1/37; 53/56 |
+| national2 | 1/37; 51/54 | 1/35; 49/54 |
+| street | 0/25; 36/36 | 0/25; 36/36 |
+| national3 | 0/31; 48/56 (3/31; 43/56) | 4/32; 45/56 (5/31; 41/56) |
+
+Neither crashes. The OpenAI wrong commits left on heldout3 are h3-04 and h3-23: the model agrees
+with a wrong lexical match, and an agreeing answer gets no check. The embeddings chooser has no
+check, so it never overrules a lexical match on its own word. Most of its wrong commits are that
+case, the same lexical confusions the no-model column shows.
+
+### What changed (one mechanism per class)
+
+| class | case(s) | mechanism | where | measured (both modes unless noted) |
+|---|---|---|---|---|
+| 1 | h3-32 | A confident choice stands only if the check's top answer is that choice, ahead of the rival **and** "either" by `CheckGate.margin` 0.2; the twins threshold is implied and removed | `decision.CheckGate` | JEV h3-32 asks (was wrong). New asks: nat2-geo-06 (0.26 / 0.24 / either 0.50), nat-sym-05 (0.41 / 0.11 / 0.48), nat-sym-07 (0.55 / 0.03 / 0.42) |
+| 2 | h3-31 | A stated doubt ("don't remember if", "not sure whether", "either ... or ..., I don't know") is never committed on. Each alternative the caller names becomes a visit by name or alias, else by one model choice over that alternative plus what they said before it, and the caller is asked between the visits found. Alternatives that all name one visit by name or alias are no doubt | `lexicon.stated_doubt`, `resolver._doubted` | JEV asks Colonoscopy or Endoscopy Consultation (was a wrong commit). No model, OpenAI, embeddings: "Is that a GI consultation?" (was a wrong commit) |
+| 3 | h3-34 | A specialty default (inferred from a body word) is not added when the caller named, by name or alias, a visit no clinic offers. The tier is then unoffered and the resolver refuses not_offered before any model | `lexicon._score_types` | h3-34 refuses (was ortho consultation). No other dev turn changes |
+| 4 | h3-p04 | The doctors the caller means come from the name plus catalog facts (language, title, specialty, site), read before type, place and policy filters. The existing refusals then speak for that doctor. Gender and other words are still weighed after the rules, also when they leave one of several namesakes | `resolver._described`, `_consult_provider` | h3-p04 refuses new_patient_provider with two alternatives (was Dr. Tomas Hernandez) |
+| 5 | h3-p11, h3-p14 | A clinic named in the description is where the caller goes, unless they gave a place of their own; it is never silently dropped (location_type refusal with alternatives, or no_availability) | `names.ProviderClues.sites`, `resolver._search` | both offer only the named clinic; tune-p4 too (still correct) |
+| 6 | nat3-geo-10, nat3-geo-05 | After a widened search ("the nearest is N miles away, in X"), offers come from the nearest clinic with openings first. Refusal alternatives go by distance; a doctor already suggested is skipped only for an equally close option. none_nearby names the nearest valid clinic, not the nearest of the nearest metro center | `resolver._nearest_first`, `_alternatives`, `_none_nearby` | nat3-geo-05 Hialeah only (was Coral Gables too); nat3-geo-10 Midtown only, 12.5 mi (was Santa Clara and Evergreen, ~40 mi); str-02/04 suggest two San Jose clinics, not Oakland |
+| 7 | nat3-sym-05 | A specialty's default chosen from a shortlist is chosen again among that specialty's visits (one more request on 9 of 202 national-catalog dev turns) | `resolver._within_specialty` | Menopause Consultation (was OB/GYN New Patient Visit). New asks: nat-sym-04, nat-sym-08, nat2-sym-05 (each check put "either" or the rival on top) |
+| 8 | nat3-new-03 | A name said first or after "Dr." beats a soundalike surname read off the last word ("about her" -> Abbott) | `names.match_providers` | refuses new_patient_provider for Dr. Inna Volkov (was "That doctor isn't within 50 miles", about Dr. Abad) |
+| 8 | nat3-geo-15 | A state's cities are the metros with a clinic in it ("Virginia" answers "Arlington: Fort Worth or Washington?") | `geo.build_gazetteer` | JEV offers (was "nothing in Virginia"); no model now offers Diabetes Management, its existing A1C confusion |
+| 8 | h3-30 | A check that does not confirm a choice among a lexical tie asks among the whole tie | `resolver._model_types` | asks all three MRIs (was two) |
+| 8 | nat3-cap-05 | A type name said twice dominates the types inside it at every occurrence | `lexicon._drop_dominated` | no model refuses location_type (was a wrong commit) |
+| review | h3-31, h3-p10 | Two descriptions a model maps to one visit leave the doubt standing; a site fact explains the place's own words ("clinic") | `resolver._doubted`, `names.read_provider_clues` | OpenAI and embeddings ask (were wrong commits); JEV unchanged |
+
+Tried and not kept: checking a model answer that agrees with a lone lexical match (aimed at h3-33).
+Over every dev set it sent 61 more JEV requests and changed no outcome. h3-33's check weighs Dental
+Exam against Dental New Patient Exam and confirms the exam (1.00). Its entries were not kept in the
+cache.
+
+`--fill` (new in `run_resolver_eval.py`) sends only the requests the cache lacks.
+
+### Label corrections, round 4
+
+| case id | old | new | reason |
+|---|---|---|---|
+| nat3-geo-10 ("drug test", near Rockridge) | `location_ids_subset` loc_000, loc_008, loc_011; `max_miles` 10 | adds loc_005; `max_miles` 13 | `types_any` accepts Drug Screening (appt_233), and no site within 10 mi offers it. The nearest that does is Midtown (loc_005), 12.5 mi away. |
+| nat3-geo-16 ("drug test", Fargo, North Dakota) | `location_ids_subset` loc_141, loc_143 | adds loc_147 | The scenario accepts Drug Screening, which no Minneapolis site offers. The nearest site that does is Como, St. Paul (loc_147, 219 mi from Fargo). |
+
+Both come from the generator's rule (`eval/national/build_cases.py`): the site set is taken from
+every acceptable type together. Regenerating national3 would undo them.
+`cases_national3.jsonl` sha256 is now `af774a7e789eb47257d9b489110726e0edf30e9462964ff2aa04269ab2e42d0e`.
+
+### Round 3 misses left as they are
+
+JEV:
+- h3-33 "due for my regular six-month dental checkup" (**wrong commit** by its label, which its
+  author marked uncertain). The alias table maps "dental checkup" to Dental Exam, and the model
+  agrees (0.98). No general mechanism found (see "Tried and not kept"). The label is not
+  demonstrably wrong either, so it stays.
+- h3-28 "sonogram of my thyroid" asks Thyroid Follow-up or Ultrasound. Every word is explained by
+  the two aliases, so only the caller can choose (the round 3 rule that keeps "MRI" or "checkup"
+  away from the model). A rule that reads "X of my Y" as X would break "follow-up of my thyroid".
+- h3-p08, h3-p09: the pre-registered gender policy asks (Carlos 0.16, Patels 0.84 / 0.88 are not
+  sure enough). The labels expect gender to narrow. The behavior follows the policy.
+- nat3-sym-08: the check contradicts the choice (arrhythmia 0.12, cardiology 0.58), so the caller
+  is asked.
+- nat3-sym-01 (gout): the model's answer is open (rheumatology 0.52), so the lexicon's podiatry
+  default ("toe") stands. No podiatry within 50 mi of Indianapolis, so the caller is told the
+  nearest is in Chicago. That is a true refusal, not a commit.
+
+No model (13 heldout3 and 4 national3 wrong commits left): lexical type confusions whose deciding
+words need a model ("hormones ... blood test" -> Blood Draw, h3-x04; "A1C blood sugar test" ->
+Diabetes Management, through the aliases "a1c" and "blood sugar"; "spine X-rayed" -> Spine
+Consultation). Asking whenever a lexical match leaves words unexplained would remove them, but it
+would also turn the no-model mode's correct bookings with extra words into questions. Not done.
+nat3-dup-06 without a model refuses with a false reason: "Dr. Joseph White isn't at any of our
+clinics within 50 miles of Raleigh". He is in Raleigh; he does not offer the Contraception
+Consultation the lexicon chose. Reported, not fixed: the outcome stays a refusal either way.
+
+### Thresholds
+
+`eval/threshold_sensitivity.py`, every dev set (now including heldout3 and national3), from the
+committed cache: shipped top-1 421/440 resolve turns, 1 wrong commit (h3-33). margin 0.15: no
+flips. margin 0.25: nat3-geo-02 and nat3-noloc-01 (leads 0.24) ask, top-1 -2. Wrong commits do not
+change in any variant. settle, settle_either and gender behave as in round 3, plus h3-p08 and h3-p09
+at gender 0.85. Dev check leads (choice minus the larger of rival and "either") have a gap between
+0.13 and 0.24. 0.2 sits in it, and h2-08's 0.04 (0.52 against either 0.48) falls below it. h2-08
+still books: the check asks Psychiatric Evaluation or Therapy Session, and only the evaluation is
+open to a new patient.
+
+### Requests, latency, spend
+
+JEV requests over the dev sets: 324 -> 330. The doubt path sends one choice per alternative and no
+check. The specialty re-ask adds one request on 9 national-catalog turns. Resolver alone, no network,
+p95 before -> after (`--chooser none`, same machine, one set at a time): main 5.27 -> 5.39 ms,
+heldout 1.30 -> 1.14, heldout2 1.44 -> 1.19, tune 1.76 -> 1.56, heldout3 1.42 -> 1.61, national 7.31 -> 7.14, national2
+7.15 -> 6.89, street 13.91 -> 14.66, national3 6.83 -> 6.64.
+
+Spend: JEV 22 new cached requests, 16,051 input tokens, $0.00064, plus 61 requests ($0.00104) for the
+experiment that was not kept. OpenAI 35 new cached requests, 9,136 input tokens, $0.0014. Both caches
+are committed.
+
+## Round 4 review fixes
+
+The review's probe phrases are regression tests in `backend/tests/scheduling/test_sched_probes.py`,
+each run with no model and with stub models that answer every question confidently.
+
+| finding | mechanism | where |
+|---|---|---|
+| 1 states | A state whose only city with a clinic is another state's ("Virginia": Washington, DC) is not taken for that city. That city answers "which city?" only. A state with no city of its own never rings: none_nearby names its nearest own clinic and the distance ("Our nearest clinic in Virginia for a flu shot is Alexandria in Washington, about 135 miles away"). Two such cities still ask (Maryland). | `geo.over_state_line`, `Gazetteer.state_sites`, `resolver._ring`, `_none_nearby` |
+| 2 PT as context | An unoffered visit said as the object of a time word ("after PT", "before I start PT", but not "after surgery, PT") or as the subject of a verb ("my PT says", "physio did not help") is no candidate. Asked for, it is refused with the body part's visit suggested ("I can book an orthopedic consultation instead"). | `lexicon._drop_unoffered_context`, `pointed_default`, `resolver._refuse_not_offered` |
+| 3 doubt grammar | A doubt marker (a knowing word up to three words after a negation, or "unsure", "dunno", "maybe", "either"...), then alternatives joined by "or" in its clause or the next, else before it. "Or not" is no alternative. An alternative about the cost, coverage, how long, the clinic or the doctor (by name) is not about the visit. | `lexicon.stated_doubt` |
+| 4 leading questions | A stated doubt marks the type model consulted: no model narrows the caller's alternatives. Fewer than two visits found: the found ones plus the whole phrase's lexical tier, plus the nearest neighbour of a visit the caller named, else an open question. Never "Is that X?". | `resolver._doubted` |
+| 5 latency | The doubt path's picks are independent and sent together (`prefetch_pick`). A failed specialty re-ask asks among the specialty's visits (openly past three), not to confirm the default. | `resolver._modeled_alternatives`, `_within_specialty`, `jev.JevTypeDisambiguator.prefetch_pick` |
+| 6 | A doctor who does not do the visit anywhere does not narrow an area search: provider_type with alternatives near the place, not "isn't within 50 miles". | `resolver._ring` |
+| 7 | provider_location is judged on the doctors meant who do the visit ("Dr. Chen at Mission Bay" + Downtown). Facts that single out one of several namesakes, said with a gender no answer confirms ("Dr. Singh, he speaks Vietnamese"), confirm that doctor by name before any rule speaks for them. | `resolver._refuse_location`, `_described` |
+
+Every dev set gives the same wrong commits and top-1 as the round 4 table, in both modes, and with
+OpenAI and embeddings from their caches. Two no-model misses change wording only: h3-31 asks openly
+(was "Is that a GI consultation?") and nat3-dup-06 refuses provider_type with two alternatives in
+Raleigh (was "Dr. Joseph White isn't at any of our clinics within 50 miles of Raleigh").
+
+JEV requests over the dev sets: 342 over 440 resolve turns, counting repeats, as before. Turns with
+three or more sequential requests: 9 before, 9 after. All nine are the specialty re-ask (pick,
+re-ask, check), where each request needs the previous answer. h3-31's two doubt picks now go
+together (two rounds to one).
+
+Spend: JEV 29 new cached requests for the review probes, 55,048 input tokens, $0.0022. No OpenAI
+requests.

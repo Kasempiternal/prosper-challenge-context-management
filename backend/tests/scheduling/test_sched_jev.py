@@ -1,5 +1,6 @@
 import itertools
 import json
+import threading
 import time
 
 import httpx
@@ -287,8 +288,13 @@ def test_a_check_that_names_the_rival_contradicts_the_choice_and_asks(index, ava
 @pytest.mark.parametrize("chosen, rival, either, acts", [
     (0.05, 0.20, 0.75, False),  # review round 3, finding 2: the check prefers the rival
     (0.40, 0.40, 0.20, False),  # a tie is no preference
-    (0.41, 0.40, 0.19, True),
+    (0.41, 0.40, 0.19, False),  # a lead of 0.01 is no preference either
     (0.15, 0.05, 0.80, False),  # twins
+    (0.34, 0.25, 0.41, False),  # "either" is the top answer (held-out round 3, a skin check)
+    (0.26, 0.24, 0.50, False),
+    (0.52, 0.00, 0.48, False),  # split between the choice and "either"
+    (0.60, 0.05, 0.35, True),
+    (0.81, 0.02, 0.17, True),
 ])
 def test_a_confident_choice_stands_only_if_its_check_still_prefers_it(chosen, rival, either, acts):
     first = Verdict(act="a", top=(("a", 0.97), ("b", 0.03)), called=True)
@@ -346,6 +352,80 @@ def test_an_unsure_or_missing_check_asks_between_the_two(index, availability, ch
     server = Server({"tummy": {"appt_053": 0.55, "appt_007": 0.43}}, checks={"tummy": check})
     plan = _plan(index, availability, {**EXISTING_REF, "service_phrase": "my tummy's been hurting for weeks"}, server)
     assert (plan.status, plan.ask.options) == ("ask", ("appt_007", "appt_053"))
+
+
+SCOPE_DOUBT = {**EXISTING_REF, "service_phrase": "the GI doc wants a scope, not sure if it's through the mouth or "
+                                                  "the other end"}
+
+
+def test_each_alternative_a_doubtful_caller_names_is_its_own_question(index, availability):
+    """Held-out round 3: "I don't remember if it goes down my throat or up from below" was booked
+    as an endoscopy consultation."""
+    server = Server({"through the mouth": {"appt_055": 0.97, "appt_053": 0.03},
+                     "the other end": {"appt_054": 0.96, "appt_055": 0.04}})
+    plan = _plan(index, availability, SCOPE_DOUBT, server)
+    assert (plan.status, plan.ask.options) == ("ask", ("appt_054", "appt_055"))
+
+
+def test_the_alternatives_questions_are_in_flight_together(index, availability):
+    """Each answer is held until both questions have arrived: asked one after the other, the first
+    would time out and the caller would be asked openly."""
+    barrier = threading.Barrier(2, timeout=1.0)
+    server = Server({"through the mouth": {"appt_055": 0.97, "appt_053": 0.03},
+                     "the other end": {"appt_054": 0.96, "appt_055": 0.04}})
+
+    def together(request):
+        try:
+            barrier.wait()
+        except threading.BrokenBarrierError:
+            return httpx.Response(503, text="asked alone")
+        return server(request)
+
+    plan = _plan(index, availability, SCOPE_DOUBT, client=JevClient("k", transport=httpx.MockTransport(together)))
+    assert (plan.status, plan.ask.options) == ("ask", ("appt_054", "appt_055"))
+
+
+def test_two_descriptions_the_model_maps_to_one_visit_leave_the_doubt_standing(index, availability):
+    """With OpenAI and embeddings both alternatives of h3-31 became a GI consultation, which then booked.
+    That visit is also all the whole phrase reaches, so the caller is asked openly, not to confirm it."""
+    server = Server({"through the mouth": {"appt_053": 0.95, "appt_055": 0.05},
+                     "the other end": {"appt_053": 0.97, "appt_054": 0.03}})
+    plan = _plan(index, availability, SCOPE_DOUBT, server)
+    assert (plan.status, plan.ask.field, plan.ask.options) == ("ask", "service_open", ())
+
+
+@pytest.mark.parametrize("other_end", [{"appt_054": 0.5, "appt_053": 0.5}, httpx.ReadTimeout])
+def test_a_doubtful_caller_is_never_booked_even_when_one_alternative_is_clear(index, availability, other_end):
+    """The clear alternative is asked about with what the whole phrase reaches, never alone."""
+    server = Server({"through the mouth": {"appt_055": 0.99, "appt_053": 0.01}, "the other end": other_end},
+                    default={"appt_055": 1.0})
+    plan = _plan(index, availability, SCOPE_DOUBT, server)
+    assert (plan.status, plan.ask.field, plan.ask.options) == ("ask", "service", ("appt_053", "appt_055"))
+
+
+def test_no_model_narrows_the_two_visits_the_caller_named(index, availability):
+    """Review round 4: "either a colonoscopy or an endoscopy, I'm not sure, the GI doctor ordered it"
+    let a confident model ask only "Is that a colonoscopy consultation?"."""
+    server = Server(default={"appt_054": 0.99, "appt_055": 0.01})
+    plan = _plan(index, availability, {**EXISTING_REF, "service_phrase": "either a colonoscopy or an endoscopy, "
+                                                                         "I'm not sure, the GI doctor ordered it"},
+                 server)
+    assert (plan.status, plan.ask.options) == ("ask", ("appt_054", "appt_055"))
+
+
+@pytest.mark.parametrize("check, options", [
+    ({"either": 0.95, "appt_063": 0.03, "appt_064": 0.02}, ("appt_063", "appt_064", "appt_065")),
+    ({"appt_063": 0.93, "appt_064": 0.02, "either": 0.05}, None),
+])
+def test_a_check_that_does_not_confirm_leaves_the_whole_lexical_tie_to_the_caller(index, availability, check, options):
+    """Held-out round 3: "my doctor ordered an MRI" asked brain or spine MRI; the knee MRI was dropped on
+    the choice question's prior alone."""
+    server = Server({"surgeon": {"appt_063": 0.9, "appt_064": 0.1}}, checks={"surgeon": check})
+    plan = _plan(index, availability, {**EXISTING_REF, "service_phrase": "the MRI my surgeon wants"}, server)
+    if options:
+        assert (plan.status, plan.ask.field, plan.ask.options) == ("ask", "service", options)
+    else:
+        assert plan.status == "offer" and _types(plan) == {"appt_063"}
 
 
 def test_specialty_default_only_is_refined(index, availability):
@@ -662,12 +742,13 @@ def test_exact_site_names_streets_and_patient_groups_are_facts(index, availabili
     assert _provs(plan) == expected
 
 
-def test_policy_decides_before_chooser(index, availability):
-    server = Server(default={"prov_000": 1.0})
+def test_the_one_doctor_policy_leaves_is_confirmed_when_the_caller_described_another(index, availability):
+    """A new patient asks for "the guy": David Chen takes no new patients, so only Emily Chen is left,
+    and the caller is asked rather than booked with her, even by a chooser that would pick her."""
+    server = Server(default={"prov_046": 1.0})
     plan = _plan(index, availability, {"is_new": True, "has_referral": True, "service_phrase": "cardiology consultation",
                                        "provider_phrase": "Dr. Chen, the guy"}, server)
-    assert _provs(plan) == {"prov_046"}
-    assert server.requests == []
+    assert (plan.status, plan.ask.options, plan.say) == ("ask", ("prov_046",), "Do you mean Dr. Emily Chen?")
 
 
 def test_a_confirmed_doctor_with_pending_policy_asks(index, availability):
@@ -678,6 +759,15 @@ def test_a_confirmed_doctor_with_pending_policy_asks(index, availability):
     assert (first.status, first.ask.options) == ("ask", ("prov_000",))
     # David Chen is closed to new patients, so whether the caller is new decides it.
     assert (second.status, second.ask.field) == ("ask", "is_new")
+
+
+def test_a_clinic_s_own_words_are_no_clue_for_the_chooser(index, availability):
+    """Held-out round 3, embeddings: "Dr. Nguyen, the one over at the Midtown clinic" booked whichever
+    Midtown Nguyen the word "clinic" sat closest to. A chooser here would book its pick."""
+    server = Server(default={"prov_016": 1.0})
+    plan = _plan(index, availability, {**EXISTING_REF, "service_phrase": "follow-up visit",
+                                       "provider_phrase": "Dr. Nguyen, the one over at the Midtown clinic"}, server)
+    assert (plan.status, plan.ask.options) == ("ask", ("prov_016", "prov_030"))
 
 
 def test_chooser_pair_asks_between_two(index, availability):

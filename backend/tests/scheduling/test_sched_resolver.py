@@ -47,6 +47,77 @@ def test_eye_exam_not_offered(converse):
     assert plan.say == "Sorry, we don't offer eye care at our clinics."
 
 
+@pytest.mark.parametrize("phrase", ["PT for my sore knee", "I need PT for my hip",
+                                    "my knee needs some PT"])
+def test_a_named_visit_we_do_not_offer_is_refused_with_the_body_part_s_visit_offered_instead(index, availability,
+                                                                                              phrase):
+    """Held-out round 3: "start PT after my shoulder surgery" was offered an orthopedic consultation,
+    the default of the specialty "shoulder" points to. It is refused, and that consultation is
+    suggested; taking the suggestion books it."""
+
+    class WouldPickOrthopedics(NoDisambiguator):
+        def pick_type(self, phrase, hint, candidate_ids):
+            raise AssertionError("an unoffered visit the caller named never reaches the model")
+
+    req = merge(Request(), Update.from_args({**EXISTING_REF, "service_phrase": phrase}))
+    for hooks in ({}, {"disambiguator": WouldPickOrthopedics()}):
+        plan = resolve(index, req, availability, **hooks)
+        assert (plan.status, plan.refusal.code, plan.say) == (
+            "refuse", "not_offered", "Sorry, we don't offer physical therapy at our clinics. I can book an orthopedic "
+                                     "consultation instead. Want that?")
+        taken = resolve(index, merge(plan.req, Update.from_args({"pick_offer": 1})), availability, **hooks)
+        assert taken.status == "offer" and {o.type_id for o in taken.offers} == {"appt_032"}
+
+
+@pytest.mark.parametrize("phrase, options", [
+    ("either a colonoscopy or an endoscopy, I'm not sure", ("appt_054", "appt_055")),
+    ("I can't remember whether it's the cleaning or the dental exam", ("appt_074", "appt_075")),
+    # One alternative named: never confirmed alone, but asked with its nearest neighbour (lexicon.nearest_type).
+    ("I don't remember if it was a colonoscopy or the other one", ("appt_053", "appt_054")),
+])
+def test_a_caller_who_says_they_do_not_know_which_visit_is_asked_never_booked(converse, phrase, options):
+    plan = converse({**EXISTING_REF, "service_phrase": phrase})
+    assert (plan.status, plan.ask.field, plan.ask.options) == ("ask", "service", options)
+
+
+@pytest.mark.parametrize("phrase", ["a flu shot, not sure what day works", "flu shot, not sure if Monday or Tuesday",
+                                    "a sonogram or an ultrasound, I don't know what they call it"])
+def test_a_doubt_that_names_no_two_visits_books_as_usual(converse, phrase):
+    plan = converse({**EXISTING_REF, "service_phrase": phrase})
+    assert plan.status == "offer"
+
+
+def test_a_described_doctor_policy_excludes_is_refused_not_replaced(converse):
+    """Held-out round 3: "the nurse practitioner, Dr. Hernandez" (a new patient) was offered Dr. Tomas
+    Hernandez. The physician assistant Michael Sato takes no new patients; two other Dr. Satos do."""
+    plan = converse({**NEW_REF, "service_phrase": "flu shot", "provider_phrase": "Sato, the PA"})
+    assert (plan.status, plan.refusal.code) == ("refuse", "new_patient_provider")
+    assert plan.say.startswith("Dr. Michael Sato isn't taking new patients. I can book ")
+    assert "prov_026" not in {p for _, p, _ in plan.refusal.alternatives}
+
+
+def test_a_described_doctor_who_does_not_offer_the_visit_is_refused_not_replaced(converse):
+    plan = converse({**EXISTING_REF, "service_phrase": "flu shot", "provider_phrase": "Dr. Chen, the cardiologist"})
+    assert (plan.status, plan.refusal.code) == ("refuse", "provider_type")
+    assert plan.say.startswith("I can't book a flu shot with Dr. Chen.")
+
+
+def test_a_clinic_named_to_describe_the_doctor_is_where_the_caller_goes(converse):
+    plan = converse({**EXISTING_REF, "service_phrase": "annual physical", "provider_phrase": "Chen, at North Gate"})
+    assert _rows(plan) and {(p, loc) for _, p, loc in _rows(plan)} == {("prov_004", "loc_003")}
+    # A place of the caller's own wins: the clinic only told the doctors apart.
+    plan = converse({**EXISTING_REF, "service_phrase": "annual physical", "provider_phrase": "Chen, at North Gate",
+                     "location_phrase": "Mission Bay"})
+    assert {(p, loc) for _, p, loc in _rows(plan)} == {("prov_004", "loc_000")}
+
+
+def test_a_described_clinic_that_cannot_do_the_visit_is_said_and_asked_about(converse):
+    plan = converse({**EXISTING_REF, "service_phrase": "blood draw", "provider_phrase": "Dr. Sato, the one at North Beach"})
+    assert (plan.status, plan.refusal.code) == ("refuse", "location_type")
+    assert plan.refusal.alternatives == (("appt_072", "prov_038", "loc_000"),)
+    assert plan.say == "We can't do a blood draw at North Beach. I can book Dr. Leila Sato at Mission Bay. Would that work?"
+
+
 def test_knee_mri_at_north_beach_refused_with_imaging_alternatives(converse):
     plan = converse({**EXISTING_REF, "service_phrase": "MRI knee", "location_phrase": "North Beach"})
     assert (plan.status, plan.refusal.code) == ("refuse", "location_type")

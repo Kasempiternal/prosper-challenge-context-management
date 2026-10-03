@@ -192,6 +192,9 @@ class EmbedChooser:
     def prefetch_check(self, phrase: str, hint: str | None, pair: tuple[str, str]) -> None:
         pass
 
+    def prefetch_pick(self, phrase: str, hint: str | None, candidate_ids: list[str]) -> None:
+        pass
+
     def provider_genders(self, candidate_ids: list[str]) -> dict[str, float] | None:
         """A cosine between "the lady doctor" and a name says nothing reliable about gender."""
         return None

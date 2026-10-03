@@ -12,6 +12,7 @@ from scheduling.availability import MockAvailability, Slot as TimeSlot
 from scheduling.catalog_index import build_index
 from scheduling.decision import DECLINE, Verdict
 from scheduling.lexicon import SHORTLIST_SIZE, match_types, type_shortlist
+from scheduling.names import match_providers
 from scheduling.request import Request, Update, merge
 from scheduling.resolver import Ask, resolve
 
@@ -218,8 +219,9 @@ def test_a_state_without_clinics_refuses_with_the_nearest(talk):
 def test_a_state_with_no_city_of_ours_refuses_instead_of_ringing_past_50_miles(talk):
     plan = talk({**FOLLOW_UP, "location_phrase": "out near Cheyenne, Wyoming"})
     assert plan.status == "refuse" and plan.refusal.code == "none_nearby"
-    assert plan.say == ("We don't offer a follow-up visit in Wyoming. The nearest is Capitol Hill in Denver, "
-                        "about 264 miles away. Want me to look there?")
+    # Cheyenne is no city of ours, so the only anchor is Wyoming's centre: no distance is said from it.
+    assert plan.say == ("We don't offer a follow-up visit in Wyoming. The nearest is Capitol Hill in Denver. "
+                        "Want me to look there?")
     assert [a[2] for a in plan.refusal.alternatives] == ["loc_v1"]
     plan = talk({**FOLLOW_UP, "location_phrase": "out near Cheyenne, Wyoming"}, {"pick_offer": 1})
     # Picking it searches there (the fixture's Dr. Ito has no open days at that site).
@@ -266,10 +268,16 @@ def test_policy_beats_none_nearby_when_rows_exist(talk):
 
 
 def test_offers_name_the_neighborhood_when_the_site_name_does_not(talk):
+    # "Mueller" alone names a clinic but no place of ours: it could be a town we do not know, so its
+    # city is confirmed first. "Mueller Clinic" says it is the clinic.
     plan = talk({**FOLLOW_UP, "location_phrase": "Mueller"})
+    assert (plan.status, plan.say) == ("ask", "Did you mean Mueller in Austin, Texas?")
+    plan = talk({**FOLLOW_UP, "location_phrase": "Mueller Clinic"})
     assert plan.status == "offer" and _offered_sites(plan) == {"loc_a3"}
     assert " at Mueller in Hyde Park" in plan.say
-    confirm = talk({**FOLLOW_UP, "location_phrase": "Mueller"}, {"pick_offer": 1})
+    yes = talk({**FOLLOW_UP, "location_phrase": "Mueller"}, {"location_phrase": "yes"})
+    assert yes.status == "offer" and _offered_sites(yes) == {"loc_a3"}
+    confirm = talk({**FOLLOW_UP, "location_phrase": "Mueller Clinic"}, {"pick_offer": 1})
     assert confirm.status == "confirm" and confirm.say.endswith("at Mueller in Hyde Park. Shall I book it?")
 
 
@@ -293,6 +301,71 @@ def test_same_start_prefers_the_nearer_site(talk, nat):
     plan = talk({**FOLLOW_UP, "provider_phrase": "Dr. Ken Ito", "location_phrase": "Hyde Park"},
                 av=SameTimeEverywhere(nat))
     assert plan.offers[0].location_id == "loc_a3"
+
+
+def _with_more_imaging():
+    """Imaging at Lakeway (Dr. Ana Lee, ~10 mi from Mueller) and at Bastrop (Dr. Bo Kim, ~27 mi; also a
+    dentist), and an Austin-metro clinic north of Dallas, nearer Denver than Dallas is."""
+    raw = national_raw()
+    raw["locations"] = LOCATIONS + [
+        _loc("loc_a5", "Lakeway Health Center", "austin-tx", "Lakeway", 30.36, -97.89, "TX", "Lakeway", ("imaging",)),
+        _loc("loc_a6", "Bastrop Health Center", "austin-tx", "Bastrop", 30.11, -97.32, "TX", "Bastrop",
+             ("imaging", "dental")),
+        _loc("loc_a7", "Denton Health Center", "austin-tx", "Denton", 33.40, -97.20, "TX", "Denton", ("imaging",)),
+    ]
+    for p in raw["providers"]:
+        if p["id"] == "prov_3":
+            p["location_ids"] = p["location_ids"] + ["loc_a5", "loc_a7"]
+    raw["providers"].append({"id": "prov_6", "name": "Dr. Bo Kim", "specialty": "Radiology", "location_ids": ["loc_a6"],
+                             "accepting_new_patients": True, "appointment_type_ids": ["appt_002", "appt_003"]})
+    return build_index(raw, ALIASES)
+
+
+class FarthestSoonest:
+    """Every clinic has three openings; the farther from Hyde Park, the sooner they are."""
+
+    def __init__(self, ix):
+        self.ix, self.now = ix, datetime(2026, 10, 7, 9, 0)
+
+    def _start(self, r, day):
+        return datetime(2026, 10, 8 + day, 8, 0) - timedelta(minutes=round(10 * abs(self.ix.locations[r.location.id].lat
+                                                                                       - 30.30) * 60))
+
+    def find(self, rows, time_pref, limit=3):
+        slots = [TimeSlot(r.type.id, r.provider.id, r.location.id, self._start(r, d), r.type.duration_min)
+                 for r in rows for d in range(3)]
+        return sorted(slots, key=lambda s: s.start)[:limit]
+
+    def is_open(self, slot):
+        return False
+
+
+def test_a_widened_search_offers_the_nearest_clinic_first(talk):
+    """National round 3: "I'm over by Rockridge" offered a clinic 40 miles away while one 13 miles away
+    had openings, because a widened ring offered its soonest times anywhere in 50 miles."""
+    ix = _with_more_imaging()
+    req = merge(Request(), Update.from_args({"service_phrase": "dental cleaning", "is_new": True,
+                                             "location_phrase": "Hyde Park"}))
+    plan = resolve(ix, req, FarthestSoonest(ix))
+    assert plan.say.startswith("There's nothing closer to Hyde Park; the nearest is 15 miles away, in Round Rock. ")
+    assert _offered_sites(plan) == {"loc_a4"}
+
+
+def test_alternatives_go_by_distance_even_with_the_same_doctor():
+    ix = _with_more_imaging()
+    req = merge(Request(), Update.from_args({"service_phrase": "knee MRI", "is_new": False, "has_referral": True,
+                                             "location_phrase": "Mueller Clinic"}))
+    plan = resolve(ix, req, MockAvailability(ix))
+    assert plan.refusal.code == "location_type"
+    assert plan.refusal.alternatives == (("appt_002", "prov_3", "loc_a1"), ("appt_002", "prov_3", "loc_a5"))
+
+
+def test_nothing_nearby_names_the_nearest_clinic_not_the_nearest_city_center():
+    ix = _with_more_imaging()
+    req = merge(Request(), Update.from_args({"service_phrase": "knee MRI", "is_new": True, "has_referral": True,
+                                             "location_phrase": "Denver"}))
+    plan = resolve(ix, req, MockAvailability(ix))
+    assert plan.refusal.code == "none_nearby" and plan.refusal.alternatives == (("appt_002", "prov_3", "loc_a7"),)
 
 
 # ---- site chooser ---------------------------------------------------------------------------
@@ -367,6 +440,82 @@ def test_large_catalogs_send_the_model_a_shortlist(talk):
     assert len(type_shortlist(ix, "knee", None)) <= SHORTLIST_SIZE
 
 
+class SpecialtyFirst(Recorder):
+    """Picks Spec3's default from a shortlist, `within` from Spec3's visits; the check confirms."""
+
+    def __init__(self, within: Verdict):
+        super().__init__()
+        self.within = within
+
+    def pick_type(self, phrase, hint, candidate_ids):
+        self.calls.append(("type", phrase, list(candidate_ids)))
+        return self.within if "appt_000" not in candidate_ids else Verdict(act="appt_103", called=True)
+
+    def check_type(self, phrase, hint, first, rival):
+        self.calls.append(("check", first.act, rival))
+        return Verdict(act=first.act, called=True)
+
+    def prefetch_check(self, phrase, hint, pair):
+        pass
+
+
+@pytest.mark.parametrize("within, expected", [
+    (Verdict(act="appt_112", called=True), ("offer", None, {"appt_112"})),
+    # No answer to the re-ask: the caller is asked what the model was, the specialty's visits (openly
+    # past three), not to confirm the default the re-ask was there to replace.
+    (Verdict(called=True, failed=True), ("ask", "service_open", set())),
+])
+def test_a_specialty_default_chosen_from_a_shortlist_is_chosen_again_within_its_specialty(within, expected):
+    """National round 3: "hot flashes, night sweats and periods all irregular" could only reach OB/GYN
+    through its default, OB/GYN New Patient Visit; Menopause Consultation was not in the shortlist."""
+    ix = build_index(_many_types_raw(), {**ALIASES, "specialty_default": {**ALIASES["specialty_default"],
+                                                                         "Spec3": "appt_103"}})
+    assert "appt_112" not in type_shortlist(ix, "my zorbly thing", None, frozenset({"austin-tx"}))
+    hooks = SpecialtyFirst(within)
+    req = merge(Request(), Update.from_args({"service_phrase": "my zorbly thing", "is_new": False,
+                                             "location_phrase": "Austin"}))
+    plan = resolve(ix, req, MockAvailability(ix), hooks, hooks, hooks)
+    assert (plan.status, plan.ask and plan.ask.field, {o.type_id for o in plan.offers}) == expected
+
+
+def _with(locations=(), metros=(), providers=()):
+    raw = national_raw()
+    raw["metros"] = METROS + list(metros)
+    raw["locations"] = LOCATIONS + list(locations)
+    raw["providers"] += [{"specialty": "General", "accepting_new_patients": True, **p} for p in providers]
+    return build_index(raw, ALIASES)
+
+
+@pytest.mark.parametrize("phrase", ["Dr. Maria Garcia, a friend told me about her", "Maria Garcia, my neighbor sees her"])
+def test_a_name_said_first_or_after_dr_is_the_name_not_the_last_word(phrase):
+    """National round 3: "Dr. Inna Volkov, a friend told me about her" matched Dr. Abbott ("about")."""
+    ix = _with(providers=[{"id": "prov_7", "name": "Dr. Lee Abbott", "location_ids": ["loc_a1"],
+                           "appointment_type_ids": ["appt_000"]},
+                          {"id": "prov_8", "name": "Dr. Ann Seese", "location_ids": ["loc_a1"],
+                           "appointment_type_ids": ["appt_000"]}])
+    assert {c.id for c in match_providers(ix, phrase)} == {"prov_0", "prov_1"}
+
+
+def test_a_state_answer_picks_the_city_with_a_clinic_in_that_state(talk):
+    """National round 3: "Arlington" -> "Which city?" -> "Virginia" refused, though the Washington, DC
+    clinics include Arlington, Virginia."""
+    ix = _with(metros=[{"id": "kc-mo", "name": "Kansas City", "state": "MO", "aliases": [], "lat": 39.10,
+                        "lon": -94.58}],
+               locations=[_loc("loc_k1", "Lakewood Health Center", "kc-mo", "Lakewood", 38.97, -94.70, "KS", "Lakewood"),
+                          _loc("loc_a8", "Lakewood Health Center", "austin-tx", "Lakewood", 30.35, -97.80, "TX",
+                               "Lakewood")],
+               providers=[{"id": "prov_7", "name": "Dr. Lee Abbott", "location_ids": ["loc_k1", "loc_a8"],
+                           "appointment_type_ids": ["appt_001"]}])
+    av, req = MockAvailability(ix), Request()
+    plans = []
+    for u in ({**FOLLOW_UP, "location_phrase": "Lakewood"}, {"location_phrase": "Kansas"}):
+        req = merge(req, Update.from_args(u))
+        plans.append(resolve(ix, req, av))
+        req = plans[-1].req
+    assert (plans[0].status, plans[0].ask.field) == ("ask", "metro")
+    assert plans[1].status == "offer" and _offered_sites(plans[1]) == {"loc_k1"}
+
+
 def test_small_catalogs_send_every_offered_type(nat):
     hooks = Recorder()
     req = merge(Request(), Update.from_args({"service_phrase": "my zorbly thing", "location_phrase": "Austin"}))
@@ -423,6 +572,7 @@ def specific():
     ("they want a knee x-ray done this week", ["appt_011"]),              # not the plain X-Ray
     ("booking a physical therapy evaluation after surgery", ["appt_015"]),  # not Psychiatry's Therapy Session
     ("just a therapy session", ["appt_014"]),
+    ("a knee x-ray, yes a knee x-ray please", ["appt_011"]),               # said twice
 ])
 def test_a_type_named_in_full_drops_the_types_inside_its_name(specific, phrase, ids):
     assert [c.type_id for c in match_types(specific, phrase)] == ids

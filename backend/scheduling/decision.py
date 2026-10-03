@@ -76,19 +76,19 @@ class Check:
 
 @dataclass(frozen=True)
 class CheckGate:
-    """Settles a choice with its check. Chosen on the dev sets (eval/README.md, round 3):
+    """Settles a choice with its check (eval/README.md, rounds 3 and 4):
 
-    - twins: "either" at or above this means the words cannot tell the two apart. Indistinguishable
-      pairs ("my yearly exam": physical or wellness) score 0.92-0.98; pairs where either answer
-      is right but one fits better score 0.52 or less.
-    - a choice the first question was sure of stands only if the check still prefers it to the
-      rival: when the two questions disagree, the caller is asked.
+    - margin: a choice the first question was sure of stands only if the check's top answer is
+      that choice, ahead of both the rival and "either" by at least this much. A check whose top
+      answer is "either" ("my yearly all-over skin check": 0.34 / 0.25 / either 0.41) or that is
+      split between the choice and "either" (0.52 / either 0.48) does not confirm it. No dev check
+      leads by 0.14 to 0.23.
     - settle: a first question that left two gets its answer only from a check more than this
       sure, with "either" under settle_either. Strictly more: h2-28 sits at 0.65 exactly, and a
       case on the boundary takes the safe side (eval/README.md, threshold sensitivity).
     """
 
-    twins: float = 0.8
+    margin: float = 0.2
     settle: float = 0.65
     settle_either: float = 0.5
 
@@ -102,9 +102,9 @@ class CheckGate:
             return unanswered((chosen,) if first.act else pair)
         top = ((chosen, round(check.chosen, 3)), (rival, round(check.rival, 3)), ("either", round(check.either, 3)))
         if first.act:
-            if check.either >= self.twins or check.chosen <= check.rival:
-                return Verdict(ask=pair, top=top, called=True)
-            return Verdict(act=first.act, top=top, called=True)
+            if round(check.chosen - max(check.rival, check.either), 9) >= self.margin:
+                return Verdict(act=first.act, top=top, called=True)
+            return Verdict(ask=pair, top=top, called=True)
         lead, p_lead, p_other = (chosen, check.chosen, check.rival) if check.chosen >= check.rival \
             else (rival, check.rival, check.chosen)
         if p_lead > self.settle and check.either < self.settle_either and p_lead > p_other:

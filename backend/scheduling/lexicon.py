@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
@@ -51,12 +52,13 @@ def _token_match(a: str, b: str) -> bool:
             and jellyfish.jaro_winkler_similarity(a, b) >= 0.92)
 
 
-def _find_span(hay: list[str], needle: list[str]) -> int:
+def _find_spans(hay: list[str], needle: list[str]) -> list[int]:
     n = len(needle)
-    for i in range(len(hay) - n + 1):
-        if all(_token_match(hay[i + k], needle[k]) for k in range(n)):
-            return i
-    return -1
+    return [i for i in range(len(hay) - n + 1) if all(_token_match(hay[i + k], needle[k]) for k in range(n))]
+
+
+def _find_span(hay: list[str], needle: list[str]) -> int:
+    return next(iter(_find_spans(hay, needle)), -1)
 
 
 # eq=False: identity hash, so _word_hits can cache per vocabulary.
@@ -201,6 +203,7 @@ def _score_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | 
                 precision = hits / len(content)
                 offer(tid, 0.85 * (0.6 * recall + 0.4 * precision), "words")
 
+    _drop_unoffered_context(index, vocab, words, best, alias_support)
     named = _drop_dominated(index, vocab, words, best, alias_support)
     _drop_inside_aliases(vocab, words, best, alias_support)
 
@@ -216,17 +219,71 @@ def _score_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | 
 
     strong = [c for c in best.values() if c.score >= _STRONG]
     if not strong and not named:
-        lay = _lay_specialties(index, words)
-        # Lay terms of two specialties ("throat" and "stomach") are no single default's evidence.
-        specialty = specialty_hint or (lay[0] if len(lay) == 1 else None)
+        specialty = _pointed_specialty(index, words, specialty_hint)
         default = index.specialty_default.get(specialty) if specialty else None
         # "an echo for my heart": an alias already names a visit of the specialty "heart" points
         # to, so the specialty's default visit adds no evidence.
         named_in_specialty = any(c.via in ("name", "alias") and index.types[c.type_id].specialty == specialty
                                  for c in best.values())
-        if default and not named_in_specialty:
+        # "start PT after my shoulder surgery" names physical therapy, which no clinic offers;
+        # "shoulder" does not turn it into an orthopedic consultation.
+        names_unoffered = any(c.via in ("name", "alias") and c.type_id in index.unoffered_types
+                              for c in best.values())
+        if default and not named_in_specialty and not names_unoffered:
             offer(default, _SPECIALTY_DEFAULT_SCORE, "specialty")
     return best
+
+
+def _pointed_specialty(index: CatalogIndex, words: list[str], hint: str | None) -> str | None:
+    """The specialty the hint or the phrase's lay terms point to. Lay terms of two specialties
+    ("throat" and "stomach") are no single specialty's evidence."""
+    lay = _lay_specialties(index, words)
+    return hint or (lay[0] if len(lay) == 1 else None)
+
+
+def pointed_default(index: CatalogIndex, phrase: str | None, hint: str | None) -> str | None:
+    """The default visit of the specialty the phrase points to ("PT for my sore knee" -> Orthopedic
+    Consultation): what a refusal of an unoffered visit suggests instead."""
+    specialty = _pointed_specialty(index, tokens(phrase or ""), hint)
+    return index.specialty_default.get(specialty) if specialty else None
+
+
+# A visit we do not offer, said as what happened or what someone said rather than as what the
+# caller asks for: the object of a time word ("my knee still hurts after PT", "before I start PT",
+# but not "after surgery, PT"), or the subject of a verb right after it ("my PT says ...", "physio
+# did not help").
+_CONTEXT_BEFORE = frozenset({"after", "before", "since", "until", "despite", "during", "following"})
+_CONTEXT_WINDOW = 3
+_STARTING = frozenset({"start", "starting", "started", "begin", "beginning", "began", "doing", "finished", "finishing",
+                       "had"})
+_SUBJECT_VERBS = frozenset({"says", "said", "told", "wants", "wanted", "thinks", "recommended", "suggested",
+                            "referred", "sent", "ordered", "did", "didn", "does", "doesn", "isn", "wasn", "hasn",
+                            "hadn", "helped", "helps", "won"})
+
+
+def _drop_unoffered_context(index: CatalogIndex, vocab: _Vocab, words: list[str], best: dict[str, TypeCandidate],
+                            alias_support: dict[str, set[int]]) -> None:
+    """An unoffered visit said only as context is no candidate: it neither refuses the call nor
+    hides the default of the body part the caller asks about."""
+    hits = [_word_hits(vocab, w) for w in words]
+
+    def context(start: int, end: int) -> bool:
+        governed = any(words[j] in _CONTEXT_BEFORE and all(w in _FILLER or w in _STARTING for w in words[j + 1:start])
+                       for j in range(max(0, start - _CONTEXT_WINDOW), start))
+        return governed or (end < len(words) and words[end] in _SUBJECT_VERBS)
+
+    for tid in [t for t in best if t in index.unoffered_types and best[t].via in ("alias", "words")]:
+        said = sorted(set(alias_support.get(tid, ())) | {
+            i for i, h in enumerate(hits) if words[i] not in _GENERIC and not h.isdisjoint(vocab.name_words[tid])})
+        runs: list[list[int]] = []  # each mention: consecutive word positions
+        for i in said:
+            if runs and i == runs[-1][-1] + 1:
+                runs[-1].append(i)
+            else:
+                runs.append([i])
+        if runs and all(context(r[0], r[-1] + 1) for r in runs):
+            del best[tid]
+            alias_support.pop(tid, None)
 
 
 def _drop_dominated(index: CatalogIndex, vocab: _Vocab, words: list[str], best: dict[str, TypeCandidate],
@@ -247,8 +304,8 @@ def _drop_dominated(index: CatalogIndex, vocab: _Vocab, words: list[str], best: 
             heard = [nw in heard_anywhere for nw in part]
             distinctive = [h for h, nw in zip(heard, part) if nw not in _GENERIC]
             named = named or (cand.score >= MIN_SCORE and bool(distinctive) and all(distinctive))
-            at = _find_span([words[i] for i in kept], list(part)) if all(heard) else -1
-            if at >= 0:
+            # Every time it was said: "a thyroid ultrasound, yeah a thyroid ultrasound".
+            for at in _find_spans([words[i] for i in kept], list(part)) if all(heard) else ():
                 spans[tid] = spans.get(tid, frozenset()) | frozenset(kept[at:at + len(part)])
     if not spans:
         return named
@@ -378,3 +435,114 @@ def _parsed_elsewhere(index: CatalogIndex, words: list[str]) -> set[int]:
                      if no_visit_word(words[k])]
             out.update([*range(i, start), *place] if place else [])
     return out
+
+
+# A stated doubt about the visit: a doubt marker, then alternatives joined by "or" in its clause or
+# the next one ("I'm not really sure if it goes down my throat or up from below", "not sure, maybe A
+# or B"), else before it in its clause or the one before ("either A or B, I don't know which").
+# A marker is a knowing word up to three words after a negation ("don't remember", "not 100 percent
+# sure", "no idea"), or a word that is doubt on its own.
+_NEGATIONS = frozenset({"not", "t", "no", "never", "dont", "cant", "cannot"})
+_NEGATION_REACH = 3
+_KNOWING = frozenset({"sure", "certain", "positive", "remember", "recall", "know", "idea"})
+_DOUBTFUL = frozenset({"unsure", "dunno", "forgot", "forget", "maybe", "either", "perhaps"})
+_DOUBT_JOINS = frozenset({"if", "whether", "either", "maybe", "perhaps"})
+# "Or not" is no alternative: "not sure if my insurance covers it or not".
+_OPTION_FILLER = _DOUBT_JOINS | {"a", "an", "the", "my", "it", "s", "is", "was", "its", "one", "that", "this", "i",
+                                 "m", "not", "no"}
+# A doubt about another part of the request is not about the visit: its cost or coverage, how long
+# ago, the clinic or the doctor (said by name). Time words, clinic and city names and doctors'
+# names are those parts' own words.
+_OTHER_TOPIC = frozenset({"insurance", "insured", "cover", "covers", "covered", "coverage", "cost", "costs", "price",
+                          "copay", "dollars", "pay", "days", "weeks", "months", "year", "years", "ago", "long",
+                          "hours"})
+_CLAUSE = re.compile(r"[,;.!?]|\bbut\b", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class Doubt:
+    """A caller unsure which visit they need: what they said before the doubt, and the
+    alternatives they name."""
+
+    sure: str
+    options: tuple[str, ...]
+
+
+def stated_doubt(index: CatalogIndex, phrase: str | None) -> Doubt | None:
+    """"... a scope, but I don't remember if it goes down my throat or up from below" -> options
+    ("it goes down my throat", "up from below"), sure "... a scope". None without a doubt, or
+    without two alternatives about the visit: "a flu shot, not sure what day" or "a cleaning, I
+    forget if I go to Mission Bay or North Beach" asks nothing about the visit."""
+    raw = [c.strip() for c in _CLAUSE.split(phrase or "") if tokens(c)]
+    clauses = [tokens(c) for c in raw]
+    for i, words in enumerate(clauses):
+        for start, end in _doubt_markers(words):
+            nearby = ((words[end:], i), (clauses[i + 1] if i + 1 < len(clauses) else [], i + 1),
+                      (words[:start], i), (clauses[i - 1] if i else [], i - 1))
+            for said, at in nearby:
+                options = _alternatives(index, said)
+                if options:
+                    return Doubt(", ".join(raw[:min(i, at)]), options)
+    return None
+
+
+def _doubt_markers(words: list[str]) -> list[tuple[int, int]]:
+    out = []
+    for k, w in enumerate(words):
+        if w in _DOUBTFUL:
+            out.append((k, k + 1))
+        elif w in _NEGATIONS:
+            known = next((j for j in range(k + 1, min(k + 1 + _NEGATION_REACH, len(words))) if words[j] in _KNOWING),
+                         None)
+            if known is not None:
+                out.append((k, known + 1))
+    return out
+
+
+def _alternatives(index: CatalogIndex, words: list[str]) -> tuple[str, ...]:
+    """"if it goes down my throat or up from below" -> ("it goes down my throat", "up from below");
+    () unless at least two alternatives are about the visit."""
+    parts, cur = [], []
+    for w in [*words, "or"]:
+        if w != "or":
+            cur.append(w)
+            continue
+        while cur and cur[0] in _DOUBT_JOINS:
+            cur = cur[1:]
+        if _about_visit(index, cur):
+            parts.append(" ".join(cur))
+        cur = []
+    return tuple(parts) if len(parts) >= 2 else ()
+
+
+def _about_visit(index: CatalogIndex, words: list[str]) -> bool:
+    """Something beyond filler and time words, and no other part of the request unless a visit
+    word is said too ("a cleaning at Mission Bay")."""
+    vocab = _vocab(index)
+    content = [w for w in words if w not in _OPTION_FILLER and w not in TIME_WORDS]
+    other = _place_positions(index, words) | {
+        i for i, w in enumerate(words) if w in _OTHER_TOPIC or w.isdigit() or w in _TITLES
+        or (is_catalog_name(index, w) and not _word_hits(vocab, w) and w not in vocab.lay_words)}
+    if not content or not other:
+        return bool(content)
+    return any(i not in other and w in content and (_word_hits(vocab, w) or w in vocab.lay_words)
+               for i, w in enumerate(words))
+
+
+def _place_positions(index: CatalogIndex, words: list[str]) -> set[int]:
+    """Positions of the words that say a clinic's or a city's name ("mission bay", "downtown")."""
+    names = _place_names(index)
+    longest = max((len(n) for n in names), default=0)
+    out: set[int] = set()
+    for n in range(min(longest, len(words)), 0, -1):
+        for i in range(len(words) - n + 1):
+            if tuple(words[i:i + n]) in names:
+                out.update(range(i, i + n))
+    return out
+
+
+@per_index
+def _place_names(index: CatalogIndex) -> frozenset[tuple[str, ...]]:
+    names = [n for loc in index.locations.values() for n in (loc.short_name, loc.neighborhood, loc.city) if n]
+    names += [n for m in index.metros.values() for n in (m.name, *m.aliases) if n]
+    return frozenset(t for t in (tuple(tokens(n)) for n in names) if t)

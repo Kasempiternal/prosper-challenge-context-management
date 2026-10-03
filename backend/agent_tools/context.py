@@ -158,6 +158,9 @@ class ModelHooks:
     def prefetch_check(self, phrase: str, hint: str | None, pair: tuple[str, str]) -> None:
         self._types.prefetch_check(phrase, hint, pair)
 
+    def prefetch_pick(self, phrase: str, hint: str | None, candidate_ids: list[str]) -> None:
+        self._types.prefetch_pick(phrase, hint, candidate_ids)
+
     def pick_provider(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
         return self._run(self._providers.pick_provider, phrase, type_id, candidate_ids)
 

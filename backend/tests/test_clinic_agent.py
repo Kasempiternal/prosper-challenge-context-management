@@ -271,8 +271,7 @@ def test_another_appointment_starts_fresh_from_the_callers_latest_words(fresh_bo
     result, _ = asyncio.run(update.handler({"service_phrase": "dental cleaning", "location_phrase": "In Maine",
                                             "time_pref": {"day": "tomorrow"}}, fm))
     assert (result["status"], result["reason"]) == ("refuse", "none_nearby")
-    assert result["spoken"] == ("We don't offer a dental cleaning in Maine. The nearest is Downtown in Boston, about "
-                                "230 miles away. Want me to look there?")
+    assert result["spoken"] == "We don't offer a dental cleaning in Maine. The nearest is Downtown in Boston. Want me to look there?"
     assert result["known"]["time"] == "thursday from 2026-10-08"
 
 
@@ -296,6 +295,5 @@ def test_text_sim_replays_the_second_live_national_call(fresh_bookings, monkeypa
     confirmations = [h for h in heard if h.startswith("You're all booked.")]
     assert confirmations == [f"You're all booked. Your confirmation is {', '.join(r.replace('-', ''))}. "
                              "Is there anything else I can help with?" for r in refs]
-    assert ("We don't offer a dental cleaning in Maine. The nearest is Downtown in Boston, about 230 miles away. "
-            "Want me to look there?") in heard
+    assert "We don't offer a dental cleaning in Maine. The nearest is Downtown in Boston. Want me to look there?" in heard
     assert heard[-1] == confirmations[-1]

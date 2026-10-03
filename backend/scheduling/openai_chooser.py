@@ -61,7 +61,8 @@ class OpenAIChoiceClient(CachedModelClient):
             return answer, round(max(answer.probabilities.values()), 3) if answer and answer.probabilities else None
         return self._fetch(request_body(self.model, state, instructions, criteria, keys), purpose, read)
 
-    def prefetch_choice(self, state: str, instructions: str, criteria: dict[str, str]) -> None:
+    def prefetch_choice(self, state: str, instructions: str, criteria: dict[str, str],
+                        ranking: list[str] = ()) -> None:
         """Never sent early: the option numbers follow the criteria order, which only the choice
         before it decides, so an early request would often not be the one asked."""
 

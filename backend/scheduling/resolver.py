@@ -20,11 +20,11 @@ import jellyfish
 from .availability import Availability, Slot as TimeSlot
 from .catalog_index import BookableRow, CatalogIndex
 from .decision import DECLINE, Verdict, gender_of, unanswered
-from .geo import RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, resolve_place
-from .lexicon import (SHORTLIST_ABOVE, TypeCandidate, match_types, nearest_type, type_shortlist, types_named,
-                      unexplained_words)
-from .names import (STREET_TYPES, hear_place, match_locations, match_providers, read_confirmation,
-                    read_provider_clues)
+from .geo import RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, over_state_line, resolve_place
+from .lexicon import (SHORTLIST_ABOVE, Doubt, TypeCandidate, match_types, nearest_type, pointed_default,
+                      stated_doubt, type_shortlist, types_named, unexplained_words)
+from .names import (STREET_TYPES, ProviderClues, hear_place, match_locations, match_providers, only_no,
+                    read_confirmation, read_provider_clues)
 from .policy import IssueKind, Rule, Violation, check, has_violation
 from .request import WEEKDAY_NAMES, AltRef, OfferRef, PendingAsk, Request, Slot, TimePref
 from .text import phonetic_keys, tokens
@@ -36,8 +36,9 @@ RIVAL_MIN_P = 0.05
 MAX_OPTIONS = 3
 HANDOFF_AFTER_MISSES = 3
 # An area search widens from the place's own radius to twice that, then to this, before refusing.
-# No ring goes past it: an anchor whose own radius is wider (a state with no catalog city in it)
-# refuses with none_nearby at once, naming the nearest city that has the visit.
+# No ring goes past it: an anchor whose own radius is wider (a state with no catalog city of its
+# own) refuses with none_nearby at once, naming the nearest clinic that has the visit, in the state
+# if it has one.
 FINAL_RING_MI = 50.0
 MAX_SITE_CHOICES = 20
 _REFUSAL_PRIORITY = (Rule.NEW_PATIENT_TYPE, Rule.REFERRAL, Rule.NEW_PATIENT_PROVIDER)
@@ -58,6 +59,9 @@ class TypeDisambiguator(Protocol):
     def prefetch_check(self, phrase: str, hint: str | None, pair: tuple[str, str]) -> None:
         """The check of `pair` will most likely follow the next pick_type: start it now, so the two
         requests overlap. Changes no answer."""
+
+    def prefetch_pick(self, phrase: str, hint: str | None, candidate_ids: list[str]) -> None:
+        """This pick_type will follow: start it now, so independent picks overlap. Changes no answer."""
 
 
 class ProviderChooser(Protocol):
@@ -88,6 +92,9 @@ class NoDisambiguator:
         return None
 
     def prefetch_check(self, phrase: str, hint: str | None, pair: tuple[str, str]) -> None:
+        pass
+
+    def prefetch_pick(self, phrase: str, hint: str | None, candidate_ids: list[str]) -> None:
         pass
 
     def pick_provider(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
@@ -184,9 +191,15 @@ class _Resolution:
         self.area: Area | None = None
         self.dist: dict[str, float] = {}   # location id -> miles from the caller's place
         self.site_choice = False           # the place left several sites a description could split
+        self.widened = False               # nothing in the place's own radius: "the nearest is N miles away"
         self.place_memo: PlaceMatch | None = None
         self.type_consulted = False
+        self.doubt = False                 # the caller said they do not know which visit: never commit
         self.provider_declined = False     # "no" to "Do you mean Dr. X?": whoever is left is asked about
+        self.named_providers: list[str] = []      # every doctor the name matches
+        self.provider_clues: ProviderClues | None = None
+        self.described_sites: tuple[str, ...] = ()  # clinics named to describe the doctor
+        self.described_ask: tuple[str, ...] = ()  # the facts' one doctor, unsettled by the gender said
         self.patient = req.patient
         self.slots: dict[str, Slot] = {"service": req.service, "provider": req.provider, "location": req.location}
         self.notes: list[str] = []
@@ -273,6 +286,11 @@ class _Resolution:
 
     def _search(self) -> Plan:
         svc = self._service_candidates()
+        if svc is not None:
+            doubted = self._doubted(svc)
+            if doubted == []:
+                return self._ask("service_open")
+            svc = doubted or svc
         if svc is not None and not svc:
             verdict = self._consult_types()
             if verdict.failed and verdict.ask:
@@ -289,8 +307,7 @@ class _Resolution:
             tier = [c for c in svc if c.score >= top - TYPE_TIE_GAP]
             offered = [c for c in tier if c.type_id not in self.ix.unoffered_types]
             if not offered:
-                spec = self.ix.types[tier[0].type_id].specialty
-                return self._refuse("not_offered", type_id=tier[0].type_id, specialty=spec)
+                return self._refuse_not_offered(tier[0].type_id)
             verdict = DECLINE
             if all(c.via == "specialty" for c in offered):
                 # "lung test" only reached Pulmonology's default type; the model may know better.
@@ -310,6 +327,10 @@ class _Resolution:
         provider_ids = self._name_candidates("provider")
         if provider_ids == []:
             return self._miss("provider")
+        if provider_ids:
+            provider_ids = self._described(provider_ids, type_ids)
+            if self.described_ask:
+                return self._ask_provider(list(self.described_ask))
         if self.geo:
             scope = self._geo_scope(type_ids, provider_ids, svc is not None)
             if isinstance(scope, Plan):
@@ -326,7 +347,7 @@ class _Resolution:
                 self.preface = f"I can't book that with {self._who(provider_ids)}. "
                 self.notes.append("dropped provider: does not offer the new service")
                 self.slots["provider"] = Slot(turn=self.req.turn)
-                provider_ids, rows_p = None, rows
+                provider_ids, rows_p, self.described_sites = None, rows, ()
                 if self.geo:
                     # The dropped doctor may have been what chose the city: scope again without them.
                     self.area, self.dist, self.site_choice = None, {}, False
@@ -340,9 +361,15 @@ class _Resolution:
                 return self._refuse("provider_type", type_id=self._best_type(rows), who=self._who(provider_ids),
                                     alternatives=alts)
 
+        # "Dr. Michael Sato, the one at the Sunset clinic": with no place of their own, the caller
+        # goes where they described the doctor.
+        at_described_site = location_ids is None and bool(self.described_sites)
+        if at_described_site:
+            location_ids = list(self.described_sites)
         rows_pl = rows_p if location_ids is None else [r for r in rows_p if r.location.id in location_ids]
         if location_ids is not None and not rows_pl:
-            if self._newer("service", "location") or self._newer("provider", "location") or self._area_too(location_ids):
+            if not at_described_site and (self._newer("service", "location") or self._newer("provider", "location")
+                                          or self._area_too(location_ids)):
                 self.preface += f"That's not available at {self._where(location_ids)}. "
                 self.notes.append("dropped location: does not fit the newer choice")
                 self.slots["location"] = Slot(turn=self.req.turn)
@@ -386,7 +413,7 @@ class _Resolution:
 
         live = ok + pending
         live_types = sorted({r.type.id for r in live}, key=lambda t: (-self.scores.get(t, 0.0), t))
-        if len(live_types) > 1:
+        if len(live_types) > 1 or (self.doubt and svc is not None):
             return self._ask_type(live_types, svc is not None)
         type_id = live[0].type.id
         self.slots["service"] = replace(self.slots["service"], resolved_id=type_id)
@@ -398,8 +425,11 @@ class _Resolution:
             provs = sorted({r.provider.id for r in live})
             if self.provider_declined:
                 return self._ask_provider(provs)
-            if len(provs) > 1:
-                verdict = self._consult_provider(provs, type_id)
+            # The rules may leave one of several same-named doctors; what the caller said about
+            # them (gender, other words) is still heard.
+            described = len(self.named_providers) > 1 and self.provider_clues and self.provider_clues.words
+            if len(provs) > 1 or described:
+                verdict = self._consult_provider(provs, type_id, location_ids)
                 if verdict.ask:
                     return self._ask_provider(sorted(verdict.ask))
                 if verdict.act not in provs:
@@ -430,7 +460,7 @@ class _Resolution:
                 return self._ask_location(locs)
             self.slots["location"] = replace(self.slots["location"], resolved_id=locs[0])
 
-        found = self.av.find(ok, self.req.time_pref, MAX_OPTIONS)
+        found = self._nearest_first(ok) if self.widened else self.av.find(ok, self.req.time_pref, MAX_OPTIONS)
         if not found:
             return self._refuse("no_availability", type_id=type_id)
         if self.dist:
@@ -524,6 +554,8 @@ class _Resolution:
             return [r for tid in type_ids for r in ix.rows_by_type[tid]], None
         if not place.sites and not place.anchors:
             return self._miss("location")
+        if place.guess:
+            return self._confirm_place(place)
 
         metros = place.metro_ids(ix)
         if provider_ids is not None and len(metros) > 1 and metros & prov_metros:
@@ -532,7 +564,7 @@ class _Resolution:
         if len(metros) > 1:
             states = [p.label for p in place.anchors if p.kind == "state"]
             return self._ask_metro(metros, states[0] if len(states) == 1 else None)
-        if len(metros) == 1:
+        if len(metros) == 1 and not place.unknown_city and not any(over_state_line(ix, p) for p in place.anchors):
             place = self._narrow(place, metros)
 
         if place.sites:
@@ -550,8 +582,10 @@ class _Resolution:
         """Widen around the area until some row there passes policy or needs only an answer. A
         named city's first ring is its own clinics: a neighboring city is "nothing closer"."""
         base = min(a.radius_mi for a in anchors)
-        radii = [r for r in sorted({base, 2 * base, FINAL_RING_MI}) if r <= FINAL_RING_MI]
-        allowed = set(provider_ids) if provider_ids is not None else None
+        radii = [r for r in sorted({base, 2 * base, FINAL_RING_MI}) if base <= r <= FINAL_RING_MI]
+        # A doctor who does not do this visit anywhere does not narrow the search: the caller hears
+        # that, with the doctors near the place who do (provider_type), not "not near here".
+        allowed = set(provider_ids) if provider_ids is not None and prov_rows else None
         if not radii:
             return self._none_nearby(anchors, base, type_ids, allowed, prov_rows, has_service)
         for radius in radii:
@@ -574,6 +608,7 @@ class _Resolution:
         self.area, self.dist, self.site_choice = Area(anchors, radius, order), dist, True
         self.notes.append(f"area {'/'.join(a.key for a in anchors)} within {radius:g} mi: {len(order)} sites")
         if nearest and radius > radii[0]:
+            self.widened = True
             lid = nearest.location.id
             self.preface += T.ring_preface(self.ix, lid, dist[lid], anchors[0].label,
                                            tuple(m for a in anchors for m in a.metro_ids))
@@ -582,9 +617,8 @@ class _Resolution:
     def _none_nearby(self, anchors: tuple[Place, ...], radius: float, type_ids: list[str],
                      allowed: set[str] | None, prov_rows: list[BookableRow] | None, has_service: bool,
                      named: dict | None = None) -> Plan:
-        """Nothing in the widest ring: name the nearest valid site in the nearest metro that has
-        one, as a pickable alternative. `named`: the clinics the caller named, when the ring was
-        around them."""
+        """Nothing in the widest ring: name the nearest valid site, as a pickable alternative.
+        `named`: the clinics the caller named, when the ring was around them."""
         named = named or {}
         ix, anchor = self.ix, anchors[0]
         who = self._who(sorted(allowed)) if allowed else None
@@ -595,20 +629,23 @@ class _Resolution:
         def miles_to(lat: float | None, lon: float | None) -> float:
             return haversine(anchor.lat, anchor.lon, lat, lon) if None not in (anchor.lat, lat) else math.inf
 
-        for mid in sorted(metros, key=lambda m: (miles_to(ix.metros[m].lat, ix.metros[m].lon), m)):
-            for lid in sorted(ix.locs_by_metro[mid], key=lambda l: (miles_to(ix.locations[l].lat, ix.locations[l].lon), l)):
-                at = ([r for r in prov_rows or () if r.location.id == lid] if allowed is not None
-                      else [r for tid in type_ids for r in ix.rows_by_type_loc.get((tid, lid), ())])
-                valid = [r for r in at if not has_violation(check(r, self.patient))]
-                if not valid:
-                    continue
-                best = min(valid, key=lambda r: (bool(check(r, self.patient)), -self.scores.get(r.type.id, 0.0), r.key))
-                alt = (best.type.id, best.provider.id, lid)
-                loc = ix.locations[lid]
-                return self._refuse("none_nearby", type_id=best.type.id if has_service else None, who=who,
-                                    alternatives=(alt,) if has_service else (), location_id=lid,
-                                    near=anchor.label, near_kind=anchor.kind, radius_mi=radius,
-                                    nearest_mi=miles_to(loc.lat, loc.lon), **named)
+        sites = [l for m in metros for l in ix.locs_by_metro[m]]
+        # A state's own clinics come first ("Kansas": Overland Park, not a nearer one in Missouri).
+        inside = set(ix.gazetteer.state_sites.get(anchor.key, ()))
+        for lid in sorted(sites, key=lambda l: (l not in inside, miles_to(ix.locations[l].lat, ix.locations[l].lon),
+                                                l)):
+            at = ([r for r in prov_rows or () if r.location.id == lid] if allowed is not None
+                  else [r for tid in type_ids for r in ix.rows_by_type_loc.get((tid, lid), ())])
+            valid = [r for r in at if not has_violation(check(r, self.patient))]
+            if not valid:
+                continue
+            best = min(valid, key=lambda r: (bool(check(r, self.patient)), -self.scores.get(r.type.id, 0.0), r.key))
+            alt = (best.type.id, best.provider.id, lid)
+            loc = ix.locations[lid]
+            return self._refuse("none_nearby", type_id=best.type.id if has_service else None, who=who,
+                                alternatives=(alt,) if has_service else (), location_id=lid,
+                                near=anchor.label, near_kind=anchor.kind, radius_mi=radius,
+                                nearest_mi=miles_to(loc.lat, loc.lon), inside=lid in inside, **named)
         return self._refuse("none_nearby", type_id=_type_understood(type_ids, has_service),
                             who=who, near=anchor.label, near_kind=anchor.kind, radius_mi=radius, **named)
 
@@ -617,6 +654,21 @@ class _Resolution:
         if 1 < len(ids) <= MAX_OPTIONS:
             return self._ask("metro", options=tuple(ids))
         return self._ask("metro", context=state)
+
+    def _confirm_place(self, place: PlaceMatch) -> Plan:
+        """A guessed place in one city is confirmed by name, city and state ("Did you mean Renton,
+        Washington?"); guesses in several cities are asked between."""
+        ix = self.ix
+        metros = place.metro_ids(ix)
+        if len(metros) != 1:
+            return self._ask_metro(metros)
+        said = ({T.place_said(l.short_name, l.city, l.state) for l in (ix.locations[c.id] for c in place.sites)}
+                | {T.place_said(p.label, p.city, p.state) for p in place.anchors})
+        if len(said) != 1:
+            m = ix.metros[next(iter(metros))]
+            said = {T.place_said(m.name, m.name, m.state)}
+        self.notes.append(f"place guessed: {said}")
+        return self._ask("place_confirm", options=tuple(metros), context=said.pop())
 
     def _place(self) -> PlaceMatch | None:
         """The location phrase as sites or area anchors; an answer to "which city?" narrows it."""
@@ -631,14 +683,22 @@ class _Resolution:
         else:
             m = resolve_place(ix, s.heard)
             options = frozenset(w for w in s.within if w in ix.metros)
+            if s.region and len(options) == 1 and only_no(s.region):
+                # "No" to "Did you mean Renton, Washington?": which city is asked afresh.
+                self.slots["location"] = Slot(turn=self.req.turn)
+                return None
             if s.region:
                 answer = resolve_place(ix, s.region)
-                chosen = answer.metro_ids(ix)
+                # "Yes" to "Did you mean Renton, Washington?", the one city asked about.
+                said_yes = len(options) == 1 and bool(read_confirmation(s.region))
+                chosen = options if said_yes else answer.metro_ids(ix)
                 if options & chosen:
                     chosen &= options
                 narrowed = self._narrow(m, chosen) if chosen else PlaceMatch()
                 if narrowed.sites or narrowed.anchors:
-                    m = narrowed
+                    # The caller said which city: the guess is settled, and the state is that city.
+                    m = replace(narrowed, guess=narrowed.guess and not said_yes and answer.guess,
+                                unknown_city=False)
                 else:
                     # Not one of the cities asked about: the caller named another place.
                     m = answer
@@ -672,11 +732,11 @@ class _Resolution:
                     anchors[mp.key] = mp
             else:
                 anchors[p.key] = p
-        return PlaceMatch(sites=sites, anchors=tuple(anchors.values()))
+        return replace(m, sites=sites, anchors=tuple(anchors.values()))
 
     def _metro_place(self, mid: str) -> Place:
         m = self.ix.metros[mid]
-        return Place(f"metro:{mid}", "metro", m.name, m.lat, m.lon, (mid,), RADIUS_MI["metro"])
+        return Place(f"metro:{mid}", "metro", m.name, m.lat, m.lon, (mid,), RADIUS_MI["metro"], m.name, m.state)
 
     def _distances(self, anchors: tuple[Place, ...], radius: float, own_metro_only: bool = False) -> dict[str, float]:
         """Miles to the nearest anchor for sites within `radius`; a city's own sites always count,
@@ -745,6 +805,20 @@ class _Resolution:
                        or (len(w) > 3 and bool(keys & phonetic_keys(n))) for n in names)
         return tuple(w for w in tokens(heard) if w not in _PLACE_FILLER and not w.isdigit() and not is_name(w))
 
+    def _nearest_first(self, ok: list[BookableRow]) -> list[TimeSlot]:
+        """After the search widened ("the nearest is 13 miles away, in San Francisco"): openings at
+        the nearest clinic first, and a farther one only for offers the nearer ones cannot fill.
+        Soonest-first across a 50-mile ring offered clinics 40 miles away while one at 13 had times."""
+        by_loc: dict[str, list[BookableRow]] = {}
+        for r in ok:
+            by_loc.setdefault(r.location.id, []).append(r)
+        found: list[TimeSlot] = []
+        for lid in sorted(by_loc, key=lambda l: (self.dist.get(l, math.inf), l)):
+            found += self.av.find(by_loc[lid], self.req.time_pref, MAX_OPTIONS - len(found))
+            if len(found) == MAX_OPTIONS:
+                break
+        return found
+
     def _nearer_ties(self, found: list[TimeSlot], ok: list[BookableRow]) -> list[TimeSlot]:
         """Soonest first; at the same start, the nearer site. Each offer may be swapped for an
         open slot at the same time at a nearer site, if the offers stay distinguishable."""
@@ -782,16 +856,80 @@ class _Resolution:
                     break
         return out
 
-    def _type_pool(self, pool: list[str], keep: list[str] = ()) -> list[str]:
-        """The types a model chooses among: all offered, cut to a shortlist on large catalogs."""
+    def _type_pool(self, pool: list[str], keep: list[str] = (), phrase: str | None = None) -> list[str]:
+        """The types a model chooses among: all offered, cut to a shortlist for `phrase` (the
+        service phrase) on large catalogs."""
         if len(pool) <= SHORTLIST_ABOVE:
             return pool
         s = self.slots["service"]
         place = self._place() if self.geo else None
         metros = place.metro_ids(self.ix) if place is not None else frozenset()
-        return sorted(set(type_shortlist(self.ix, s.heard, s.hint, metros or None)) | set(keep))
+        return sorted(set(type_shortlist(self.ix, phrase or s.heard, s.hint, metros or None)) | set(keep))
 
     # ---- type choice ---------------------------------------------------------------------
+
+    def _doubted(self, lexical: list[TypeCandidate]) -> list[TypeCandidate] | None:
+        """The caller said they do not know which visit it is ("I don't remember if it goes down my
+        throat or up from below"): no answer of ours commits and no model narrows it, the caller
+        is asked. Each alternative they named is a visit by name or alias, else by a model's choice
+        over that alternative with what they said before it. The caller is asked between the
+        visits found, never to confirm one: with fewer than two found, between those and what the
+        whole phrase reaches lexically, else openly ([]). Alternatives that all name one visit by
+        name or alias leave no doubt about it ("a sonogram or an ultrasound, I'm not sure which
+        they call it"); two descriptions a model maps to one visit do not settle it."""
+        s = self.slots["service"]
+        doubt = stated_doubt(self.ix, s.heard) if s.heard and not s.within else None
+        if doubt is None:
+            return None
+        by_name = [self._named_alternative(option) for option in doubt.options]
+        if None not in by_name and len(set(by_name)) == 1:
+            return None
+        found = self._modeled_alternatives(doubt, by_name)
+        self.doubt = self.type_consulted = True
+        self.notes.append(f"caller unsure between {list(doubt.options)}: {found}")
+        named = list(dict.fromkeys(t for t in found if t))
+        if len(named) < 2:
+            top = lexical[0].score if lexical else 0.0
+            named = list(dict.fromkeys(named + [c.type_id for c in lexical if c.score >= top - TYPE_TIE_GAP
+                                                and c.type_id not in self.ix.unoffered_types]))
+        if len(named) == 1 and named[0] in by_name:
+            # "the cleaning or the exam": the caller named one visit, and the other alternative
+            # found none or the same; it is most likely that visit's nearest neighbour (Dental Exam).
+            offered = [t for t in self.ix.types if t not in self.ix.unoffered_types]
+            other = " ".join(o for t, o in zip(by_name, doubt.options) if t is None)
+            neighbour = nearest_type(self.ix, named[0], offered, other, s.hint)
+            named += [neighbour] if neighbour else []
+        if not 2 <= len(named) <= MAX_OPTIONS:
+            return []
+        self.slots["service"] = replace(s, asks=0, candidates=tuple((t, 1.0) for t in named))
+        return [TypeCandidate(t, 1.0, "doubt") for t in named]
+
+    def _named_alternative(self, option: str) -> str | None:
+        named = [c for c in match_types(self.ix, option, self.slots["service"].hint)
+                 if c.via != "specialty" and c.type_id not in self.ix.unoffered_types]
+        tier = {c.type_id for c in named if c.score >= named[0].score - TYPE_TIE_GAP} if named else set()
+        return tier.pop() if len(tier) == 1 else None
+
+    def _modeled_alternatives(self, doubt: Doubt, found: list[str | None]) -> list[str | None]:
+        """A model's choice for each alternative no name or alias found. The questions do not
+        depend on each other, so they are all sent before the first answer is awaited."""
+        if not self.type_model:
+            return found
+        hint = self.slots["service"].hint
+        offered = sorted(t for t in self.ix.types if t not in self.ix.unoffered_types)
+        questions: dict[str, tuple[str, list[str]]] = {}
+        for t, option in zip(found, doubt.options):
+            if t is None and option not in questions:
+                phrase = f"{doubt.sure}, {option}" if doubt.sure else option
+                questions[option] = (phrase, self._type_pool(offered, phrase=phrase))
+        for phrase, pool in questions.values():
+            self.dis.prefetch_pick(phrase, hint, pool)
+        chosen: dict[str, str | None] = {}
+        for option, (phrase, pool) in questions.items():
+            verdict = self.dis.pick_type(phrase, hint, pool)
+            self._consulted("type", verdict, f"type disambiguator on {option!r}: {verdict.describe()}")
+            chosen[option] = verdict.act if verdict.act in pool else None
+        return [t or chosen.get(option) for t, option in zip(found, doubt.options)]
 
     def _consult_types(self) -> Verdict:
         """Ask the type disambiguator over every offered type (or the options the caller is
@@ -800,8 +938,9 @@ class _Resolution:
         if not self.type_model or not s.heard or self.type_consulted:
             return DECLINE
         self.type_consulted = True
-        pool = self._type_pool([t for t in (s.within or sorted(self.ix.types)) if t not in self.ix.unoffered_types])
-        return self._model_types(pool, ())
+        full = [t for t in (s.within or sorted(self.ix.types)) if t not in self.ix.unoffered_types]
+        pool = self._type_pool(full)
+        return self._model_types(pool, (), shortlisted=len(pool) < len(full))
 
     def _verify_types(self, lexical: list[TypeCandidate]) -> Verdict:
         """The lexicon matched, but the caller said more than the matched names and aliases explain
@@ -815,14 +954,15 @@ class _Resolution:
         ids = [c.type_id for c in lexical]
         # An answer to "Is that A or B?" that matched one of them is heard among A and B only.
         asked = self.slots["service"].within if set(ids) <= set(self.slots["service"].within) else ()
-        pool = self._type_pool(sorted(t for t in (asked or self.ix.types) if t not in self.ix.unoffered_types), ids)
-        return self._model_types(pool, ids)
+        full = sorted(t for t in (asked or self.ix.types) if t not in self.ix.unoffered_types)
+        pool = self._type_pool(full, ids)
+        return self._model_types(pool, ids, shortlisted=len(pool) < len(full))
 
-    def _model_types(self, pool: list[str], lexical: list[str]) -> Verdict:
-        """A choice over `pool`, then a check of its front-runner against the runner-up, or against
-        the lexical match when the choice went elsewhere. Declined: the model had nothing to add.
-        Failed: no usable answer came, and the caller is asked among its `ask` (none: among what
-        the lexicon understood)."""
+    def _model_types(self, pool: list[str], lexical: list[str], shortlisted: bool = False) -> Verdict:
+        """A choice over `pool` (`shortlisted`: cut from every offered type), then a check of its
+        front-runner against the runner-up, or against the lexical match when the choice went
+        elsewhere. Declined: the model had nothing to add. Failed: no usable answer came, and the
+        caller is asked among its `ask` (none: among what the lexicon understood)."""
         s = self.slots["service"]
         if len(lexical) == 2:
             # A tie the choice breaks is mostly checked between the two: both requests at once.
@@ -834,6 +974,11 @@ class _Resolution:
         ids = [first.act] if first.act else list(first.ask or ())
         if not ids or not set(ids) <= set(pool) or lexical == [first.act]:
             return DECLINE
+        if shortlisted:
+            first, pool = self._within_specialty(first, pool)
+            if first.failed:
+                return first
+            ids = [first.act] if first.act else list(first.ask or ())
         chosen = ids[0]
         rival = self._rival(first, chosen, pool, lexical)
         if rival is not None:
@@ -844,6 +989,11 @@ class _Resolution:
                 return DECLINE
             first = checked or first
             self._consulted("type check", first, f"type check {chosen} vs {rival}: {first.describe()}")
+            if first.ask and not first.failed and lexical and set(first.ask) <= set(lexical):
+                # The check did not confirm a choice among visits the words fit alike: which one
+                # the model preferred is a prior ("my doctor ordered an MRI" -> brain), so the
+                # caller is asked among all of them, as without a model.
+                return DECLINE
         ids = [first.act] if first.act else list(first.ask or ())
         if not set(ids) <= set(pool):
             # The check gate only settles on the two it weighed; anything else is no usable answer.
@@ -852,6 +1002,30 @@ class _Resolution:
             ids = list(first.ask)
         self.slots["service"] = replace(s, asks=0, candidates=tuple((t, 1.0) for t in ids))
         return first
+
+    def _within_specialty(self, first: Verdict, pool: list[str]) -> tuple[Verdict, list[str]]:
+        """A shortlist offers a specialty no word of the phrase reached by its default visit only.
+        A choice of that default named the specialty, not the visit ("hot flashes, night sweats"
+        -> OB/GYN New Patient Visit): the model chooses again among that specialty's visits."""
+        chosen = first.act
+        spec = self.ix.types[chosen].specialty if chosen else None
+        if spec is None or self.ix.specialty_default.get(spec) != chosen:
+            return first, pool
+        place = self._place() if self.geo else None
+        metros = place.metro_ids(self.ix) if place is not None else frozenset()
+        siblings = sorted(t for t, ty in self.ix.types.items() if ty.specialty == spec
+                          and t not in self.ix.unoffered_types and (not metros or self.ix.metros_by_type[t] & metros))
+        if set(siblings) <= set(pool):
+            return first, pool
+        s = self.slots["service"]
+        second = self.dis.pick_type(s.heard, s.hint, siblings)
+        self._consulted("type", second, f"type disambiguator within {spec}: {second.describe()}")
+        if second.failed:
+            # The caller is asked what the model was: the specialty's visits, openly past three.
+            return unanswered(siblings), pool
+        if not (second.act or second.ask):
+            return first, pool
+        return second, sorted(set(pool) | set(siblings))
 
     def _rival(self, first: Verdict, chosen: str, pool: list[str], lexical: list[str]) -> str | None:
         """What the check weighs the choice against: the other option of a pair; the lexical match
@@ -868,25 +1042,62 @@ class _Resolution:
         s = self.slots["service"]
         return nearest_type(self.ix, chosen, pool, s.heard, s.hint) or (runner[0] if runner else None)
 
-    def _consult_provider(self, provs: list[str], type_id: str) -> Verdict:
-        """Splits same-named providers by what the caller said about them: catalog facts
-        (language, title, specialty, site), then gender, which only the model can read off a first
-        name, then any words left, which only the model can weigh. Asks among whoever is left.
+    def _described(self, named: list[str], type_ids: list[str]) -> list[str]:
+        """The doctors the caller means: those the name matches, narrowed by the catalog facts
+        they gave (language, title, specialty, site) before any booking rule. "The nurse
+        practitioner, Dr. Hernandez" is the nurse practitioner even when she takes no new patients,
+        so the refusal says so instead of offering another Dr. Hernandez. Gender and other words
+        are weighed later, among the doctors the rules leave (_consult_provider)."""
+        self.named_providers = named
+        clues = self.provider_clues = read_provider_clues(self.ix, self.slots["provider"].heard, named)
+        if clues.negated or not clues.facts:
+            return named
+        self.notes.append(f"provider facts {list(clues.facts)}: {list(clues.fits)}")
+        if not self.slots["location"].heard:
+            self.described_sites = clues.sites
+        if clues.gender and len(clues.fits) == 1 < len(named):
+            # "Dr. Singh, he speaks Vietnamese": the language singles out Dr. Olivia Singh, but the
+            # gender said is part of the description too, so no rule speaks for her before it is
+            # settled, as in _consult_provider: with no sure answer she is confirmed by full name;
+            # a sure answer of the other gender asks among every Dr. Singh who can take the visit.
+            asked = self.chooser.provider_genders(list(clues.fits))
+            gender = gender_of((asked or {}).get(clues.fits[0]))
+            self._consulted("provider gender", DECLINE if asked is None else Verdict(called=True, failed=not asked),
+                            f"provider gender {clues.gender} of the one the facts leave: {gender}")
+            if gender is None:
+                self.described_ask = clues.fits
+            elif gender != clues.gender:
+                tset = set(type_ids)
+                self.described_ask = tuple(sorted({r.provider.id for p in named for r in self.ix.rows_by_provider[p]
+                                                   if r.type.id in tset and not has_violation(check(r, self.patient))})
+                                           or named)
+        return list(clues.fits)
+
+    def _bookable(self, provider_ids: list[str], type_id: str, location_ids: list[str] | None) -> list[str]:
+        """Of these doctors, those with this visit (at these clinics) that passes policy or needs
+        only an answer."""
+        return sorted({r.provider.id for p in provider_ids for r in self.ix.rows_by_provider[p]
+                       if r.type.id == type_id and (location_ids is None or r.location.id in location_ids)
+                       and not has_violation(check(r, self.patient))})
+
+    def _consult_provider(self, provs: list[str], type_id: str, location_ids: list[str] | None) -> Verdict:
+        """Splits same-named providers by what the caller said about them beyond the catalog
+        facts (_described already applied those): gender, which only the model can read off a
+        first name, then any words left, which only the model can weigh. Asks among whoever is left.
 
         Inferred gender narrows but never books on its own. Only a sure answer rules a doctor out
         (decision.gender_of); a doctor it alone singles out is confirmed by full name ("Do you mean
         Dr. Emily Chen?"), and so is the one doctor the facts leave when the model cannot say they
-        are the gender the caller said. A gender that rules out everyone the facts left asks."""
+        are the gender the caller said. A gender that rules out everyone the facts left asks among
+        every doctor of that name who can take the visit."""
         heard = self.slots["provider"].heard or ""
-        clues = read_provider_clues(self.ix, heard, provs)
-        if not clues.words:
+        clues = self.provider_clues
+        if clues is None or not clues.words:
             return DECLINE
         if clues.negated:
             self.notes.append(f"provider clues negated {list(clues.words)}: asking")
             return Verdict(ask=tuple(provs))
-        fits = list(clues.fits)
-        if clues.facts:
-            self.notes.append(f"provider facts {list(clues.facts)}: {fits}")
+        fits = list(provs)
         if clues.gender:
             asked = self.chooser.provider_genders(fits)
             p_woman = asked or {}
@@ -897,7 +1108,7 @@ class _Resolution:
                             f"provider gender {clues.gender}: {kept} of {fits}, p(woman) "
                             + " ".join(f"{p}={v:.2f}" for p, v in sorted(p_woman.items())))
             if not kept:
-                return Verdict(ask=tuple(provs))
+                return Verdict(ask=tuple(self._bookable(self.named_providers, type_id, location_ids) or provs))
             if len(kept) == 1 and (len(fits) > 1 or known.get(kept[0]) != clues.gender):
                 return Verdict(ask=(kept[0],))
             fits = kept
@@ -939,40 +1150,52 @@ class _Resolution:
     def _alternatives(self, rows: list[BookableRow], location_ids: list[str] | None,
                       exclude_providers: set[str] = frozenset()) -> tuple[tuple[str, str, str], ...]:
         """Nearest valid options: same service, other providers/sites, that pass policy for this
-        patient now (needs-info rows count, the caller can still answer). Same-site first."""
-        valid = [r for r in rows if r.provider.id not in exclude_providers
-                 and not has_violation(check(r, self.patient))]
+        patient now (needs-info rows count, the caller can still answer). The named clinics first,
+        then by distance; a doctor already suggested is passed over only for an equally close one
+        ("Dr. Maria Garcia at Mission Bay" twice would be unanswerable), never for a farther one."""
         near = self.dist
-        if location_ids:
-            valid.sort(key=lambda r: (r.location.id not in location_ids, bool(check(r, self.patient)),
-                                      near.get(r.location.id, 0.0), r.key))
-        else:
-            valid.sort(key=lambda r: (bool(check(r, self.patient)), near.get(r.location.id, 0.0), r.key))
-        out, seen = [], set()
+        valid = sorted((r for r in rows if r.provider.id not in exclude_providers
+                        and not has_violation(check(r, self.patient))),
+                       key=lambda r: (bool(location_ids) and r.location.id not in location_ids,
+                                      near.get(r.location.id, 0.0), bool(check(r, self.patient)), r.key))
+        out: list[BookableRow] = []
         for r in valid:
-            # Two "Dr. Maria Garcia" alternatives in one sentence would be unanswerable.
-            if r.provider.name in seen:
+            if any(o.provider.name == r.provider.name
+                   and near.get(o.location.id, 0.0) == near.get(r.location.id, 0.0) for o in out):
                 continue
-            seen.add(r.provider.name)
-            out.append(r.key)
+            out.append(r)
             if len(out) == 2:
                 break
-        return tuple(out)
+        return tuple(r.key for r in out)
 
     def _refuse_location(self, rows_p, provider_ids, location_ids, type_ids, has_service) -> Plan:
         type_id = self._best_type(rows_p) or _type_understood(type_ids, has_service)
         alts = self._alternatives(rows_p, None)
         named = {"at": tuple(location_ids), "on_street": self._named_by_street()}
+        # The doctors meant who do this visit: "Dr. Chen at Mission Bay" for a follow-up is not at
+        # Downtown, though a cardiologist Dr. Chen is.
+        doers = sorted({r.provider.id for r in rows_p}) or provider_ids
         if provider_ids is not None and not any(set(self.ix.providers[p].location_ids) & set(location_ids)
-                                                for p in provider_ids):
-            single = provider_ids[0] if len(provider_ids) == 1 else None
-            return self._refuse("provider_location", type_id=type_id, who=self._who(provider_ids),
+                                                for p in doers):
+            single = doers[0] if len(doers) == 1 else None
+            return self._refuse("provider_location", type_id=type_id, who=self._who(doers),
                                 provider_id=single, alternatives=alts, **named)
         anchors = tuple(self.ix.gazetteer.sites[l] for l in location_ids if l in self.ix.gazetteer.sites)
         if not rows_p and provider_ids is None and anchors:
             # Not even the widest ring around the clinic has the visit: name the nearest that does.
             return self._none_nearby(anchors, FINAL_RING_MI, type_ids, None, None, has_service, named)
         return self._refuse("location_type", type_id=type_id, alternatives=alts, **named)
+
+    def _refuse_not_offered(self, type_id: str) -> Plan:
+        """"PT for my sore knee": no physical therapy here, but the visit the knee points to is
+        suggested, if this patient can book it."""
+        s = self.slots["service"]
+        alt = pointed_default(self.ix, s.heard, s.hint)
+        if alt in self.ix.unoffered_types or not any(not has_violation(check(r, self.patient))
+                                                     for r in self.ix.rows_by_type.get(alt, ())):
+            alt = None
+        return self._refuse("not_offered", type_id=type_id, specialty=self.ix.types[type_id].specialty,
+                            alt_type_id=alt)
 
     def _named_by_street(self) -> bool:
         sites = self.place_memo.sites if self.place_memo else ()
@@ -1132,7 +1355,7 @@ def _alternative_labels(ix: CatalogIndex, alts: tuple[AltRef, ...]) -> list[str]
 
 
 def _option_labels(ix: CatalogIndex, field: str, options: tuple[str, ...]) -> list[str]:
-    if field == "metro":
+    if field in ("metro", "place_confirm"):
         return T.metro_labels(ix, list(options))
     return [_option_label(ix, field, o) for o in options]
 

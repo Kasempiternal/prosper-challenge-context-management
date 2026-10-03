@@ -2,7 +2,7 @@
 
 Usage:
   backend/.venv/Scripts/python eval/run_resolver_eval.py [--set main|heldout|heldout2|tune|all|national|national2|street]
-                                                        [--catalog PATH] [--jev off|on] [--live] [--verbose]
+                                                        [--catalog PATH] [--jev off|on] [--live|--fill] [--verbose]
 
 Every set, its file and its catalog are in eval/sets.py. A national set runs against the national
 catalog and refuses to run unless the catalog's sha256 equals the one pinned in every case. `all`
@@ -13,6 +13,8 @@ is the SF dev sets.
            repeated alongside it and printed side by side.
 --live     with --jev on: send every distinct JEV request to the network, refresh the cache and
            report the measured latency. Costs money (~$0.0001 per request).
+--fill     with --jev on (or --chooser openai): network only for the requests the cache lacks;
+           every cached answer is kept as it is.
 
 --chooser jev|openai|embed|none  which model answers the resolver's hooks (--jev on|off are aliases
            for jev|none). openai reads eval/.openai_cache.json; with --live it sends only the requests
@@ -404,12 +406,13 @@ def print_comparison(name: str, off: dict, on: dict, chooser: str = "jev") -> No
         print(f"{label:<32}{x:<32}{y}")
 
 
-def make_client(chooser: str, live: bool = False, openai_model: str = OPENAI_MODEL):
+def make_client(chooser: str, live: bool = False, openai_model: str = OPENAI_MODEL, fill: bool = False):
     """Offline settings: patient timeout, no per-turn budget, so the cache gets filled. The live
     call path uses each client's call defaults; see "over the request timeout"."""
     load_dotenv(ROOT / "backend" / ".env")
-    settings = {"jev": dict(mode="live" if live else "cache", cache_path=CACHE, timeout_s=2.5, retries=1),
-                "openai": dict(mode="auto" if live else "cache", cache_path=OPENAI_CACHE, model=openai_model,
+    settings = {"jev": dict(mode="live" if live else "auto" if fill else "cache", cache_path=CACHE, timeout_s=2.5,
+                            retries=1),
+                "openai": dict(mode="auto" if live or fill else "cache", cache_path=OPENAI_CACHE, model=openai_model,
                                timeout_s=10.0, live_limit=OPENAI_LIVE_LIMIT)}
     return CHOOSERS[chooser].make_client(turn_budget_s=None, **settings.get(chooser, {}))
 
@@ -422,24 +425,26 @@ def main() -> None:
     ap.add_argument("--chooser", choices=tuple(CHOOSER_LABEL))
     ap.add_argument("--openai-model", default=OPENAI_MODEL)
     ap.add_argument("--live", action="store_true")
+    ap.add_argument("--fill", action="store_true")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
     if args.jev and args.chooser and args.chooser != {"on": "jev", "off": "none"}[args.jev]:
         ap.error("--jev and --chooser disagree")
     chooser = args.chooser or ("jev" if args.jev == "on" else "none")
-    if args.live and chooser not in ("jev", "openai"):
-        ap.error("--live needs --chooser jev or openai")
+    if (args.live or args.fill) and chooser not in ("jev", "openai"):
+        ap.error("--live and --fill need --chooser jev or openai")
 
     names = tuple(n for n, s in SETS.items() if s.in_all) if args.set == "all" else (args.set,)
     catalog = args.catalog or catalog_of(names[0])
     sets = {name: load_set(name, catalog) for name in names}
     index = CatalogIndex.load(catalog)
-    client = make_client(chooser, args.live, args.openai_model)
+    client = make_client(chooser, args.live, args.openai_model, args.fill)
     if chooser == "embed":
         client.warm_up(index)  # as the live startup preload does; not counted in the latencies
     hooks = make_hooks(index, client)
     print(f"Resolver eval (o200k_base tokenizer); chooser {chooser}"
-          + (" (LIVE network)" if args.live else " (disk cache only)" if chooser in ("jev", "openai") else ""))
+          + (" (LIVE network)" if args.live else " (cache, network for misses)" if args.fill
+             else " (disk cache only)" if chooser in ("jev", "openai") else ""))
 
     results = {}
     try:

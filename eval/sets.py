@@ -26,11 +26,11 @@ SETS: dict[str, EvalSet] = {
     "heldout": EvalSet("cases.jsonl", in_all=True, heldout=True),
     "heldout2": EvalSet("cases_heldout2.jsonl", in_all=True),
     "tune": EvalSet("cases_tune.jsonl", in_all=True),
-    "heldout3": EvalSet("cases_heldout3.jsonl", blind=True),
+    "heldout3": EvalSet("cases_heldout3.jsonl"),
     "national": EvalSet("cases_national.jsonl", national=True),
     "national2": EvalSet("cases_national2.jsonl", national=True),
     "street": EvalSet("cases_street.jsonl", national=True),
-    "national3": EvalSet("cases_national3.jsonl", national=True, blind=True),
+    "national3": EvalSet("cases_national3.jsonl", national=True),
     "heldout4": EvalSet("cases_heldout4.jsonl", blind=True),
     "national4": EvalSet("cases_national4.jsonl", national=True, blind=True),
 }

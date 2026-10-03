@@ -54,10 +54,11 @@ class JevClient(CachedModelClient):
         answers = self._fetch(_choice_body(state, instructions, criteria), purpose, _read)
         return _parse(answers[_QUESTION], criteria) if answers else None
 
-    def prefetch_choice(self, state: str, instructions: str, criteria: dict[str, str]) -> None:
+    def prefetch_choice(self, state: str, instructions: str, criteria: dict[str, str],
+                        ranking: list[str] = ()) -> None:
         """A later choice() of the same question waits for this request. The cache key ignores the
         option order, so either order of a pair is the same request."""
-        self.prefetch(_choice_body(state, instructions, cap_options(criteria)))
+        self.prefetch(_choice_body(state, instructions, cap_options(criteria, ranking)))
 
     def nouls(self, state: str, questions: dict[str, str], purpose: str = "") -> dict[str, float] | None:
         """Several yes/no questions about one state in one request: name -> probability of yes."""
@@ -225,10 +226,15 @@ class JevTypeDisambiguator:
         self.ix, self.client, self.gate, self.check_gate = index, client, gate, check_gate
 
     def pick_type(self, phrase: str, hint: str | None, candidate_ids: list[str]) -> Verdict:
-        ans = self.client.choice(_said(phrase, hint), "Which appointment type is the caller asking for?",
-                                 type_criteria(self.ix, candidate_ids), ranking=ranked_types(self.ix, phrase, hint),
-                                 purpose="type")
+        ans = self.client.choice(*self._pick_question(phrase, hint, candidate_ids), purpose="type")
         return self.gate.decide(ans.probabilities) if ans else FAILED
+
+    def prefetch_pick(self, phrase: str, hint: str | None, candidate_ids: list[str]) -> None:
+        self.client.prefetch_choice(*self._pick_question(phrase, hint, candidate_ids))
+
+    def _pick_question(self, phrase: str, hint: str | None, candidate_ids: list[str]) -> tuple[str, str, dict, list]:
+        return (_said(phrase, hint), "Which appointment type is the caller asking for?",
+                type_criteria(self.ix, candidate_ids), ranked_types(self.ix, phrase, hint))
 
     def check_type(self, phrase: str, hint: str | None, first: Verdict, rival: str) -> Verdict:
         """The choice's front-runner and its rival alone, plus "either": the third answer is what

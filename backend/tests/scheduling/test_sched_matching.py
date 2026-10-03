@@ -181,6 +181,7 @@ def test_lookup_facts(index):
 # ---- NameIndex equivalence: the pre-NameIndex matcher, frozen as the oracle -----------------
 
 import json  # noqa: E402
+from itertools import takewhile  # noqa: E402
 
 
 import jellyfish  # noqa: E402
@@ -216,6 +217,27 @@ def _oracle_match_providers(index, phrase, within=None):
     words = [w for w in tokens(phrase or "") if w not in _TITLE_WORDS and (w not in _NEVER_NAMES or w in names)]
     if not words:
         return []
+    tier = _oracle_tier(index, words, within)
+    if len(words) > 1 and words[-1] not in names:
+        raw = tokens(phrase or "")
+        lasts = {normalize(p.last_name) for p in index.providers.values()}
+        for start in [0] + [i + 1 for i, w in enumerate(raw) if w in _HONORIFICS]:
+            run = list(takewhile(lambda w: w in names and w not in _NEVER_NAMES and w not in _CLUE_STOPWORDS,
+                                 raw[start:start + 2]))
+            named = _oracle_tier(index, run, within) if run and run[-1] in lasts else []
+            if named and (not tier or named[0].score > tier[0].score):
+                tier = named
+    if within:
+        anywhere = _oracle_match_providers(index, phrase)
+        return anywhere if not tier or (anywhere and anywhere[0].score > tier[0].score) else tier
+    if not tier and len(words) > 1:
+        names = [w for w in words if _oracle_is_name_word(index, w)]
+        if names and names != words:
+            return _oracle_match_providers(index, " ".join(names), within)
+    return tier
+
+
+def _oracle_tier(index, words, within):
     pool = [index.providers[i] for i in within] if within else list(index.providers.values())
     scored = []
     for prov in pool:
@@ -235,15 +257,7 @@ def _oracle_match_providers(index, phrase, within=None):
                 scored.append(NameCandidate(prov.id, round(joined, 3), "fuzzy"))
                 continue
             scored.append(NameCandidate(prov.id, round(s_last * (1.0 if s_first >= 0.88 else 0.9), 3), via))
-    tier = _top_tier(scored, MIN_PROVIDER_SCORE)
-    if within:
-        anywhere = _oracle_match_providers(index, phrase)
-        return anywhere if not tier or (anywhere and anywhere[0].score > tier[0].score) else tier
-    if not tier and len(words) > 1:
-        names = [w for w in words if _oracle_is_name_word(index, w)]
-        if names and names != words:
-            return _oracle_match_providers(index, " ".join(names), within)
-    return tier
+    return _top_tier(scored, MIN_PROVIDER_SCORE)
 
 
 def _oracle_clue_words(index, phrase, ids):

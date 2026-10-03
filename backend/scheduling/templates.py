@@ -73,6 +73,21 @@ def site_in_city(index: CatalogIndex, location_id: str) -> str:
     return f"{site_label(index, location_id)} in {city}" if city else site_label(index, location_id)
 
 
+def site_near_city(index: CatalogIndex, location_id: str) -> str:
+    """"Cherry Hill, near Philadelphia" for a site in a city of its own; "The Avenues in Salt Lake City"."""
+    loc, city = index.locations[location_id], city_of(index, location_id)
+    if loc.city and city and normalize(loc.city) != normalize(city):
+        return f"{site_label(index, location_id)}, near {city}"
+    return site_in_city(index, location_id)
+
+
+def place_said(name: str, city: str | None, state: str | None) -> str:
+    """"Renton, Washington"; "Lincoln Park in Chicago, Illinois"; "New York, New York"; "Virginia"."""
+    where = name if not city or normalize(city) == normalize(name) else f"{name} in {city}"
+    is_the_state = not city and normalize(name) == normalize(state_name(state or ""))
+    return f"{where}, {state_name(state)}" if state and not is_the_state else where
+
+
 def _at(sites: str) -> str:
     """" at Mission Bay", or " there" when no site was named: never a phrase around an empty label."""
     return f" at {sites}" if sites else " there"
@@ -211,6 +226,8 @@ def say_ask(index: CatalogIndex, field: str, options: list[str], context: str | 
         return "Which neighborhood is that location in?"
     if field == "location_retry":
         return "Sorry, which location was that?"
+    if field == "place_confirm":
+        return f"Did you mean {context}?"
     if field == "metro" and options:
         return f"Is that {join_or(metro_labels(index, options))}?"
     if field == "metro":
@@ -240,17 +257,20 @@ def say_refuse(index: CatalogIndex, code: str, *, type_id: str | None = None, wh
                location_id: str | None = None, specialty: str | None = None,
                alternatives: tuple[tuple[str, str, str], ...] = (), alt_type_id: str | None = None,
                needs_referral: bool = False, near: str | None = None, near_kind: str | None = None,
-               radius_mi: float | None = None, nearest_mi: float | None = None) -> str:
+               radius_mi: float | None = None, nearest_mi: float | None = None, inside: bool = False) -> str:
     """`at`: the clinics the caller named (location_type, provider_location, and none_nearby when
     nothing near a named clinic has the visit); `location_id`: the nearest clinic that has it
-    (none_nearby)."""
+    (none_nearby), `inside` the state the caller named."""
     what = with_article(type_label(index.types[type_id])) if type_id else "that"
     What = what[0].upper() + what[1:]
     loc = named_sites(index, at, on_street)
     alt = _alternatives_sentence(index, alternatives, at) if code != "none_nearby" else ""
 
     if code == "not_offered":
-        return f"Sorry, we don't offer {index.specialty_spoken.get(specialty, 'that')} at our clinics."
+        s = f"Sorry, we don't offer {index.specialty_spoken.get(specialty, 'that')} at our clinics."
+        if alt_type_id:
+            s += f" I can book {with_article(type_label(index.types[alt_type_id]))} instead. Want that?"
+        return s
     if code == "new_patient_type":
         extra = " and needs a referral" if needs_referral else ""
         s = f"{What} is only for established patients{extra}, so I can't book it for a new patient."
@@ -274,17 +294,26 @@ def say_refuse(index: CatalogIndex, code: str, *, type_id: str | None = None, wh
     if code == "no_availability":
         return f"I don't see any openings for {what} in the next three weeks with those preferences. Want me to try other days?"
     if code == "none_nearby":
+        if near_kind == "state":
+            # A state's centre is nowhere the caller is: the clinic is named, never a distance to it.
+            nearest = site_near_city(index, location_id) if location_id else ""
+        else:
+            nearest = f"{site_in_city(index, location_id)}, about {miles(nearest_mi or 0)} away" if location_id else ""
         where = f"in {near}" if near_kind == "state" else f"within {miles(radius_mi or 0)} of {near}"
-        if who:
+        if inside:
+            # The nearest is in the state named: "we don't offer it in Kansas" would be false.
+            whose = f"{who[0].upper()}{who[1:]}'s" if who else "Our"
+            s = f"{whose} nearest clinic {where}{f' for {what}' if type_id else ''} is {nearest}."
+        elif who:
             s = f"{who[0].upper()}{who[1:]} isn't at any of our clinics {where}."
         elif loc:
             s = f"We can't do {what} at {loc}, or anywhere within {miles(radius_mi or 0)} of it."
         else:
             s = f"We don't offer {what} {where}." if type_id else f"We don't have a clinic {where}."
-        if location_id:
-            s += f" The nearest is {site_in_city(index, location_id)}, about {miles(nearest_mi or 0)} away."
-            if alternatives:
-                s += " Want me to look there?"
+        if location_id and not inside:
+            s += f" The nearest is {nearest}."
+        if location_id and alternatives:
+            s += " Want me to look there?"
         return s
     if code == "handoff":
         return "I'm having trouble finding that. Let me have someone from our front desk call you back."

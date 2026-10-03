@@ -119,8 +119,9 @@ def test_shared_street_with_one_valid_site_books_there(nat):
 
 def test_refusal_names_the_street_clinics_never_none(nat):
     plan = _say(nat, "blood test", "the clinic on Market Street in San Jose")
+    # The two nearest San Jose clinics, though the same doctor: not one in Oakland, 40 miles away.
     assert plan.say == ("We can't do a blood draw at Downtown or Willow Glen on Market Street. I can book "
-                        "Dr. Jennifer Malabanan at Santa Clara or Dr. Ryan Wahlstrom at Downtown in Oakland. "
+                        "Dr. Jennifer Malabanan at Santa Clara or Dr. Jennifer Malabanan at Evergreen. "
                         "Would either of those work?")
     plan = _say(nat, "blood test", "3330 Market Street, San Jose")
     assert plan.say.startswith("We can't do a blood draw at Willow Glen on Market Street. ")

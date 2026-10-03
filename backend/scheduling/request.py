@@ -185,8 +185,9 @@ def _parse_time_pref(tp: Any) -> TimePref:
     return TimePref(days=days, part_of_day=part, not_before=not_before)
 
 
-# Asks whose answer arrives in another slot's phrase: "Which city?" is answered as a location.
-_ASK_SLOT = {"metro": "location"}
+# Asks whose answer arrives in another slot's phrase: "Which city?" and "Did you mean Renton,
+# Washington?" are answered as a location.
+_ASK_SLOT = {"metro": "location", "place_confirm": "location"}
 
 
 def _answered(req: Request, slot_name: str) -> tuple[str, ...]:

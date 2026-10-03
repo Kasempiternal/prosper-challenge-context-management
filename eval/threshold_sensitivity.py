@@ -14,28 +14,11 @@ import run_resolver_eval as E  # noqa: E402
 
 import scheduling.decision as D  # noqa: E402
 from scheduling.catalog_index import CatalogIndex  # noqa: E402
-from scheduling.decision import CheckGate, Gate, Verdict  # noqa: E402
+from scheduling.decision import CheckGate, Gate  # noqa: E402
 from scheduling.jev import JevProviderChooser, JevSiteChooser, JevTypeDisambiguator  # noqa: E402
 from sets import DEV  # noqa: E402
 
 STEP = 0.05
-
-
-class MarginGate(CheckGate):
-    """The shipped gate, with a margin on its act rule: a confident choice stands only if the check
-    puts it more than `margin` ahead of the rival (shipped: 0)."""
-
-    def __init__(self, margin: float):
-        super().__init__()
-        object.__setattr__(self, "margin", margin)
-
-    def decide(self, first, rival, check):
-        verdict = super().decide(first, rival, check)
-        if first.act and check is not None and check.either < self.twins:
-            if check.chosen > check.rival + self.margin:
-                return Verdict(act=first.act, top=verdict.top, called=True)
-            return Verdict(ask=(first.act, rival), top=verdict.top, called=True)
-        return verdict
 
 
 def outcomes(check_gate: CheckGate, gender_sure: float, indexes: dict) -> tuple[dict, int]:
@@ -73,7 +56,6 @@ def main() -> None:
         for d in (-STEP, STEP):
             value = round(getattr(CheckGate(), f.name) + d, 2)
             variants.append((f"{f.name} {value:.2f}", CheckGate(**{f.name: value}), shipped_gender))
-    variants += [(f"act margin {d:+.2f}", MarginGate(d), shipped_gender) for d in (-STEP, STEP)]
     variants += [(f"gender {round(shipped_gender + d, 2):.2f}", CheckGate(), round(shipped_gender + d, 2))
                  for d in (-STEP, STEP)]
     for label, gate, gender in variants:

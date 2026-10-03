@@ -6,6 +6,7 @@ import os
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
+from itertools import takewhile
 from typing import TYPE_CHECKING, Callable, Iterable
 
 import jellyfish
@@ -140,6 +141,13 @@ def match_providers(index: CatalogIndex, phrase: str | None, within: Iterable[st
         return []
     within = list(within) if within else None
     tier = _top_tier(_score_providers(index.name_index, words, within), MIN_PROVIDER_SCORE)
+    if len(words) > 1 and words[-1] not in ni.keys:
+        # "Dr. Inna Volkov, a friend told me about her": the last word is no name of ours, and read
+        # as a surname, "about" sounds like Abbott. A name is said first or right after "Dr.".
+        for said in _names_said(index, phrase):
+            named = _top_tier(_score_providers(ni, said, within), MIN_PROVIDER_SCORE)
+            if named and (not tier or named[0].score > tier[0].score):
+                tier = named
     if within:
         # An answer to "Do you mean Dr. Emily Chen?" may name someone else ("Lucas Chen"): a
         # better match outside the options asked about wins.
@@ -152,6 +160,16 @@ def match_providers(index: CatalogIndex, phrase: str | None, within: Iterable[st
         if names and names != words:
             return match_providers(index, " ".join(names), within)
     return tier
+
+
+def _names_said(index: CatalogIndex, phrase: str | None) -> list[list[str]]:
+    """The catalog names (first, last; at most two) that open the phrase or follow "Dr."/"doctor":
+    "Dr. Inna Volkov, a friend told me" -> [["inna", "volkov"]]. A surname that is also a word
+    ("friend") elsewhere in the phrase is not taken for a name."""
+    raw = tokens(phrase or "")
+    starts = [0] + [i + 1 for i, w in enumerate(raw) if w in _HONORIFICS]
+    runs = [list(takewhile(lambda w: is_catalog_name(index, w), raw[i:i + 2])) for i in starts]
+    return [r for r in dict.fromkeys(map(tuple, runs)) if r and r[-1] in index.name_index.by_last]
 
 
 def _score_providers(ni: NameIndex, words: list[str], within: list[str] | None) -> list[NameCandidate]:
@@ -282,9 +300,10 @@ def _said_gender(raw: list[str]) -> tuple[str | None, set[str]]:
 @dataclass(frozen=True)
 class ProviderClues:
     """What a provider phrase says beyond the name. `fits`: the candidates left by every catalog fact
-    the caller named (language, title, specialty, site); `gender`: "female" or "male", a fact the
-    catalog does not hold; `rest`: clue words neither explains ("the one I saw last time");
-    `negated`: the phrase says who the caller does not mean, so nothing narrows."""
+    the caller named (language, title, specialty, site); `sites`: the clinics a site fact named;
+    `gender`: "female" or "male", a fact the catalog does not hold; `rest`: clue words neither
+    explains ("the one I saw last time"); `negated`: the phrase says who the caller does not mean,
+    so nothing narrows."""
 
     words: tuple[str, ...]
     fits: tuple[str, ...]
@@ -292,6 +311,7 @@ class ProviderClues:
     gender: str | None = None
     rest: tuple[str, ...] = ()
     negated: bool = False
+    sites: tuple[str, ...] = ()
 
 
 def read_provider_clues(index: CatalogIndex, phrase: str | None, candidate_ids: Iterable[str]) -> ProviderClues:
@@ -333,13 +353,17 @@ def read_provider_clues(index: CatalogIndex, phrase: str | None, candidate_ids: 
                                        and w not in _CLUE_LINKS and w not in kin],
                                hear_place(phrase).street_words, {lid for p in providers for lid in p.location_ids})
     narrow("site", lambda p: bool(sites & set(p.location_ids)), said)
+    if "site" in facts:
+        # "the one over at the Midtown clinic": "clinic" belongs to the place, not to the doctor.
+        explained.update(w for w in words if w in _LOCATION_GENERIC)
 
     if gender:
         explained.update(gender_words)
     if facts or gender:
         explained.update(w for w in words if w in _CLUE_LINKS)
     rest = tuple(w for w in words if w not in explained)
-    return ProviderClues(words, tuple(p.id for p in providers), tuple(facts), gender, rest)
+    return ProviderClues(words, tuple(p.id for p in providers), tuple(facts), gender, rest,
+                         sites=tuple(sorted(sites)) if "site" in facts else ())
 
 
 _CONFIRM_FILLER = frozenset({"that", "s", "it", "is", "the", "one", "her", "him", "she", "he", "um", "uh", "huh",
@@ -356,6 +380,12 @@ def read_confirmation(phrase: str | None) -> bool | None:
     if words & (_NO | _NEGATIONS):
         return False
     return True if words & _YES and words <= _YES | _CONFIRM_FILLER else None
+
+
+def only_no(phrase: str | None) -> bool:
+    """A no and nothing else to hear ("no", "nope, not that one"); "no, Trenton, New Jersey" says more."""
+    words = set(tokens(phrase or ""))
+    return bool(words & (_NO | _NEGATIONS)) and words <= _NO | _NEGATIONS | _CONFIRM_FILLER
 
 
 def _sites_named(index: CatalogIndex, words: list[str], street_words: frozenset[str],
