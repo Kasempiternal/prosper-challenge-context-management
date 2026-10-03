@@ -719,7 +719,7 @@ From here on, `heldout3` and `national3` are dev sets. A fresh blind round judge
 
 ## Held-out round 4 (`heldout4`, `national4`)
 
-Frozen on 2026-10-03 and not yet scored. Both sets were authored blind. The author read no resolver code
+Frozen on 2026-10-03; scored once at resolver `500e0ce` on that date. The recorded round 4 scores are below. Both sets were authored blind. The author read no resolver code
 (`backend/scheduling/**`), no resolver results (`eval/results/**`) and no README section after the
 round 3 heading. Neither the resolver nor `run_resolver_eval.py` was run on these cases. Both are
 registered as blind in `eval/sets.py`, so no test, tuning run or `--set all` reads them. Labels come
@@ -962,7 +962,7 @@ Misses that are not wrong commits but matter:
 
 ## Held-out round 5 (`heldout5`, `national5`)
 
-Frozen on 2026-10-03 and not yet scored. Both sets were authored blind. The author read no resolver code
+Frozen on 2026-10-03; scored once at resolver `222eb22` on that date. Final scores are below. Both sets were authored blind. The author read no resolver code
 (`backend/scheduling/**`), no resolver results (`eval/results/**`), no `.kstack` files and no README
 section that reports scores, misses or failure classes. One exception, after authoring: when staging
 the commit, `git diff` context printed the last three lines of the round 4 scored section (a national
@@ -1219,3 +1219,40 @@ OpenAI 8 new cached requests, 1,530 input tokens, $0.00024. Both caches are comm
 Still open: a lexical tie narrowed by a doctor commits the survivor, as in base ("a blood test for
 my cholesterol" with Dr. Leila Sato books a blood draw); "the one at Richmond or Mission Bay"
 books the Mission Bay Dr. Maria Garcia (the site named with more words wins), as in base.
+
+## Final verification (2026-10-03, resolver frozen at `222eb22`)
+
+The final safety fixes strip question scaffolding before interpreting proximity phrases, require a new doctor name to start an answer before widening beyond the asked roster, and bound offers and picked-time confirmations to 50 miles from a known place anchor. Language, credential and clinic descriptions answer within the asked roster. An unknown attribute asks again. The old full-scan matcher oracle retains its equivalence checks with explicit updates for these intended semantics and the adjacent first-name correction.
+
+Round 5 was scored once in all four modes, after the hard-suite fixes and before any blind result was inspected. No resolver fix was made after scoring. JEV and OpenAI used live calls; Off and embeddings ran locally. Scores are preserved in `eval/results/round5_*.txt`.
+
+| Set | Off | Embeddings | OpenAI | JEV (default) |
+|---|---|---|---|---|
+| heldout5 | 11/26, 30/64 | 15/30, 31/64 | 8/40, 48/64 | 4/38, 52/64 |
+| national5 | 4/37, 50/59 | 5/37, 49/59 | 3/38, 52/59 | 1/35, 51/59 |
+
+Each cell is wrong commits per commit, then fully correct turns. JEV: SF **4/38 (10.5%), 52/64**; national **1/35 (2.9%), 51/59**. SF's wrong-commit rate rose from round 4's 3/38; national fell from 1/31. The sets differ, so this is not a matched comparison. The hard suite has zero unsafe JEV outcomes; fresh blind cases still fail.
+
+Practice checks: all 11 sets retain zero JEV wrong commits, **535/566** fully correct turns. Off's wrong counts rose on no set (30 total). Backend: **1,288 passed, 1 intentional live-smoke skip**. Frontend: **122 passed**, production build successful; National Scheduler, JEV default and Dev view verified in a browser. The geographic property enumerates all national clinic addresses and metros in all four modes with two services; every actual offer stays within 50 miles of its original known anchor. A stale distant offer cannot be confirmed.
+
+### Hard suite (development evidence)
+
+88 catalog-derived cases: 40 SF and 48 national. These cases were seen before the fixes; they are not blind evidence. C / SBA / SO / U means correct / safe but asked / safe other / unsafe. Unsafe also counts a false refusal when an offer is required.
+
+| Set | Off | Embeddings | JEV (live) | OpenAI (cache only) |
+|---|---|---|---|---|
+| SF (40) | 26 / 4 / 4 / 6 | 26 / 2 / 3 / 9 | **36 / 3 / 1 / 0** | 28 / 5 / 6 / 1 |
+| National (48) | 40 / 5 / 0 / 3 | 40 / 5 / 0 / 3 | **43 / 5 / 0 / 0** | 37 / 11 / 0 / 0 |
+
+OpenAI stress scores are partial: cache misses ask safely and no OpenAI stress network run was approved. The ordinary exact-match metric may flag a speech-only error even when the stress structural metric is correct; these metrics are intentionally distinct. Live JEV stress spend was $0.00232. Round 5 spend: JEV $0.00605; OpenAI $0.00976 (102 new requests).
+
+### Remaining risks
+
+- A named doctor can narrow "a blood test for my cholesterol" to a blood draw without clarifying the lipid panel.
+- "The one at Richmond or Mission Bay" can select the Mission Bay doctor instead of asking between sites.
+- Off can offer adult neurology for a pediatric request.
+- SF has no catalog marking that separates its mammogram from diagnostic imaging for a lump.
+- Embeddings had 9 unsafe SF stress outcomes, against Off's 6.
+- Fresh blind round 5 still has confident choices on underspecified requests: MRI region, mental-health medication follow-up and school/sports physicals. One national symptomatic request gives a false refusal with an incorrect distant alternative.
+
+Offline cases feed tool arguments directly. They do not test speech recognition, LLM extraction, interruptions or audio timing. Use [the live-call script](../docs/LIVE_CALL_TESTS.md) for that layer. Passing twelve calls cannot prove universal safety.

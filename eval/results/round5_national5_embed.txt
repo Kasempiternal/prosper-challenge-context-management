@@ -1,0 +1,123 @@
+Resolver eval (o200k_base tokenizer); chooser embed
+
+=== national5: no model ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   51 / 59
+WRONG-COMMIT rate per commit (headline)   4/37 = 10.8%  (over 59 resolve turns)
+top-1 (turn fully correct)                50/59 = 84.7%
+ask precision (field-level)               9/12 = 75.0%
+ask recall (field-level)                  9/9 = 100.0%
+mean questions per booking                0.26 over 42 bookings
+refusal correctness                       8/8 = 100.0%
+resolver latency p50 / p95 (no network)   1.44 ms / 11.55 ms  (n=1180)
+Plan.say tokens  mean / p95 / max         36 / 58 / 77
+Plan.summary tokens mean / p95 / max      71 / 94 / 99
+tool result tokens mean / p95 / max       110 / 146 / 161
+  ... speak-direct (no say) mean/p95/max  71 / 91 / 96
+model requests; turns where a hook fired  0; 0 of 59 turns
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       5/5
+  dup_name_metro         6/6
+  general_variant        2/3
+  geo                    18/18
+  new_patient            5/5
+  no_location            3/3
+  ring                   1/1
+  symptom                0/8
+  unoffered              2/2
+MISSES (9):
+  nat5-sym-01 turn 1: status ask != offer
+      said: What's the visit for?
+  nat5-sym-02 turn 1: status refuse != offer; alternative locations ['loc_155'] not within ['loc_180']
+      said: We don't offer a lump or mass evaluation within 50 miles of Indianapolis. The nearest is Pilsen in Chicago, about 164 miles away. Want me to look there?
+  nat5-sym-03 turn 1: status ask != offer
+      said: What's the visit for?
+  nat5-sym-04 turn 1: types ['appt_072'] not within ['appt_273', 'appt_274']; locations ['loc_156'] not within ['loc_150', 'loc_157', 'loc_159']
+      said: For a blood draw, Dr. Olive Hutchins has today at 11:30, Monday at 7:30, or Thursday the 15th at 7:45 at Chinatown. Which works best?
+  nat5-sym-05 turn 1: status ask != offer
+      said: What's the visit for?
+  nat5-sym-06 turn 1: types ['appt_016'] not within ['appt_110']
+      said: For a newborn visit, Dr. Lynn Venable has today at 11 at Ybor City and Dr. Elaina Boland has tomorrow at 7:30 or Friday at 7 at Clearwater. Which works best?
+  nat5-sym-07 turn 1: types ['appt_007'] not within ['appt_077', 'appt_226', 'appt_246']
+      said: For a sick visit, Dr. Johnathan Riggs has today at 11 at Rockridge, Dr. Charles Myers has tomorrow at 7:30 at Fruitvale, and Dr. Darla Bhargava has Friday at 7:30 at Fruitvale. Which works best?
+  nat5-sym-08 turn 1: types ['appt_036'] not within ['appt_008', 'appt_017', 'appt_084', 'appt_143', 'appt_145']
+      said: For a neurology consultation, Dr. Lawrence Desai has today at 11 at Chestnut Hill and Dr. Vicky Karras has tomorrow at 8 or Friday at 8 at Center City. Which works best?
+  nat5-gen-02 turn 1: status refuse != offer; alternative locations ['loc_031', 'loc_076'] not within ['loc_076']
+      said: The nearest breast ultrasound is about 225 miles away, in Los Angeles; an ultrasound is 13 miles away, at Henderson. Would that work, or should I look in Los Angeles?
+
+=== national5: embeddings ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   51 / 59
+WRONG-COMMIT rate per commit (headline)   5/37 = 13.5%  (over 59 resolve turns)
+top-1 (turn fully correct)                49/59 = 83.1%
+ask precision (field-level)               9/11 = 81.8%
+ask recall (field-level)                  9/9 = 100.0%
+mean questions per booking                0.24 over 42 bookings
+refusal correctness                       8/8 = 100.0%
+resolver latency p50 / p95 (no network)   1.86 ms / 11.67 ms  (n=1180)
+Plan.say tokens  mean / p95 / max         36 / 58 / 77
+Plan.summary tokens mean / p95 / max      71 / 94 / 99
+tool result tokens mean / p95 / max       111 / 146 / 161
+  ... speak-direct (no say) mean/p95/max  71 / 91 / 96
+model requests (rate per resolve turn)    32 (54.2%); local 32, disk cache 0, failed 0
+model latency p50 / p95 / max (local)     7 / 10 / 12 ms
+model input tokens total / per request    0 / 0
+model cost if every request were live     $0.00000
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       5/5
+  dup_name_metro         6/6
+  general_variant        1/3
+  geo                    18/18
+  new_patient            5/5
+  no_location            3/3
+  ring                   1/1
+  symptom                0/8
+  unoffered              2/2
+MISSES (10):
+  nat5-sym-01 turn 1: types ['appt_258'] not within ['appt_026', 'appt_121']
+      said: For a patch testing, Dr. Michelle Bhagat has today at 11 at Koreatown, tomorrow at 8 at Koreatown, or Friday at 8 at Hollywood. Which works best?
+      type disambiguator: act appt_258 [appt_258=1.00 appt_026=0.00 appt_080=0.00]
+      type check appt_258 vs appt_080: act appt_258 [appt_258=1.00 appt_026=0.00 appt_080=0.00]
+  nat5-sym-02 turn 1: status refuse != offer; alternative locations ['loc_155'] not within ['loc_180']
+      said: We don't offer a lump or mass evaluation within 50 miles of Indianapolis. The nearest is Pilsen in Chicago, about 164 miles away. Want me to look there?
+      type disambiguator: act appt_304 [appt_304=0.98 appt_180=0.02 appt_050=0.00]
+  nat5-sym-03 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: ask ('appt_162', 'appt_133') [appt_162=0.58 appt_133=0.38 appt_135=0.03]
+  nat5-sym-04 turn 1: types ['appt_072'] not within ['appt_273', 'appt_274']; locations ['loc_156'] not within ['loc_150', 'loc_157', 'loc_159']
+      said: For a blood draw, Dr. Olive Hutchins has today at 11:30, Monday at 7:30, or Thursday the 15th at 7:45 at Chinatown. Which works best?
+      type disambiguator: ask ('appt_073', 'appt_072') [appt_073=0.75 appt_072=0.15 appt_007=0.09]
+  nat5-sym-05 turn 1: status ask != offer
+      said: Is that a weight management consultation or an adolescent well visit?
+      type disambiguator: ask ('appt_105', 'appt_092') [appt_105=0.57 appt_092=0.34 appt_107=0.04]
+      type check appt_105 vs appt_092: ask ('appt_105', 'appt_092') [appt_105=0.57 appt_092=0.34 appt_107=0.04]
+  nat5-sym-06 turn 1: types ['appt_016'] not within ['appt_110']
+      said: For a newborn visit, Dr. Lynn Venable has today at 11 at Ybor City and Dr. Elaina Boland has tomorrow at 7:30 or Friday at 7 at Clearwater. Which works best?
+      type disambiguator: act appt_016 [appt_016=0.99 appt_295=0.00 appt_053=0.00]
+  nat5-sym-07 turn 1: types ['appt_007'] not within ['appt_077', 'appt_226', 'appt_246']
+      said: For a sick visit, Dr. Johnathan Riggs has today at 11 at Rockridge, Dr. Charles Myers has tomorrow at 7:30 at Fruitvale, and Dr. Darla Bhargava has Friday at 7:30 at Fruitvale. Which works best?
+      type disambiguator: open [appt_077=0.61 appt_007=0.19 appt_078=0.06]
+  nat5-sym-08 turn 1: types ['appt_036'] not within ['appt_008', 'appt_017', 'appt_084', 'appt_143', 'appt_145']
+      said: For a neurology consultation, Dr. Lawrence Desai has today at 11 at Chestnut Hill and Dr. Vicky Karras has tomorrow at 8 or Friday at 8 at Center City. Which works best?
+      type disambiguator: act appt_038 [appt_038=0.99 appt_017=0.00 appt_107=0.00]
+  nat5-gen-01 turn 1: status refuse != offer; alternative locations ['loc_211', 'loc_213'] not within ['loc_213']
+      said: The nearest CT - head is about 122 miles away, in Charlotte; a CT scan is 1 mile away, at Glenwood South. Would that work, or should I look in Charlotte?
+      type disambiguator: act appt_209 [appt_209=0.97 appt_066=0.03 appt_211=0.00]
+      type check appt_209 vs appt_066: act appt_209 [appt_209=0.97 appt_066=0.03 appt_211=0.00]
+  nat5-gen-02 turn 1: status refuse != offer; alternative locations ['loc_031', 'loc_076'] not within ['loc_076']
+      said: The nearest breast ultrasound is about 225 miles away, in Los Angeles; an ultrasound is 13 miles away, at Henderson. Would that work, or should I look in Los Angeles?
+      type disambiguator: act appt_215 [appt_215=1.00 appt_040=0.00 appt_001=0.00]
+
+--- national5: no model vs embeddings ---
+metric                          off                             on
+wrong-commit (per commit)       4/37 = 10.8%                    5/37 = 13.5%
+top-1                           50/59 (84.7%)                   49/59 (83.1%)
+questions per booking           0.26                            0.24
+model requests (rate)           0 (0%)                          32 (54%)
+model latency p50/p95/max       -                               7/10/12 ms
+model $ per run (per 1k turns)  $0.00000 ($0.0000/1k turns)     $0.00000 ($0.0000/1k turns)
+
+=== HEADLINE: wrong commits per commit; top-1 per evaluated turn ===
+set                           no model                            embeddings

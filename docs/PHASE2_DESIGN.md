@@ -242,3 +242,38 @@ EHR integration, identity verification, real reschedule and cancel (they go to h
 | 100× synthetic catalog scale test (`eval/scale_catalog.py`) | National v2 generator (`backend/tools/gen_national_catalog.py`) with real metros and geography, plus dev and blind eval sets | A national catalog needs geography: at 299 sites, "near me" is the hard part (I). |
 | `service_name` enum compared in the eval | Not shipped | It costs 799 tok of schema on SF and 2,006 on national (M). |
 | JEV eval judge and paid dialog simulation | Not built | Costs money. Needs approval. |
+
+## Final verification (2026-10-03, resolver frozen at `222eb22`)
+
+Round 5 was scored once in all four modes, after the hard-suite fixes and before any blind result was inspected. No resolver fix was made after scoring. JEV and OpenAI used live calls; Off and embeddings ran locally. Scores are preserved in `eval/results/round5_*.txt`.
+
+| Set | Off | Embeddings | OpenAI | JEV (default) |
+|---|---|---|---|---|
+| heldout5 | 11/26, 30/64 | 15/30, 31/64 | 8/40, 48/64 | 4/38, 52/64 |
+| national5 | 4/37, 50/59 | 5/37, 49/59 | 3/38, 52/59 | 1/35, 51/59 |
+
+Each cell is wrong commits per commit, then fully correct turns. JEV: SF **4/38 (10.5%), 52/64**; national **1/35 (2.9%), 51/59**. SF's wrong-commit rate rose from round 4's 3/38; national fell from 1/31. The sets differ, so this is not a matched comparison. The hard suite has zero unsafe JEV outcomes; fresh blind cases still fail.
+
+Practice checks: all 11 sets retain zero JEV wrong commits, **535/566** fully correct turns. Off's wrong counts rose on no set (30 total). Backend: **1,288 passed, 1 intentional live-smoke skip**. Frontend: **122 passed**, production build successful; National Scheduler, JEV default and Dev view verified in a browser. The geographic property enumerates all national clinic addresses and metros in all four modes with two services; every actual offer stays within 50 miles of its original known anchor. A stale distant offer cannot be confirmed.
+
+### Hard suite (development evidence)
+
+88 catalog-derived cases: 40 SF and 48 national. These cases were seen before the fixes; they are not blind evidence. C / SBA / SO / U means correct / safe but asked / safe other / unsafe. Unsafe also counts a false refusal when an offer is required.
+
+| Set | Off | Embeddings | JEV (live) | OpenAI (cache only) |
+|---|---|---|---|---|
+| SF (40) | 26 / 4 / 4 / 6 | 26 / 2 / 3 / 9 | **36 / 3 / 1 / 0** | 28 / 5 / 6 / 1 |
+| National (48) | 40 / 5 / 0 / 3 | 40 / 5 / 0 / 3 | **43 / 5 / 0 / 0** | 37 / 11 / 0 / 0 |
+
+OpenAI stress scores are partial: cache misses ask safely and no OpenAI stress network run was approved. The ordinary exact-match metric may flag a speech-only error even when the stress structural metric is correct; these metrics are intentionally distinct. Live JEV stress spend was $0.00232. Round 5 spend: JEV $0.00605; OpenAI $0.00976 (102 new requests).
+
+### Remaining risks
+
+- A named doctor can narrow "a blood test for my cholesterol" to a blood draw without clarifying the lipid panel.
+- "The one at Richmond or Mission Bay" can select the Mission Bay doctor instead of asking between sites.
+- Off can offer adult neurology for a pediatric request.
+- SF has no catalog marking that separates its mammogram from diagnostic imaging for a lump.
+- Embeddings had 9 unsafe SF stress outcomes, against Off's 6.
+- Fresh blind round 5 still has confident choices on underspecified requests: MRI region, mental-health medication follow-up and school/sports physicals. One national symptomatic request gives a false refusal with an incorrect distant alternative.
+
+Offline cases feed tool arguments directly. They do not test speech recognition, LLM extraction, interruptions or audio timing. Use [the live-call script](LIVE_CALL_TESTS.md) for that layer. Passing twelve calls cannot prove universal safety.

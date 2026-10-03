@@ -1,0 +1,124 @@
+Resolver eval (o200k_base tokenizer); chooser jev (LIVE network)
+
+=== national5: no model ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   51 / 59
+WRONG-COMMIT rate per commit (headline)   4/37 = 10.8%  (over 59 resolve turns)
+top-1 (turn fully correct)                50/59 = 84.7%
+ask precision (field-level)               9/12 = 75.0%
+ask recall (field-level)                  9/9 = 100.0%
+mean questions per booking                0.26 over 42 bookings
+refusal correctness                       8/8 = 100.0%
+resolver latency p50 / p95 (no network)   1.50 ms / 11.51 ms  (n=1180)
+Plan.say tokens  mean / p95 / max         36 / 58 / 77
+Plan.summary tokens mean / p95 / max      71 / 94 / 99
+tool result tokens mean / p95 / max       110 / 146 / 161
+  ... speak-direct (no say) mean/p95/max  71 / 91 / 96
+model requests; turns where a hook fired  0; 0 of 59 turns
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       5/5
+  dup_name_metro         6/6
+  general_variant        2/3
+  geo                    18/18
+  new_patient            5/5
+  no_location            3/3
+  ring                   1/1
+  symptom                0/8
+  unoffered              2/2
+MISSES (9):
+  nat5-sym-01 turn 1: status ask != offer
+      said: What's the visit for?
+  nat5-sym-02 turn 1: status refuse != offer; alternative locations ['loc_155'] not within ['loc_180']
+      said: We don't offer a lump or mass evaluation within 50 miles of Indianapolis. The nearest is Pilsen in Chicago, about 164 miles away. Want me to look there?
+  nat5-sym-03 turn 1: status ask != offer
+      said: What's the visit for?
+  nat5-sym-04 turn 1: types ['appt_072'] not within ['appt_273', 'appt_274']; locations ['loc_156'] not within ['loc_150', 'loc_157', 'loc_159']
+      said: For a blood draw, Dr. Olive Hutchins has today at 11:30, Monday at 7:30, or Thursday the 15th at 7:45 at Chinatown. Which works best?
+  nat5-sym-05 turn 1: status ask != offer
+      said: What's the visit for?
+  nat5-sym-06 turn 1: types ['appt_016'] not within ['appt_110']
+      said: For a newborn visit, Dr. Lynn Venable has today at 11 at Ybor City and Dr. Elaina Boland has tomorrow at 7:30 or Friday at 7 at Clearwater. Which works best?
+  nat5-sym-07 turn 1: types ['appt_007'] not within ['appt_077', 'appt_226', 'appt_246']
+      said: For a sick visit, Dr. Johnathan Riggs has today at 11 at Rockridge, Dr. Charles Myers has tomorrow at 7:30 at Fruitvale, and Dr. Darla Bhargava has Friday at 7:30 at Fruitvale. Which works best?
+  nat5-sym-08 turn 1: types ['appt_036'] not within ['appt_008', 'appt_017', 'appt_084', 'appt_143', 'appt_145']
+      said: For a neurology consultation, Dr. Lawrence Desai has today at 11 at Chestnut Hill and Dr. Vicky Karras has tomorrow at 8 or Friday at 8 at Center City. Which works best?
+  nat5-gen-02 turn 1: status refuse != offer; alternative locations ['loc_031', 'loc_076'] not within ['loc_076']
+      said: The nearest breast ultrasound is about 225 miles away, in Los Angeles; an ultrasound is 13 miles away, at Henderson. Would that work, or should I look in Los Angeles?
+
+=== national5: JEV ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   51 / 59
+WRONG-COMMIT rate per commit (headline)   1/35 = 2.9%  (over 59 resolve turns)
+top-1 (turn fully correct)                51/59 = 86.4%
+ask precision (field-level)               9/12 = 75.0%
+ask recall (field-level)                  9/9 = 100.0%
+mean questions per booking                0.26 over 42 bookings
+refusal correctness                       8/8 = 100.0%
+resolver latency p50 / p95 (no network)   1.54 ms / 10.08 ms  (n=1180)
+Plan.say tokens  mean / p95 / max         36 / 56 / 77
+Plan.summary tokens mean / p95 / max      70 / 94 / 99
+tool result tokens mean / p95 / max       109 / 145 / 161
+  ... speak-direct (no say) mean/p95/max  71 / 91 / 96
+model requests (rate per resolve turn)    43 (72.9%); live 43, disk cache 0, failed 0
+model latency p50 / p95 / max (live)      522 / 798 / 1124 ms
+  ... over the 1.5 s request timeout      0 of 43
+  ... turns past the 2.5 s turn budget    0 of 32 (summed request time)
+model input tokens total / per request    45417 / 1056
+model cost if every request were live     $0.00182
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  capability_metro       5/5
+  dup_name_metro         6/6
+  general_variant        0/3
+  geo                    18/18
+  new_patient            5/5
+  no_location            3/3
+  ring                   1/1
+  symptom                3/8
+  unoffered              2/2
+MISSES (8):
+  nat5-sym-02 turn 1: status refuse != offer; alternative locations ['loc_155'] not within ['loc_180']
+      said: We don't offer a lump or mass evaluation within 50 miles of Indianapolis. The nearest is Pilsen in Chicago, about 164 miles away. Want me to look there?
+      type disambiguator: ask ('appt_304', 'appt_050') [appt_304=0.72 appt_050=0.28 appt_001=0.00]
+      type check appt_304 vs appt_050: act appt_304 [appt_304=0.70 appt_050=0.15 either=0.15]
+  nat5-sym-03 turn 1: types ['appt_133'] not within ['appt_008', 'appt_077', 'appt_084', 'appt_244']
+      said: For a back pain evaluation, Dr. Jeri Johnson has today at 11 or Friday at 8 at Downtown and Dr. Austin Johnson has tomorrow at 8 at Fountain Square. Which works best?
+      type disambiguator: ask ('appt_007', 'appt_133') [appt_007=0.55 appt_133=0.43 appt_001=0.01]
+      type check appt_007 vs appt_133: act appt_133 [appt_007=0.00 appt_133=0.97 either=0.03]
+  nat5-sym-04 turn 1: status ask != offer
+      said: Is that a sick visit or a blood draw?
+      type disambiguator: act appt_007 [appt_007=0.81 appt_001=0.07 appt_020=0.04]
+      type check appt_007 vs appt_072: ask ('appt_007', 'appt_072') [appt_007=0.20 appt_072=0.50 either=0.30]
+  nat5-sym-05 turn 1: status ask != offer
+      said: What's the visit for?
+      type disambiguator: open [appt_059=0.67 appt_092=0.13 appt_105=0.10]
+  nat5-sym-06 turn 1: status ask != offer
+      said: Is that a newborn visit or an OB/GYN new patient visit?
+      type disambiguator: ask ('appt_016', 'appt_040') [appt_016=0.58 appt_040=0.38 appt_001=0.03]
+      type check appt_016 vs appt_040: ask ('appt_016', 'appt_040') [appt_016=0.51 appt_040=0.20 either=0.29]
+  nat5-gen-01 turn 1: status refuse != offer; alternative locations ['loc_211', 'loc_213'] not within ['loc_213']
+      said: The nearest CT - head is about 122 miles away, in Charlotte; a CT scan is 1 mile away, at Glenwood South. Would that work, or should I look in Charlotte?
+      type disambiguator: act appt_209 [appt_209=1.00 appt_001=0.00 appt_002=0.00]
+      type check appt_209 vs appt_066: act appt_209 [appt_209=0.98 appt_066=0.01 either=0.01]
+  nat5-gen-02 turn 1: status refuse != offer; alternative locations ['loc_031', 'loc_076'] not within ['loc_076']
+      said: The nearest breast ultrasound is about 225 miles away, in Los Angeles; an ultrasound is 13 miles away, at Henderson. Would that work, or should I look in Los Angeles?
+      type disambiguator: act appt_215 [appt_215=0.99 appt_040=0.01 appt_001=0.00]
+  nat5-gen-03 turn 1: status refuse != offer; alternative locations ['loc_177', 'loc_182'] not within ['loc_177', 'loc_180']
+      said: The nearest CT - chest is about 168 miles away, in Columbus; a CT scan is 7 miles away, at Broad Ripple. Would that work, or should I look in Columbus?
+      type disambiguator: act appt_210 [appt_210=1.00 appt_001=0.00 appt_002=0.00]
+      type check appt_210 vs appt_066: act appt_210 [appt_210=0.98 appt_066=0.01 either=0.01]
+
+--- national5: no model vs JEV ---
+metric                          off                             on
+wrong-commit (per commit)       4/37 = 10.8%                    1/35 = 2.9%
+top-1                           50/59 (84.7%)                   51/59 (86.4%)
+questions per booking           0.26                            0.26
+model requests (rate)           0 (0%)                          43 (73%)
+model latency p50/p95/max       -                               522/798/1124 ms
+model $ per run (per 1k turns)  $0.00000 ($0.0000/1k turns)     $0.00182 ($0.0308/1k turns)
+
+LIVE this run: 43 requests, 45417 input tokens, $0.00182
+
+=== HEADLINE: wrong commits per commit; top-1 per evaluated turn ===
+set                           no model                            JEV

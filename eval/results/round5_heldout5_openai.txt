@@ -1,0 +1,191 @@
+Resolver eval (o200k_base tokenizer); chooser openai (LIVE network)
+
+=== heldout5: no model ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   56 / 64
+WRONG-COMMIT rate per commit (headline)   11/26 = 42.3%  (over 64 resolve turns)
+top-1 (turn fully correct)                30/64 = 46.9%
+ask precision (field-level)               11/28 = 39.3%
+ask recall (field-level)                  11/16 = 68.8%
+mean questions per booking                0.50 over 40 bookings
+refusal correctness                       7/8 = 87.5%
+resolver latency p50 / p95 (no network)   0.35 ms / 1.22 ms  (n=1280)
+Plan.say tokens  mean / p95 / max         24 / 44 / 45
+Plan.summary tokens mean / p95 / max      54 / 86 / 91
+tool result tokens mean / p95 / max       85 / 126 / 131
+  ... speak-direct (no say) mean/p95/max  58 / 82 / 88
+model requests; turns where a hook fired  0; 4 of 64 turns
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  heldout5_multiturn     3/8
+  heldout5_policy        4/5
+  heldout5_provider      11/14
+  heldout5_type          6/29
+MISSES (32):
+  h5-01 turn 1: types ['appt_020'] != appt_021
+      said: For a cardiology consultation, Dr. Linda Ramirez has today at 11:20 at Midtown and Dr. David Chen has tomorrow at 8 or Friday at 8 at Downtown. Which works best?
+  h5-02 turn 1: status ask != offer
+      said: What's the visit for?
+  h5-03 turn 1: types ['appt_036'] != appt_063; locations ['loc_001', 'loc_003', 'loc_005'] not within ['loc_004', 'loc_005']
+      said: For a neurology consultation, Dr. Sofia Patel has today at 11 at North Gate or tomorrow at 8:45 at Mission District and Dr. Olivia Singh has Friday at 8 at Midtown. Which works best?
+  h5-04 turn 1: status ask != offer
+      said: What's the visit for?
+  h5-05 turn 1: status ask != offer
+      said: What's the visit for?
+  h5-06 turn 1: status refuse != offer
+      said: Sorry, we don't offer eye care at our clinics.
+  h5-07 turn 1: status ask != offer
+      said: What's the visit for?
+  h5-08 turn 1: types ['appt_020'] != appt_053
+      said: For a cardiology consultation, Dr. Linda Ramirez has today at 11:20 at Midtown and Dr. David Chen has tomorrow at 8 or Friday at 8 at Downtown. Which works best?
+  h5-10 turn 1: status ask != offer
+      said: What's the visit for?
+  h5-11 turn 1: types ['appt_032'] != appt_008
+      said: For an orthopedic consultation, Dr. Carlos Nguyen has today at 11:20 at North Beach, tomorrow at 8 at Midtown, or Friday at 10 at Midtown. Which works best?
+  h5-12 turn 1: status refuse != offer
+      said: Sorry, we don't offer eye care at our clinics.
+  h5-14 turn 1: status ask != offer
+      said: Is that a vaccination, a flu shot, or a COVID-19 vaccine?
+  h5-15 turn 1: types ['appt_032'] != appt_035
+      said: For an orthopedic consultation, Dr. Carlos Nguyen has today at 11:20 at North Beach, tomorrow at 8 at Midtown, or Friday at 10 at Midtown. Which works best?
+  h5-16 turn 1: types ['appt_053'] != appt_054
+      said: For a GI consultation, Dr. Fatima Hernandez has today at 11:20, Friday at 8:40, or Thursday the 15th at 9:20 at North Gate. Which works best?
+  h5-17 turn 1: types ['appt_062'] != appt_078
+      said: For an x-ray, Dr. Linda Ramirez has today at 11, tomorrow at 8:20, or Friday at 8 at Downtown. Which works best?
+  h5-18 turn 1: status ask != offer
+      said: What's the visit for?
+  h5-19 turn 1: types ['appt_053'] != appt_055
+      said: For a GI consultation, Dr. Fatima Hernandez has today at 11:20, Friday at 8:40, or Thursday the 15th at 9:20 at North Gate. Which works best?
+  h5-20 turn 1: status ask != offer
+      said: What's the visit for?
+  h5-21 turn 1: status ask != offer
+      said: What's the visit for?
+  h5-24 turn 1: ask options ['appt_010', 'appt_012', 'appt_011'] != ['appt_010', 'appt_012']
+      said: Is that a vaccination, a COVID-19 vaccine, or a flu shot?
+  h5-25 turn 1: ask options ['appt_004', 'appt_005', 'appt_056'] != ['appt_057', 'appt_058']
+      said: Is that a follow-up visit, a follow-up consultation, or an endocrinology consultation?
+  h5-26 turn 1: ask service_open != service; ask options [] != ['appt_064', 'appt_066']
+      said: What's the visit for?
+  h5-27 turn 1: ask service_open != service; ask options [] != ['appt_067', 'appt_068']
+      said: What's the visit for?
+  h5-x05 turn 1: refusal new_patient_type != new_patient_provider
+      said: A thyroid follow-up is only for established patients, so I can't book it for a new patient.
+  h5-p05 turn 1: status ask != offer
+      said: Do you mean Dr. Priya Ramirez?
+      provider facts ['title']: ['prov_021']
+      provider gender female of the one the facts leave: None
+  h5-p11 turn 1: ask provider_first_name != provider; ask options ['prov_031', 'prov_042', 'prov_044', 'prov_045'] != ['prov_031', 'prov_044']
+      said: Which Dr. Patel is it? Do you know the first name?
+      provider gender male: ['prov_031', 'prov_042', 'prov_044', 'prov_045'] of ['prov_031', 'prov_042', 'prov_044', 'prov_045'], p(woman)
+  h5-p12 turn 1: status ask != offer
+      said: Do you mean Dr. Tomas Hernandez or Dr. Patricia Hernandez?
+      provider gender male: ['prov_009', 'prov_025'] of ['prov_009', 'prov_025'], p(woman)
+  h5-m01 turn 2: status ask != offer
+      said: Do you mean Dr. David Chen or Dr. Emily Chen?
+      provider gender female: ['prov_000', 'prov_046'] of ['prov_000', 'prov_046'], p(woman)
+  h5-m05 turn 2: status ask != offer
+      said: Did your doctor say to fast for it?
+  h5-m06 turn 1: status offer != ask; ask None != service; ask options None != ['appt_074', 'appt_075']; WRONG COMMIT: offered when it should not
+      said: For a dental exam, Dr. Lucas Singh has today at 12:30 at Mission District and Dr. Wei Lee has Friday at 8:30 or Monday at 8 at Mission District. Which works best?
+  h5-m07 turn 1: status offer != ask; ask None != service; ask options None != ['appt_060', 'appt_061']; WRONG COMMIT: offered when it should not
+      said: For a psychiatric evaluation, Dr. Wei Smith has today at 11 at Mission District and Dr. Fatima Smith has tomorrow at 8 or Friday at 9 at Mission District. Which works best?
+  h5-m07 turn 2: types ['appt_009'] != appt_061
+      said: For a medication review, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Mission Bay, or Friday at 8 at Richmond. Which works best?
+  h5-m08 turn 1: ask options ['appt_002', 'appt_003'] != ['appt_018', 'appt_019']
+      said: Is that an annual physical or an annual wellness visit?
+  h5-m08 turn 2: status ask != offer
+      said: What's the visit for?
+
+=== heldout5: OpenAI ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   56 / 64
+WRONG-COMMIT rate per commit (headline)   8/40 = 20.0%  (over 64 resolve turns)
+top-1 (turn fully correct)                48/64 = 75.0%
+ask precision (field-level)               9/14 = 64.3%
+ask recall (field-level)                  9/16 = 56.2%
+mean questions per booking                0.23 over 40 bookings
+refusal correctness                       8/8 = 100.0%
+resolver latency p50 / p95 (no network)   0.87 ms / 6.98 ms  (n=1280)
+Plan.say tokens  mean / p95 / max         31 / 44 / 44
+Plan.summary tokens mean / p95 / max      63 / 86 / 91
+tool result tokens mean / p95 / max       98 / 126 / 131
+  ... speak-direct (no say) mean/p95/max  65 / 82 / 88
+model requests (rate per resolve turn)    63 (98.4%); live 63, disk cache 0, failed 0
+model latency p50 / p95 / max (live)      500 / 750 / 1206 ms
+  ... over the 1.5 s request timeout      0 of 63
+  ... turns past the 2.5 s turn budget    0 of 37 (summed request time)
+model input tokens total / per request    46099 / 732
+model cost if every request were live     $0.00695
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  heldout5_multiturn     3/8
+  heldout5_policy        5/5
+  heldout5_provider      11/14
+  heldout5_type          22/29
+MISSES (15):
+  h5-06 turn 1: status refuse != offer
+      said: Sorry, we don't offer eye care at our clinics.
+      type disambiguator beside unoffered appt_045: ask ('appt_080', 'appt_045') [appt_080=0.56 appt_045=0.44 appt_043=0.00]
+  h5-12 turn 1: status refuse != offer
+      said: Sorry, we don't offer eye care at our clinics.
+  h5-15 turn 1: types ['appt_032'] != appt_035
+      said: For an orthopedic consultation, Dr. Carlos Nguyen has today at 11:20 at North Beach, tomorrow at 8 at Midtown, or Friday at 10 at Midtown. Which works best?
+      type disambiguator: act appt_032 [appt_032=1.00 appt_035=0.00 appt_033=0.00]
+  h5-24 turn 1: ask options ['appt_010', 'appt_012', 'appt_011'] != ['appt_010', 'appt_012']
+      said: Is that a vaccination, a COVID-19 vaccine, or a flu shot?
+      type disambiguator: act appt_010 [appt_010=1.00 appt_012=0.00 appt_000=0.00]
+      type check appt_010 vs appt_012: ask ('appt_010', 'appt_012') [appt_010=0.00 appt_012=1.00 either=0.00]
+  h5-25 turn 1: status offer != ask; ask None != service; ask options None != ['appt_057', 'appt_058']; WRONG COMMIT: offered when it should not
+      said: For a thyroid follow-up, Dr. Samuel Kim has today at 11:20 at Downtown, tomorrow at 8 at Richmond, or Friday at 8 at Downtown. Which works best?
+      type disambiguator: act appt_058 [appt_058=0.94 appt_056=0.06 appt_004=0.00]
+      type check appt_058 vs appt_004: act appt_058 [appt_058=0.95 appt_004=0.00 either=0.00]
+  h5-26 turn 1: status offer != ask; ask None != service; ask options None != ['appt_064', 'appt_066']; WRONG COMMIT: offered when it should not
+      said: For a spine MRI, Dr. Linda Ramirez has today at 11, tomorrow at 9, or Friday at 8 at Downtown. Which works best?
+      type disambiguator: act appt_064 [appt_064=0.85 appt_062=0.00 appt_032=0.00]
+      type check appt_064 vs appt_063: act appt_064 [appt_064=1.00 appt_063=0.00 either=0.00]
+  h5-27 turn 1: status offer != ask; ask None != service; ask options None != ['appt_067', 'appt_068']; WRONG COMMIT: offered when it should not
+      said: For a mammogram, Dr. Hannah Nguyen has today at 11 at Midtown and Dr. Linda Ramirez has tomorrow at 8 or Friday at 8 at Downtown. Which works best?
+      type disambiguator: act appt_068 [appt_068=0.97 appt_067=0.03 appt_062=0.00]
+      type check appt_068 vs appt_062: act appt_068 [appt_068=1.00 appt_062=0.00 either=0.00]
+  h5-p05 turn 1: status ask != offer
+      said: Do you mean Dr. Priya Ramirez?
+      provider facts ['title']: ['prov_021']
+      provider gender female of the one the facts leave: None
+  h5-p11 turn 1: ask provider_first_name != provider; ask options ['prov_031', 'prov_042', 'prov_044', 'prov_045'] != ['prov_031', 'prov_044']
+      said: Which Dr. Patel is it? Do you know the first name?
+      provider gender male: ['prov_031', 'prov_042', 'prov_044', 'prov_045'] of ['prov_031', 'prov_042', 'prov_044', 'prov_045'], p(woman)
+  h5-p12 turn 1: status ask != offer
+      said: Do you mean Dr. Tomas Hernandez or Dr. Patricia Hernandez?
+      provider gender male: ['prov_009', 'prov_025'] of ['prov_009', 'prov_025'], p(woman)
+  h5-m01 turn 2: status ask != offer
+      said: Do you mean Dr. David Chen or Dr. Emily Chen?
+      provider gender female: ['prov_000', 'prov_046'] of ['prov_000', 'prov_046'], p(woman)
+  h5-m05 turn 2: status ask != offer
+      said: Did your doctor say to fast for it?
+  h5-m06 turn 1: status offer != ask; ask None != service; ask options None != ['appt_074', 'appt_075']; WRONG COMMIT: offered when it should not
+      said: For a dental exam, Dr. Lucas Singh has today at 12:30 at Mission District and Dr. Wei Lee has Friday at 8:30 or Monday at 8 at Mission District. Which works best?
+      type disambiguator: act appt_075 [appt_075=0.83 appt_074=0.14 appt_072=0.00]
+  h5-m07 turn 1: status offer != ask; ask None != service; ask options None != ['appt_060', 'appt_061']; WRONG COMMIT: offered when it should not
+      said: For a psychiatric evaluation, Dr. Wei Smith has today at 11 at Mission District and Dr. Fatima Smith has tomorrow at 8 or Friday at 9 at Mission District. Which works best?
+      type disambiguator: open [appt_004=0.45 appt_059=0.27 appt_060=0.19]
+  h5-m07 turn 2: types ['appt_009'] != appt_061
+      said: For a medication review, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Mission Bay, or Friday at 8 at Richmond. Which works best?
+      type disambiguator: act appt_009 [appt_009=1.00 appt_000=0.00 appt_004=0.00]
+  h5-m08 turn 1: status offer != ask; ask None != service; ask options None != ['appt_018', 'appt_019']; WRONG COMMIT: offered when it should not
+      said: For a school physical, Dr. Priya Williams has today at 11:20 at Downtown and Dr. Maria Garcia has tomorrow at 8 or Friday at 8 at Mission Bay. Which works best?
+      type disambiguator: act appt_018 [appt_018=0.97 appt_015=0.02 appt_019=0.00]
+      type check appt_018 vs appt_002: act appt_018 [appt_018=1.00 appt_002=0.00 either=0.00]
+
+--- heldout5: no model vs OpenAI ---
+metric                          off                             on
+wrong-commit (per commit)       11/26 = 42.3%                   8/40 = 20.0%
+top-1                           30/64 (46.9%)                   48/64 (75.0%)
+questions per booking           0.50                            0.23
+model requests (rate)           0 (0%)                          63 (98%)
+model latency p50/p95/max       -                               500/750/1206 ms
+model $ per run (per 1k turns)  $0.00000 ($0.0000/1k turns)     $0.00695 ($0.1086/1k turns)
+
+LIVE this run: 63 requests, 46099 input tokens, $0.00695
+
+=== HEADLINE: wrong commits per commit; top-1 per evaluated turn ===
+set                           no model                            OpenAI

@@ -102,7 +102,7 @@ Full design: [docs/PHASE2_DESIGN.md](docs/PHASE2_DESIGN.md). Eval method and eve
 1. **The LLM never sees the catalog.** Its job is extraction. It passes the caller's own words to `update_request` (`service_phrase`, `provider_phrase`, `location_phrase`, `specialty_hint`, `is_new`, `has_referral`, `time_pref`, `pick_offer`, `clear`). Questions about hours, addresses and "do you offer X" go to `lookup`, which returns at most 5 facts.
 2. **A precomputed policy table.** At server start `CatalogIndex` joins provider locations, provider types and location capabilities into bookable rows. `policy.check(row, patient)` is the only home of the booking rules. It runs in the resolver and again at booking time.
 3. **Ask only what changes the set.** Ambiguity is often a catalog fact, not a probability. "Dr. Chen, the heart doctor" matches two SF cardiologists. For a new patient, policy removes David Chen (not accepting new patients), and Emily Chen is offered with no question. For an established patient both are valid, so the agent asks.
-4. **Geography without a geocoder.** The national catalog carries metros and site coordinates. `scheduling/geo.py` reads a clinic name, street, house number, full address, city, state, ZIP, ZIP3, neighborhood or "near X" against the catalog's own places. It searches the place's own radius, then twice that, then 50 miles. Past 50 miles it refuses with `none_nearby` and offers the nearest valid clinic. With no place at all it asks "Which city are you in?". The SF catalog has no coordinates and loads as one implicit metro.
+4. **Geography without a geocoder.** The national catalog carries metros and site coordinates. `scheduling/geo.py` reads a clinic name, street, house number, full address, city, state, ZIP, ZIP3, neighborhood or "near X" against the catalog's own places. It searches the place's own radius, then twice that, then 50 miles. Past 50 miles it refuses with `none_nearby` and names the nearest valid alternative for explicit caller consent. It never silently offers a distant booking. With no place at all it asks "Which city are you in?". The SF catalog has no coordinates and loads as one implicit metro.
 5. **Speak-direct templates.** Offers, questions and refusals are rendered from templates and queued straight to TTS. The handler returns `NO_RESPONSE`, which skips the LLM's second round trip. Names and times come from the catalog and the availability source, so the LLM cannot paraphrase them into something false.
 6. **Booking in code.** The `confirm_booking` edge has the `offer_confirmed` precondition and the `book_confirmed` action. It is refused until the caller picked a time, heard it read back and said yes. The action books exactly that offer, re-checks policy, holds the slot, and speaks the confirmation reference from a template.
 7. **Small prompts.** Five nodes: `greeting -> schedule -> booked -> done`, plus `handoff`. `schedule` uses `context_strategy: "reset"` and a `{{ summary }}` placeholder, so the prompt stays small as the call grows.
@@ -167,9 +167,9 @@ Wrong commits per commit, then top-1 turns. heldout and heldout2 were held out b
 | Before round 3 | national 0/39, 56/56; SF main 0/48, 105/105 | heldout + heldout2: 2/39 (5.1%), 49/61 | national2: 1/37 (2.7%), 50/54 |
 | Round 3 | 0 wrong commits over every dev set; 323/330 turns | heldout3: **7/42 (16.7%)**, 42/54 | national3: **3/35 (8.6%)**, 46/56 |
 | Round 4 | 1 wrong commit over every dev set (h3-33); 421/440 turns | heldout4: **3/38 (7.9%)**, 53/62 | national4: **1/31 (3.2%)**, 47/56 |
-| **Round 5 (blind): pending** | pending | pending | pending |
+| **Round 5 (blind)** | 0 wrong; 535/566 turns | **4/38 (10.5%), 52/64** | **1/35 (2.9%), 51/59** |
 
-The dev sets read 0 or 1 wrong commits. The blind sets did not. That gap is the honest measure, and it is why blind rounds exist. Between rounds 3 and 4 the blind JEV wrong-commit rate fell on both catalogs.
+The dev sets read 0 or 1 wrong commits. The blind sets still contain errors. That gap is the honest measure, and it is why blind rounds exist. Between rounds 3 and 4 the blind JEV wrong-commit rate fell on both catalogs.
 
 ### Held-out and blind sets, every mode
 
@@ -181,7 +181,8 @@ The dev sets read 0 or 1 wrong commits. The blind sets did not. That gap is the 
 | national3 (56) | 5/19, 28/56 | 5/31, 41/56 | 3/31, 43/56 | 3/35, 46/56 |
 | heldout4, SF (62) | 7/25, 33/62 | 7/32, 40/62 | 9/40, 46/62 | 3/38, 53/62 |
 | national4 (56) | 0/26, 41/56 | 1/30, 46/56 | 0/33, 50/56 | 1/31, 47/56 |
-| **Round 5 (blind): pending** | | | | |
+| heldout5 | 11/26, 30/64 | 15/30, 31/64 | 8/40, 48/64 | 4/38, 52/64 |
+| national5 | 4/37, 50/59 | 5/37, 49/59 | 3/38, 52/59 | 1/35, 51/59 |
 
 How to read it:
 - On heldout2, most model calls split same-named doctors by clue words. OpenAI and embeddings made 8 and 6 wrong commits against JEV's 2. gpt-4o-mini put p = 1.00 on wrong doctors, so a gate tuned to JEV's calibration acts on them (inferred: its logprobs are overconfident). On heldout4 the gap held (9 and 7 against 3). On heldout3 it was small for OpenAI (8 against 7).
@@ -343,4 +344,39 @@ cd frontend && pnpm test                                   # vitest
 cd frontend && pnpm typecheck && pnpm lint && pnpm build
 ```
 
-Last run: 987 backend tests passed and 1 live JEV smoke test skipped (2026-10-03, at `6ffdde3`). 83 frontend tests passed (recorded at `fe67d0b`, the last commit that changed `frontend/`).
+Last run: **1,288 backend tests passed, 1 live JEV smoke test skipped** (2026-10-03, resolver `222eb22`). **122 frontend tests passed**, and the frontend production build passed after restoring dependencies from the unchanged lockfile.
+
+## Final verification (2026-10-03, resolver frozen at `222eb22`)
+
+Round 5 was scored once in all four modes, after the hard-suite fixes and before any blind result was inspected. No resolver fix was made after scoring. JEV and OpenAI used live calls; Off and embeddings ran locally. Scores are preserved in `eval/results/round5_*.txt`.
+
+| Set | Off | Embeddings | OpenAI | JEV (default) |
+|---|---|---|---|---|
+| heldout5 | 11/26, 30/64 | 15/30, 31/64 | 8/40, 48/64 | 4/38, 52/64 |
+| national5 | 4/37, 50/59 | 5/37, 49/59 | 3/38, 52/59 | 1/35, 51/59 |
+
+Each cell is wrong commits per commit, then fully correct turns. JEV: SF **4/38 (10.5%), 52/64**; national **1/35 (2.9%), 51/59**. SF's wrong-commit rate rose from round 4's 3/38; national fell from 1/31. The sets differ, so this is not a matched comparison. The hard suite has zero unsafe JEV outcomes; fresh blind cases still fail.
+
+Practice checks: all 11 sets retain zero JEV wrong commits, **535/566** fully correct turns. Off's wrong counts rose on no set (30 total). Backend: **1,288 passed, 1 intentional live-smoke skip**. Frontend: **122 passed**, production build successful; National Scheduler, JEV default and Dev view verified in a browser. The geographic property enumerates all national clinic addresses and metros in all four modes with two services; every actual offer stays within 50 miles of its original known anchor. A stale distant offer cannot be confirmed.
+
+### Hard suite (development evidence)
+
+88 catalog-derived cases: 40 SF and 48 national. These cases were seen before the fixes; they are not blind evidence. C / SBA / SO / U means correct / safe but asked / safe other / unsafe. Unsafe also counts a false refusal when an offer is required.
+
+| Set | Off | Embeddings | JEV (live) | OpenAI (cache only) |
+|---|---|---|---|---|
+| SF (40) | 26 / 4 / 4 / 6 | 26 / 2 / 3 / 9 | **36 / 3 / 1 / 0** | 28 / 5 / 6 / 1 |
+| National (48) | 40 / 5 / 0 / 3 | 40 / 5 / 0 / 3 | **43 / 5 / 0 / 0** | 37 / 11 / 0 / 0 |
+
+OpenAI stress scores are partial: cache misses ask safely and no OpenAI stress network run was approved. The ordinary exact-match metric may flag a speech-only error even when the stress structural metric is correct; these metrics are intentionally distinct. Live JEV stress spend was $0.00232. Round 5 spend: JEV $0.00605; OpenAI $0.00976 (102 new requests).
+
+### Remaining risks
+
+- A named doctor can narrow "a blood test for my cholesterol" to a blood draw without clarifying the lipid panel.
+- "The one at Richmond or Mission Bay" can select the Mission Bay doctor instead of asking between sites.
+- Off can offer adult neurology for a pediatric request.
+- SF has no catalog marking that separates its mammogram from diagnostic imaging for a lump.
+- Embeddings had 9 unsafe SF stress outcomes, against Off's 6.
+- Fresh blind round 5 still has confident choices on underspecified requests: MRI region, mental-health medication follow-up and school/sports physicals. One national symptomatic request gives a false refusal with an incorrect distant alternative.
+
+Offline cases feed tool arguments directly. They do not test speech recognition, LLM extraction, interruptions or audio timing. Use [the live-call script](docs/LIVE_CALL_TESTS.md) for that layer. Passing twelve calls cannot prove universal safety.

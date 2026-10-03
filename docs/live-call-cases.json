@@ -1,0 +1,373 @@
+[
+  {
+    "name": "Market Street",
+    "catalog": "national",
+    "updates": [
+      {
+        "service_phrase": "sick visit, fever since yesterday",
+        "is_new": false
+      },
+      {
+        "service_phrase": "sick visit"
+      },
+      {
+        "location_phrase": "Market Street in San Jose"
+      },
+      {
+        "location_phrase": "thirty three thirty"
+      },
+      {
+        "pick_offer": 1
+      }
+    ],
+    "expectations": {
+      "jev": [
+        {
+          "status": "ask",
+          "field": "service|metro"
+        },
+        {
+          "status": "ask",
+          "field": "metro"
+        },
+        {
+          "status": "ask",
+          "field": "location",
+          "options": [
+            "loc_013",
+            "loc_014"
+          ]
+        },
+        {
+          "status": "offer",
+          "location_id": [
+            "loc_014"
+          ]
+        },
+        {
+          "status": "confirm",
+          "location_id": [
+            "loc_014"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "Same-name language",
+    "catalog": "national",
+    "updates": [
+      {
+        "service_phrase": "sick visit",
+        "provider_phrase": "Dr. Maria Garcia",
+        "location_phrase": "San Francisco",
+        "is_new": false
+      },
+      {
+        "provider_phrase": "the one who speaks Arabic"
+      }
+    ],
+    "expectations": {
+      "jev": [
+        {
+          "status": "ask",
+          "field": "provider",
+          "options": [
+            "prov_002",
+            "prov_003"
+          ]
+        },
+        {
+          "status": "offer",
+          "type_id": [
+            "appt_007"
+          ],
+          "provider_id": [
+            "prov_003"
+          ],
+          "location_id": [
+            "loc_002",
+            "loc_005",
+            "loc_007"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "Trenton",
+    "catalog": "national",
+    "updates": [
+      {
+        "service_phrase": "flu shot",
+        "location_phrase": "Trenton",
+        "is_new": false
+      },
+      {
+        "location_phrase": "No, Trenton, New Jersey"
+      }
+    ],
+    "expectations": {
+      "jev": [
+        {
+          "status": "ask",
+          "field": "place_confirm"
+        },
+        {
+          "status": "refuse",
+          "refuse_code": "none_nearby"
+        }
+      ]
+    }
+  },
+  {
+    "name": "Washington loop",
+    "catalog": "national",
+    "updates": [
+      {
+        "service_phrase": "flu shot",
+        "location_phrase": "Washington",
+        "is_new": false
+      },
+      {
+        "location_phrase": "Washington"
+      },
+      {
+        "location_phrase": "Seattle, Washington"
+      }
+    ],
+    "expectations": {
+      "jev": [
+        {
+          "status": "ask",
+          "field": "metro"
+        },
+        {
+          "status": "ask",
+          "field": "metro_again"
+        },
+        {
+          "status": "offer"
+        }
+      ]
+    }
+  },
+  {
+    "name": "Boulder",
+    "catalog": "national",
+    "updates": [
+      {
+        "service_phrase": "flu shot",
+        "location_phrase": "what's the closest city to Boulder",
+        "is_new": false
+      }
+    ],
+    "expectations": {
+      "jev": [
+        {
+          "status": "ask",
+          "field": "location_retry"
+        }
+      ]
+    }
+  },
+  {
+    "name": "Lincoln Avenue blood test",
+    "catalog": "national",
+    "updates": [
+      {
+        "service_phrase": "blood test",
+        "location_phrase": "Lincoln Avenue in Salt Lake",
+        "is_new": false
+      },
+      {
+        "service_phrase": "Blood Draw"
+      }
+    ],
+    "expectations": {
+      "jev": [
+        {
+          "status": "ask",
+          "field": "service"
+        },
+        {
+          "status": "offer",
+          "type_id": [
+            "appt_072"
+          ],
+          "location_id": [
+            "loc_086"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "Scope ambiguity",
+    "catalog": "national",
+    "updates": [
+      {
+        "service_phrase": "my stomach doctor said I need a scope",
+        "location_phrase": "Houston",
+        "is_new": false,
+        "has_referral": true
+      }
+    ],
+    "expectations": {
+      "jev": [
+        {
+          "status": "ask",
+          "field": "service",
+          "options": [
+            "appt_055",
+            "appt_184"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "Dental ambiguity",
+    "catalog": "national",
+    "updates": [
+      {
+        "service_phrase": "my six-month dental checkup",
+        "location_phrase": "Houston",
+        "is_new": false,
+        "has_referral": true
+      }
+    ],
+    "expectations": {
+      "jev": [
+        {
+          "status": "ask",
+          "field": "service",
+          "options": [
+            "appt_074",
+            "appt_075"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "New patient allergy shots",
+    "catalog": "national",
+    "updates": [
+      {
+        "service_phrase": "allergy shots",
+        "location_phrase": "Sacramento",
+        "is_new": true,
+        "has_referral": true
+      }
+    ],
+    "expectations": {
+      "jev": [
+        {
+          "status": "refuse",
+          "refuse_code": "new_patient_type"
+        }
+      ]
+    }
+  },
+  {
+    "name": "Doubt",
+    "catalog": "sf",
+    "updates": [
+      {
+        "service_phrase": "the GI doc wants a scope, I don't remember if it goes down my throat or up from below",
+        "is_new": false,
+        "has_referral": true
+      }
+    ],
+    "expectations": {
+      "jev": [
+        {
+          "status": "ask",
+          "field": "service",
+          "options": [
+            "appt_054",
+            "appt_055"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "Provider policy",
+    "catalog": "sf",
+    "updates": [
+      {
+        "service_phrase": "cardiology consultation",
+        "provider_phrase": "Dr. Chen",
+        "is_new": true,
+        "has_referral": true
+      }
+    ],
+    "expectations": {
+      "jev": [
+        {
+          "status": "offer",
+          "type_id": [
+            "appt_020"
+          ],
+          "provider_id": [
+            "prov_046"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "JEV Off versus On",
+    "catalog": "sf",
+    "updates": [
+      {
+        "service_phrase": "cardiology consultation",
+        "provider_phrase": "Dr. Chen",
+        "is_new": false,
+        "has_referral": true
+      },
+      {
+        "provider_phrase": "the lady one"
+      }
+    ],
+    "expectations": {
+      "jev": [
+        {
+          "status": "ask",
+          "field": "provider",
+          "options": [
+            "prov_000",
+            "prov_046"
+          ]
+        },
+        {
+          "status": "ask",
+          "field": "provider",
+          "options": [
+            "prov_046"
+          ]
+        }
+      ],
+      "none": [
+        {
+          "status": "ask",
+          "field": "provider",
+          "options": [
+            "prov_000",
+            "prov_046"
+          ]
+        },
+        {
+          "status": "ask",
+          "field": "provider",
+          "options": [
+            "prov_000",
+            "prov_046"
+          ]
+        }
+      ]
+    }
+  }
+]
