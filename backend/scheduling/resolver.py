@@ -925,6 +925,11 @@ class _Resolution:
         by_name = [self._named_alternative(option) for option in doubt.options]
         if None not in by_name and len(set(by_name)) == 1:
             return None
+        sure = self._named_alternative(doubt.sure) if doubt.sure else None
+        if sure is not None and sure in by_name and set(by_name) <= {sure, None}:
+            # "starting birth control, maybe the pill or an IUD": the visit was named before the
+            # doubt, and an alternative names it again; the doubt is about what happens in it.
+            return None
         found = self._modeled_alternatives(doubt, by_name)
         self.doubt = self.type_consulted = True
         self.notes.append(f"caller unsure between {list(doubt.options)}: {found}")

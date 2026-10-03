@@ -27,6 +27,8 @@ _STRONG = 0.7
 _SPECIALTY_DEFAULT_SCORE = 0.75
 # Words a type name carries that say nothing about it: "MRI - Brain", "Vaccination / Immunization".
 _NAME_STOP = {"of", "a", "an", "the", "and", "with", "for"}
+# Words that start the reason for a visit: "a strep test for a sore throat", "because of my cough".
+_REASON_WORDS = frozenset({"for", "because"})
 # Words callers use for a type-name word, either way: "yearly physical" says the name "Annual
 # Physical". English, not catalog data, so every catalog shares it (aliases.json is per catalog).
 _SAME_AS = {"yearly": "annual"}
@@ -168,11 +170,13 @@ def _score_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | 
 
     words = tokens(phrase or "")
     vocab = _vocab(index)
+    said: list[tuple[int, int, Alias]] = []
     if words:
         for tid in vocab.by_name.get(" ".join(words), ()):
             offer(tid, 1.0, "name")
 
-        for start, end, alias in _said_aliases(index, words):
+        said = _said_aliases(index, words)
+        for start, end, alias in said:
             coverage = (end - start) / len(words)
             for tid, w in alias.weights:
                 offer(tid, w * (0.6 + 0.4 * coverage), "alias")
@@ -207,7 +211,11 @@ def _score_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | 
 
     strong = [c for c in best.values() if c.score >= _STRONG]
     if not strong and not named:
-        specialty = _pointed_specialty(index, words, specialty_hint)
+        # A lay term inside a said alias is that alias's evidence: "sore throat" is a sick visit,
+        # and its "throat" points nowhere else.
+        in_alias = {i for start, end, _ in said for i in range(start, end)}
+        specialty = _pointed_specialty(index, ["" if i in in_alias else w for i, w in enumerate(words)],
+                                       specialty_hint)
         default = index.specialty_default.get(specialty) if specialty else None
         # "an echo for my heart": an alias already names a visit of the specialty "heart" points
         # to, so the specialty's default visit adds no evidence.
@@ -294,12 +302,13 @@ def _drop_unoffered_context(index: CatalogIndex, vocab: _Vocab, words: list[str]
 
 def _drop_dominated(index: CatalogIndex, vocab: _Vocab, words: list[str], best: dict[str, TypeCandidate],
                     alias_support: dict[str, set[int]]) -> bool:
-    """A type whose full name the caller said, in order ("I need to get a colonoscopy", "knee
-    x-ray please"), drops every candidate whose evidence lies inside that name: Colonoscopy
-    Consultation, X-Ray, Therapy Session inside "physical therapy evaluation". This is the
-    exact-name rule for a name said inside a longer phrase; a name inside a longer said name
-    ("x-ray" in "knee x-ray") goes too. Returns whether some candidate at or above MIN_SCORE has
-    every distinctive name word heard (in any order)."""
+    """A type whose full name the caller said ("I need to get a colonoscopy", "knee x-ray please",
+    "an ultrasound of my abdomen") drops every candidate whose evidence lies inside the words that
+    said it: Colonoscopy Consultation, X-Ray, Ultrasound, Therapy Session inside "physical therapy
+    evaluation". This is the exact-name rule for a name said inside a longer phrase; a name inside
+    a longer said name ("x-ray" in "knee x-ray") goes too. Every word of the name counts, a visit
+    noun too: "dental" alone does not say Dental Exam. Returns whether some candidate at or above
+    MIN_SCORE has every distinctive name word heard (in any order)."""
     kept = [i for i, w in enumerate(words) if w not in _NAME_STOP]
     hits = [_word_hits(vocab, w) for w in words]
     heard_anywhere = set().union(*(hits[i] for i in kept)) if kept else set()
@@ -310,9 +319,13 @@ def _drop_dominated(index: CatalogIndex, vocab: _Vocab, words: list[str], best: 
             heard = [nw in heard_anywhere for nw in part]
             distinctive = [h for h, nw in zip(heard, part) if nw not in _GENERIC]
             named = named or (cand.score >= MIN_SCORE and bool(distinctive) and all(distinctive))
+            if not all(heard):
+                continue
             # Every time it was said: "a thyroid ultrasound, yeah a thyroid ultrasound".
-            for at in _find_spans([words[i] for i in kept], list(part)) if all(heard) else ():
-                spans[tid] = spans.get(tid, frozenset()) | frozenset(kept[at:at + len(part)])
+            found = _find_spans([words[i] for i in kept], list(part))
+            said = {i for at in found for i in kept[at:at + len(part)]} or {
+                i for i in kept if not hits[i].isdisjoint(part)}  # in its own words: "X of my Y"
+            spans[tid] = spans.get(tid, frozenset()) | frozenset(said)
     if not spans:
         return named
 
@@ -324,6 +337,11 @@ def _drop_dominated(index: CatalogIndex, vocab: _Vocab, words: list[str], best: 
 
     dominated = {b for b in best for a, span in spans.items()
                  if a != b and spans.get(b) != span and support(b) <= span}
+    # "a strep test for a sore throat": what follows "for" after a visit said in full is why the
+    # caller wants that visit, not another one.
+    reasons = [i for i, w in enumerate(words) if w in _REASON_WORDS]
+    dominated |= {b for b in best if b not in spans and (evidence := support(b))
+                  and any(max(span) < r < min(evidence) for span in spans.values() for r in reasons)}
     for tid in dominated:
         del best[tid]
     return True

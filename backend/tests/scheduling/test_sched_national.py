@@ -591,14 +591,15 @@ def specific():
     ("booking a physical therapy evaluation after surgery", ["appt_015"]),  # not Psychiatry's Therapy Session
     ("just a therapy session", ["appt_014"]),
     ("a knee x-ray, yes a knee x-ray please", ["appt_011"]),               # said twice
+    ("an x-ray of my knee", ["appt_011"]),                                  # in its own words
 ])
 def test_a_type_named_in_full_drops_the_types_inside_its_name(specific, phrase, ids):
     assert [c.type_id for c in match_types(specific, phrase)] == ids
 
 
 def test_lay_term_default_only_when_no_type_is_named_and_one_specialty_is_meant(specific):
-    knee = [c.type_id for c in match_types(specific, "an x-ray of the knee, it's been sore")]
-    assert "appt_017" not in knee and {"appt_010", "appt_011"} <= set(knee)
+    # "an x-ray of the knee" names Knee X-Ray in its own words, so plain X-Ray goes too (round 5).
+    assert [c.type_id for c in match_types(specific, "an x-ray of the knee, it's been sore")] == ["appt_011"]
     assert [c.type_id for c in match_types(specific, "my stomach keeps hurting")] == ["appt_018"]
     assert match_types(specific, "my throat and my stomach both burn") == []
 
