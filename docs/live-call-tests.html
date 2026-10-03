@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live-call retest, round 3</title>
+<style>
+:root{--fg:#1a1a1a;--mute:#6b6b6b;--line:#e6e6e6;--bg:#fff;--ok:#1a7f37;--bad:#c62828;--warn:#b26a00;--say:#0b57d0}
+@media (prefers-color-scheme:dark){:root{--fg:#e8e8e8;--mute:#9a9a9a;--line:#2c2c2c;--bg:#121212;--say:#8ab4f8;--ok:#4caf50;--bad:#ef5350;--warn:#ffb74d}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--fg);background:var(--bg)}
+main{max-width:760px;margin:0 auto;padding:24px 18px 80px}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:36px 0 8px;border-bottom:1px solid var(--line);padding-bottom:6px}
+h3{font-size:16px;margin:0}
+p,ol{margin:6px 0}
+.mute{color:var(--mute)}
+.bar{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 18px;font-size:13px;display:flex;gap:14px;justify-content:center;z-index:1}
+.bar b{font-variant-numeric:tabular-nums}
+.plan{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+.plan td,.plan th{border-top:1px solid var(--line);padding:5px 8px 5px 0;text-align:left;vertical-align:top}
+.plan th{font-size:12px;color:var(--mute);font-weight:600;border-top:0}
+.call{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0}
+.call.pass{border-left:4px solid var(--ok)}.call.fail{border-left:4px solid var(--bad)}.call.extra{border-left:4px solid var(--warn)}
+.head{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.n{color:var(--mute);font-variant-numeric:tabular-nums;margin-right:6px}
+.res{display:flex;gap:4px}
+.res button{font:12px system-ui;border:1px solid var(--line);background:none;color:var(--mute);border-radius:5px;padding:3px 8px;cursor:pointer}
+.call.pass .res .p{background:var(--ok);color:#fff;border-color:var(--ok)}
+.call.fail .res .f{background:var(--bad);color:#fff;border-color:var(--bad)}
+.call.extra .res .e{background:var(--warn);color:#fff;border-color:var(--warn)}
+.call table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:14px}
+.call td{padding:5px 0;vertical-align:top;border-top:1px solid var(--line)}
+.call td:first-child{width:52%;padding-right:12px}
+.say{color:var(--say);font-weight:600}
+.x{color:var(--bad);font-size:14px;margin:4px 0 0}
+.x::before{content:"✗ "}
+.note{font-size:13px;color:var(--mute);margin:4px 0 0}
+.switch{background:color-mix(in srgb,var(--say) 10%,transparent);border-radius:6px;padding:8px 12px;font-size:14px;margin:10px 0}
+input.ref{font:12px system-ui;border:1px solid var(--line);background:none;color:var(--fg);border-radius:5px;padding:3px 6px;width:120px}
+code{font-size:13px}
+</style>
+</head>
+<body>
+<div class="bar"><span>Must-pass <b id="must">0/5</b></span><span style="color:var(--ok)">Pass <b id="cp">0</b></span><span style="color:var(--bad)">Fail <b id="cf">0</b></span><span style="color:var(--warn)">Extra Q <b id="ce">0</b></span><a href="#" id="reset" class="mute">reset</a></div>
+<main>
+<h1>Live-call retest, round 3</h1>
+<p><b>5 calls.</b> They check only what round 2 broke or never reached. Everything else passed.</p>
+
+<table class="plan">
+<tr><th>#</th><th>Agent (left sidebar)</th><th>Disambiguator</th><th>Checks</th></tr>
+<tr><td>1</td><td><b>Clinic Scheduler</b></td><td>JEV</td><td>Unsure which scope, on the right agent this time</td></tr>
+<tr><td>2</td><td>National Scheduler</td><td>JEV</td><td>The same words: the doubt must survive</td></tr>
+<tr><td>3</td><td>National Scheduler</td><td>JEV</td><td>A child's physical: never an adult visit</td></tr>
+<tr><td>4</td><td>National Scheduler</td><td>JEV</td><td>“Upper endoscopy.” as your answer</td></tr>
+<tr><td>5</td><td>National Scheduler</td><td>JEV</td><td>Trenton with no visit said: the call keeps going</td></tr>
+</table>
+
+<h2>Before you start</h2>
+<ol>
+<li>Open <b>http://localhost:5174</b>, reload the page once, and press <b>D</b> for the Dev view.</li>
+<li><b>To change agent, click its name in the left sidebar</b> (“Clinic Scheduler” or “National Scheduler”). The Test call panel's header now shows it: <b>TEST CALL · CLINIC SCHEDULER</b>. Check it before each call. In round 2 every call ran on National.</li>
+<li>One new call per number. Hang up after the card's last line.</li>
+<li>Answer anything not on the card naturally (<b>returning patient</b>, <b>yes, I have a referral</b>). That's <b>Extra Q</b>, not Fail.</li>
+</ol>
+
+<h2>Call 1 · Clinic Scheduler · JEV</h2>
+<div class="switch">Click <b>Clinic Scheduler</b> in the left sidebar. Header must read <b>TEST CALL · CLINIC SCHEDULER</b>.</div>
+
+<section class="call" data-id="1"><div class="head"><h3><span class="n">1</span>Unsure which scope</h3><div class="res"></div></div>
+<table>
+<tr><td class="say">“The GI doc wants a scope. I don't remember if it goes down my throat or up from below. I'm a returning patient and I have a referral.”</td><td>“Is that a colonoscopy consultation or an endoscopy consultation?” Hang up.</td></tr>
+</table>
+<p class="x">It offers times before asking. It asks “Which city?” (wrong agent: check the header).</p></section>
+
+<h2>Calls 2–5 · National Scheduler · JEV</h2>
+<div class="switch">Click <b>National Scheduler</b> in the left sidebar. Header must read <b>TEST CALL · NATIONAL SCHEDULER</b>.</div>
+
+<section class="call" data-id="2"><div class="head"><h3><span class="n">2</span>The same doubt, national</h3><div class="res"></div></div>
+<table>
+<tr><td class="say">“The GI doc wants a scope. I don't remember if it goes down my throat or up from below. I'm a returning patient and I have a referral.”</td><td>“Which city are you in?”</td></tr>
+<tr><td class="say">“San Francisco.”</td><td>A question between two visits, e.g. “Is that a GI consultation or an endoscopy consultation?” Hang up.</td></tr>
+</table>
+<p class="x">It offers times (round 2 offered a GI consultation here). In the Dev view, the <code>update_request</code> service phrase should include “I don't remember if…”.</p></section>
+
+<section class="call" data-id="3"><div class="head"><h3><span class="n">3</span>A child's physical</h3><div class="res"></div></div>
+<table>
+<tr><td class="say">“My 10-year-old needs a physical and a form signed by the doctor. We are returning patients and we have a referral.”</td><td>“Which city are you in?”</td></tr>
+<tr><td class="say">“San Francisco.”</td><td>A school physical, or a question about which physical. Hang up.</td></tr>
+</table>
+<p class="x">A pre-employment physical, an annual physical or any other adult visit (round 2 offered a pre-employment physical). A school physical is the known weakness (it should ask school or sports), so mark it <b>Extra Q</b>, not Fail.</p></section>
+
+<section class="call" data-id="4"><div class="head"><h3><span class="n">4</span>“Upper endoscopy.” as the answer</h3><div class="res"></div></div>
+<table>
+<tr><td class="say">“My stomach doctor said I need a scope. I'm in Houston, I'm a returning patient, and I have a referral.”</td><td>“Is that an endoscopy consultation or an upper endoscopy?”</td></tr>
+<tr><td class="say">“Upper endoscopy.”</td><td>Upper endoscopy times (Dr. Johnnie Na at Katy). Hang up.</td></tr>
+</table>
+<p class="x">It offers an endoscopy <i>consultation</i> after you said “Upper endoscopy.”</p></section>
+
+<section class="call" data-id="5"><div class="head"><h3><span class="n">5</span>Trenton, no visit said</h3><div class="res"></div></div>
+<table>
+<tr><td class="say">“I'm in Trenton. I'm a returning patient.”</td><td>“Did you mean Renton, Washington?”</td></tr>
+<tr><td class="say">“No, Trenton, New Jersey.”</td><td>“Our nearest clinic in New Jersey is Cherry Hill, near Philadelphia. What's the visit for?”</td></tr>
+<tr><td class="say">“A flu shot.”</td><td>“…for a flu shot is Cherry Hill, near Philadelphia. Want me to look there?”</td></tr>
+<tr><td class="say">“Yes.”</td><td>Flu shot times at Cherry Hill. Hang up.</td></tr>
+</table>
+<p class="x">It goes silent after Cherry Hill (round 2 did). It offers Renton.</p></section>
+
+<h2>On a fail, check in the Dev view</h2>
+<ul>
+<li><b>Header:</b> the agent name is the one on the card.</li>
+<li><b>Tool arguments:</b> <code>update_request</code> carries your words, not a doctor, place, visit or day you never said.</li>
+<li><b>Hearing:</b> the transcript caught what you said.</li>
+</ul>
+<p class="mute">Replies come from the scheduler with live JEV and the fixes in place. The conversation model's wording can still differ.</p>
+</main>
+<script>
+const K='prosper-live-calls-r3',s=JSON.parse(localStorage.getItem(K)||'{}');
+const opts=[['p','Pass','pass'],['e','Extra Q','extra'],['f','Fail','fail']];
+function paint(){
+  let p=0,f=0,e=0,m=0;
+  document.querySelectorAll('.call').forEach(c=>{
+    const v=(s[c.dataset.id]||{}).r;c.className='call'+(v?' '+v:'');
+    if(v==='pass')p++;if(v==='fail')f++;if(v==='extra')e++;
+    if(+c.dataset.id<=5&&(v==='pass'||v==='extra'))m++;
+  });
+  must.textContent=m+'/5';cp.textContent=p;cf.textContent=f;ce.textContent=e;
+  localStorage.setItem(K,JSON.stringify(s));
+}
+document.querySelectorAll('.call').forEach(c=>{
+  const id=c.dataset.id,box=c.querySelector('.res');s[id]=s[id]||{};
+  const ref=document.createElement('input');ref.className='ref';ref.placeholder='note';ref.value=s[id].n||'';
+  ref.oninput=()=>{s[id].n=ref.value;paint()};box.append(ref);
+  opts.forEach(([k,label,v])=>{const b=document.createElement('button');b.className=k;b.textContent=label;
+    b.onclick=()=>{s[id].r=s[id].r===v?'':v;paint()};box.append(b)});
+});
+reset.onclick=e=>{e.preventDefault();if(confirm('Clear all results?')){localStorage.removeItem(K);location.reload()}};
+paint();
+</script>
+</body>
+</html>

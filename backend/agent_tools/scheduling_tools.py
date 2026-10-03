@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
@@ -24,7 +25,7 @@ from typing import Awaitable, Callable
 
 import tiktoken
 from loguru import logger
-from pipecat.flows import NO_RESPONSE, FlowManager, FlowsFunctionSchema
+from pipecat.flows import NO_RESPONSE, FlowError, FlowManager, FlowsFunctionSchema
 from pipecat.frames.frames import TTSSpeakFrame
 
 from scheduling.availability import Slot as TimeSlot
@@ -33,6 +34,8 @@ from scheduling.policy import check
 from scheduling.request import PARTS_OF_DAY, SLOT_NAMES, WEEKDAY_NAMES, Request, Update, merge
 from scheduling.resolver import Offer, Plan, resolve
 from scheduling.templates import spoken_when, type_label
+from scheduling.lexicon import says_unsure
+from scheduling.text import tokens
 
 from .context import ToolContext, model_call_event
 
@@ -227,9 +230,101 @@ async def _apply_plan(ctx: ToolContext, flow_manager: FlowManager, plan: Plan, e
     return result, speak
 
 
+# Asks a doctor or place answers, by the update field that carries the answer.
+_ANSWER_FIELD = {"provider": "provider_phrase", "location": "location_phrase", "metro": "location_phrase",
+                 "service": "service_phrase"}
+_FILLER_WORDS = frozenset({"dr", "doctor", "the", "a", "an", "in", "at", "of", "on", "one", "with", "near",
+                           "please", "i", "m", "im", "its", "it", "s", "is", "that", "and"})
+
+
+def caller_turn(messages: list[dict]) -> str:
+    """The caller's words since the assistant last spoke: the user messages after the last
+    assistant text, skipping the tool calls and results the current reply is made of."""
+    said: list[str] = []
+    for m in reversed(messages):
+        role, content = m.get("role"), m.get("content")
+        if role == "user":
+            if isinstance(content, list):
+                content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
+            said.append(content if isinstance(content, str) else "")
+        elif role == "assistant" and content and not m.get("tool_calls"):
+            break
+    return " ".join(reversed(said)).strip()
+
+
+# Who the visit is for: "my 10-year-old", "my daughter". It decides between a child's visit and
+# an adult's, and the conversation model drops it ("physical and a form signed by the doctor").
+_WHO = re.compile(r"\b\d+[- ]?(?:year|month|week)s?[- ]?olds?\b|\b(?:son|daughter|kid|kids|child|children|baby|"
+                  r"toddler|infant|newborn|teen|teenager|boy|girl)\b", re.IGNORECASE)
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+# Patient status said in the same breath: the update carries it in is_new and has_referral.
+_STATUS = re.compile(r"\b(?:i'?m|i am|we'?re|we are)\b[^.]*\b(?:patients?|referral)\b.*$", re.IGNORECASE)
+
+
+def with_dropped_clauses(phrase: str, said: str) -> str:
+    """The service phrase with the caller's sentences that change which visit fits and that the
+    conversation model dropped: whom it is for, and a stated doubt with its other half ("I don't
+    remember if it goes down my throat." "Or up from below"). A sentence that holds the whole
+    phrase replaces it."""
+    kept: list[str] = []
+    for sentence in (_STATUS.sub("", x).strip() for x in _SENTENCE_END.split(said)):
+        words = tokens(sentence)
+        if not words:
+            continue
+        who = _WHO.search(sentence) and not _WHO.search(phrase)
+        unsure = says_unsure(sentence) and not says_unsure(phrase)
+        if who or unsure or (kept and words[0] == "or" and says_unsure(kept[-1])):
+            kept.append(sentence)
+    if not kept:
+        return phrase
+    if set(tokens(phrase)) <= set(tokens(kept[0])):
+        return " ".join(kept)
+    return " ".join([phrase.rstrip(".") + ".", *kept])
+
+
+def grounded(args: dict, req: Request, said: str) -> tuple[dict, list[str]]:
+    """What the caller answers must come from the caller, not from the conversation model: it
+    turned "The lady one" into "Dr. Emily Chen" and "Washington" into "Washington, DC", skipping
+    the confirmation the resolver asks for, and heard "Wednesday" in "day of checkup". While a
+    doctor or place question is open, a phrase with a word the caller did not say is replaced by
+    the caller's own words; a day the caller did not say is dropped. A one-option question ("Do
+    you mean Dr. Emily Chen?") is a yes/no, where the model naming the option is the expected
+    answer. Returns the arguments and what was replaced."""
+    if not said:
+        return args, []
+    heard = set(tokens(said))
+    replaced: list[str] = []
+    pa = req.pending_ask
+    key = _ANSWER_FIELD.get(pa.field) if pa and len(pa.options) != 1 else None
+    phrase = args.get(key) if key else None
+    if isinstance(phrase, str) and not all(w in heard or w in _FILLER_WORDS for w in tokens(phrase)):
+        args, replaced = {**args, key: said}, [phrase]
+    service = args.get("service_phrase")
+    if key != "service_phrase" and isinstance(service, str) and service.strip():
+        fuller = with_dropped_clauses(service, said)
+        if fuller != service:
+            args, replaced = {**args, "service_phrase": fuller}, [*replaced, service]
+    tp = args.get("time_pref")
+    day = tp.get("day") if isinstance(tp, dict) else None
+    if isinstance(day, str) and not any(day.lower().startswith(w) for w in heard if len(w) >= 3):
+        args, replaced = {**args, "time_pref": {k: v for k, v in tp.items() if k != "day"}}, [*replaced, day]
+    return args, replaced
+
+
 def update_request_tool(ctx: ToolContext) -> FlowsFunctionSchema:
     async def handler(args: dict, flow_manager: FlowManager):
         today = ctx.availability.now.date()
+        try:
+            said = caller_turn(flow_manager.get_current_context())
+        except (FlowError, AttributeError):  # test doubles carry no conversation
+            said = ""
+        # The schedule node resets the context on entry: the first update after start has no caller
+        # message to check against, only the words start was given.
+        started = flow_manager.state.pop("started_with", "")
+        said = said or started
+        args, replaced = grounded(args, _request(flow_manager), said)
+        if replaced:
+            logger.info(f"update_request: the caller did not say {replaced!r}; they said {said!r}")
         try:
             update = Update.from_args(_with_day_word(args, today))
         except (ValueError, TypeError) as e:
@@ -382,4 +477,5 @@ async def new_request(ctx: ToolContext, args: dict, flow_manager: FlowManager) -
     state["req"] = Request(patient=_request(flow_manager).patient).to_dict()
     state.pop("status", None)
     state["summary"] = words.strip()
+    state["started_with"] = words.strip()
     return EdgeOutcome({"status": "success", "request": words.strip()}, proceed=True, respond=True)

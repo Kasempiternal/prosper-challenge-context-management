@@ -1255,4 +1255,32 @@ OpenAI stress scores are partial: cache misses ask safely and no OpenAI stress n
 - Embeddings had 9 unsafe SF stress outcomes, against Off's 6.
 - Fresh blind round 5 still has confident choices on underspecified requests: MRI region, mental-health medication follow-up and school/sports physicals. One national symptomatic request gives a false refusal with an incorrect distant alternative.
 
-Offline cases feed tool arguments directly. They do not test speech recognition, LLM extraction, interruptions or audio timing. Use [the live-call script](../docs/LIVE_CALL_TESTS.md) for that layer. Passing twelve calls cannot prove universal safety.
+Offline cases feed tool arguments directly. They do not test speech recognition, LLM extraction, interruptions or audio timing. Use [the live-call script](../docs/live-call-tests.html) for that layer. Passing these calls cannot prove universal safety.
+
+## Live-call fixes (2026-10-03, after the round 5 score)
+
+Fourteen live voice calls on the National agent with JEV found four faults that the offline cases cannot reach. Each was reproduced offline, then fixed with a general mechanism. Blind round 5 stays as scored; these fixes were not tuned on it.
+
+| Live call | Fault | Fix |
+|---|---|---|
+| "Washington." to "Seattle, Washington or Washington, DC?" | The conversation model sent `Washington, DC` and the resolver booked DC | While a doctor or place question is open, a phrase with a word the caller did not say is replaced by the caller's transcript (`grounded` in `scheduling_tools.py`) |
+| "The lady one." to "Dr. David Chen or Dr. Emily Chen?" | The model sent `Dr. Emily Chen`, skipping the confirmation, in Off and JEV alike | Same check: the resolver now gets "The lady one." and confirms by name |
+| "Day of checkup." | The model sent `time_pref.day = wednesday` | A day the caller did not say is dropped |
+| "The GI doc wants a scope", San Francisco | GI Consultation offered with no question. The shortlist held no scope visit, and an unsure JEV fell back to the lexical match | Each said word brings the few visits it attaches to into the shortlist. An unsure model that gives every lexical match under 0.2 leads to a question, not to the lexical match |
+| "Boulder." said twice | "Sorry, which location was that?" repeated | The second miss asks for a nearby city or a ZIP code |
+
+Dev and stress sets with JEV after the fixes: 0 wrong commits on all 13 sets, both stress gates PASS. Top-1 moved by one turn on seven sets (net −3, every move an ask/offer swing, none a wrong commit): h2-28, nat-cap-04 and a heldout4 turn now book; nat-sym-01 asks between two acceptable visits; tune-16 asks a specific question instead of an open one.
+
+### Second live round (same day)
+
+Thirteen more calls. Two new faults, both from the conversation model rewriting the caller:
+- "I don't remember if it goes down my throat or up from below" reached the resolver as `scope`, and "My 10-year-old needs a physical" as `physical and a form signed by the doctor`. The second offered a child a pre-employment physical. Replaying those turns through the real prompt showed gpt-4.1 doing the same (and answering "dental exam" for the caller), so the fix is not a model swap: the tool handler restores the caller's sentences that say whom the visit is for or that state a doubt, and an answer to a visit question is checked like a doctor or place answer.
+- Passing the caller's own words exposed a lexicon gap: "Upper endoscopy" scored Endoscopy Consultation over "Upper Endoscopy (EGD)". A visit's name now also matches without its bracketed abbreviation (six national visits have one).
+- A refusal with no visit known ("in Trenton") now ends with "What's the visit for?" instead of silence.
+- All calls in this round ran on the National agent: the Test call panel did not say which agent it calls. Its header now names it.
+
+Dev and stress sets after these fixes, JEV live: 0 wrong commits on all 13 sets, both stress gates PASS. Versus the first live-call fix: nat3-geo-09, nat-18 and tune-16 now pass; h2-p12 now asks between two of the three Dr. Satos, because JEV's refreshed answer gives the third 0.15 for "the one I saw last time" (an ask, not a commit; JEV variance, not this change).
+
+### Third live round
+
+Five calls, all on the intended agent (the header fix worked). Scope doubt on both agents, "Upper endoscopy." and Trenton passed. The logs showed the dropped-clause check never ran on the first update after `start`: the schedule node resets its context on entry, so that update had no caller message to check against. `start` now keeps the caller's words for that one update. In this round JEV still caught the bare "the GI doc wants a scope", and "physical and form signed" for a 10-year-old asked "annual physical or school physical?".

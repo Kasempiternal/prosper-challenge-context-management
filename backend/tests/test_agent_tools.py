@@ -9,7 +9,7 @@ from pipecat.frames.frames import TTSSpeakFrame
 from agent_tools import build_tool, make_context, stt_keyterms
 from agent_tools.context import BACKEND_DIR, ModelHooks, shared_availability
 from agent_tools.keyterms import LAY_TERMS
-from agent_tools.scheduling_tools import (REFUSED_PREFACE, TAKEN_PREFACE, EdgeOutcome, book_confirmed, new_request,
+from agent_tools.scheduling_tools import (caller_turn, grounded, REFUSED_PREFACE, TAKEN_PREFACE, EdgeOutcome, book_confirmed, new_request,
                                           spoken_ref)
 from scheduling.decision import DECLINE, Verdict
 from scheduling.resolver import NoDisambiguator
@@ -24,9 +24,13 @@ class FakeWorker:
 
 
 class FakeFlowManager:
-    def __init__(self):
+    def __init__(self, messages=None):
         self.state = {"summary": ""}
         self.worker = FakeWorker()
+        self.messages = messages if messages is not None else []
+
+    def get_current_context(self):
+        return self.messages
 
 
 @pytest.fixture
@@ -525,3 +529,84 @@ def test_a_gender_question_no_chooser_can_ask_is_no_model_use(make_ctx, events):
                                                  "service_phrase": "cardiology consultation"})
     assert result["ask"]["field"] == "provider"
     assert next(e for e in events if e["type"] == "resolver_decision")["model"] == {"used": False}
+
+
+def turn(*said, asked="Do you mean Dr. David Chen or Dr. Emily Chen?"):
+    return [{"role": "assistant", "content": asked},
+            *({"role": "user", "content": t} for t in said),
+            {"role": "assistant", "content": None, "tool_calls": [{"id": "1"}]}]
+
+
+def test_caller_turn_is_what_was_said_since_the_last_question():
+    assert caller_turn(turn("The lady one.")) == "The lady one."
+    assert caller_turn(turn("In...", "DC.")) == "In... DC."
+    assert caller_turn([]) == ""
+
+
+@pytest.mark.parametrize("field,options,args,said,passed", [
+    ("provider", ("p1", "p2"), {"provider_phrase": "Dr. Emily Chen"}, "The lady one.", "The lady one."),
+    ("metro", ("sea", "dc"), {"location_phrase": "Washington, DC"}, "Washington.", "Washington."),
+    ("provider", ("p1", "p2"), {"provider_phrase": "Dr. Emily Chen"}, "Doctor Emily Chen.", None),
+    ("provider", ("p1", "p2"), {"provider_phrase": "The one who speaks Arabic"}, "The one who speaks Arabic.", None),
+    ("metro", ("sea", "dc"), {"location_phrase": "Seattle, Washington"}, "Seattle, Washington.", None),
+    ("provider", ("p1",), {"provider_phrase": "Dr. Emily Chen"}, "Yes.", None),
+    ("service", ("t1", "t2"), {"service_phrase": "Upper Endoscopy (EGD)"}, "Upper endoscopy.", "Upper endoscopy."),
+    ("service", ("t1", "t2"), {"service_phrase": "dental cleaning"}, "Dental cleaning.", None),
+])
+def test_an_answer_names_only_what_the_caller_said(field, options, args, said, passed):
+    from scheduling.request import PendingAsk, Request
+    out, replaced = grounded(args, Request(pending_ask=PendingAsk(field, options)), said)
+    key = next(iter(args))
+    assert out[key] == (passed or args[key])
+    assert bool(replaced) == (passed is not None)
+
+
+@pytest.mark.parametrize("said,day,kept", [
+    ("Day of checkup.", "wednesday", False),
+    ("Next Wed works.", "wednesday", True),
+    ("Tomorrow, please.", "tomorrow", True),
+])
+def test_a_day_is_one_the_caller_said(said, day, kept):
+    from scheduling.request import Request
+    out, _ = grounded({"time_pref": {"day": day}}, Request(), said)
+    assert ("day" in out["time_pref"]) == kept
+
+
+def test_the_lady_one_is_not_rewritten_into_a_booking(make_ctx):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    call(ctx, fm, "update_request", {**BEAT_1, "is_new": False})
+    fm.messages = turn("The lady one.")
+    result, _ = call(ctx, fm, "update_request", {"provider_phrase": "Dr. Emily Chen"})
+    assert result["status"] == "ask", result
+    assert fm.state["req"]["provider"]["heard"] == "The lady one."
+
+
+@pytest.mark.parametrize("phrase,said,sent", [
+    ("needs a physical and a form signed by the doctor",
+     "My 10-year-old needs a physical and a form signed by the doctor. We are returning patients and we have a referral.",
+     "My 10-year-old needs a physical and a form signed by the doctor."),
+    ("scope", "The GI doc wants a scope. I don't remember if it goes down my throat. Or up from below. I'm a returning patient.",
+     "scope. I don't remember if it goes down my throat. Or up from below."),
+    ("flu shot", "A flu shot in Washington. I'm a returning patient.", "flu shot"),
+    ("sick visit", "I'm a person with a fever, for a sick visit.", "sick visit"),
+    ("well-child visit for my daughter", "My daughter needs her well-child visit.", "well-child visit for my daughter"),
+])
+def test_the_visit_keeps_whom_it_is_for_and_a_stated_doubt(phrase, said, sent):
+    from agent_tools.scheduling_tools import with_dropped_clauses
+    assert with_dropped_clauses(phrase, said) == sent
+
+
+def test_an_answer_to_a_visit_question_is_the_callers():
+    from scheduling.request import PendingAsk, Request
+    req = Request(pending_ask=PendingAsk("service", ("appt_cleaning", "appt_exam")))
+    out, replaced = grounded({"service_phrase": "dental exam"}, req, "Mm, day of checkup.")
+    assert out["service_phrase"] == "Mm, day of checkup." and replaced == ["dental exam"]
+
+
+def test_the_first_update_after_a_context_reset_is_checked_against_the_start_words(make_ctx):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    asyncio.run(new_request(ctx, {"request": "My 10-year-old needs a physical and a form signed by the doctor. "
+                                             "We are returning patients and we have a referral."}, fm))
+    call(ctx, fm, "update_request", {"service_phrase": "physical and form signed", "is_new": False})
+    assert fm.state["req"]["service"]["heard"] == "My 10-year-old needs a physical and a form signed by the doctor."
+    assert "started_with" not in fm.state

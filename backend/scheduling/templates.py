@@ -240,6 +240,9 @@ def say_ask(index: CatalogIndex, field: str, options: list[str], context: str | 
         return "Which neighborhood is that location in?"
     if field == "location_retry":
         return "Sorry, which location was that?"
+    if field == "location_zip":
+        # The same place said again would get the same miss: ask for something else to go on.
+        return "I couldn't find that place. Could you tell me a nearby city, or your ZIP code?"
     if field == "place_confirm":
         return f"Did you mean {context}?"
     if field == "metro" and options:
@@ -341,6 +344,9 @@ def say_refuse(index: CatalogIndex, code: str, *, type_id: str | None = None, wh
             s += f" The nearest is {nearest}."
         if location_id and alternatives:
             s += " Want me to look there?"
+        elif not type_id:
+            # Only the place is known ("in Trenton"): the call goes on with the visit, not silence.
+            s += " What's the visit for?"
         return s
     if code == "handoff":
         return "I'm having trouble finding that. Let me have someone from our front desk call you back."

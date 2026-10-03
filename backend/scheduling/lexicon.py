@@ -32,11 +32,14 @@ _REASON_WORDS = frozenset({"for", "because"})
 # Words callers use for a type-name word, either way: "yearly physical" says the name "Annual
 # Physical". English, not catalog data, so every catalog shares it (aliases.json is per catalog).
 _SAME_AS = {"yearly": "annual"}
+_BRACKETED = re.compile(r"\([^)]*\)")
 _SAME = {**_SAME_AS, **{v: k for k, v in _SAME_AS.items()}}
 # A model choosing among every offered type is fine at SF's 74; at national scale (~300) the
 # request is cut to the types the phrase plausibly reaches.
 SHORTLIST_ABOVE = 80
 SHORTLIST_SIZE = 20
+# A word attached to more visits than this ("visit", "test") says too little to shortlist them.
+_WORD_VISITS_MAX = 6
 
 
 @dataclass(frozen=True)
@@ -110,6 +113,10 @@ class _Vocab:
                 types_by_name_word[w].append(tid)
         for t in index.types.values():
             by_name[normalize(t.name)].append(t.id)
+            # "Upper Endoscopy (EGD)": a caller says the name without its bracketed abbreviation.
+            short = normalize(_BRACKETED.sub(" ", t.name))
+            if short and short != normalize(t.name):
+                by_name[short].append(t.id)
 
         def freeze(d: dict) -> dict:
             return {k: tuple(v) for k, v in d.items()}
@@ -440,6 +447,16 @@ def _attached(index: CatalogIndex, word: str) -> frozenset[str]:
     return frozenset(out)
 
 
+def said_visits(index: CatalogIndex, phrase: str | None) -> frozenset[str]:
+    """The offered visits some word of the phrase attaches to, by a few visits at most each."""
+    out: set[str] = set()
+    for w in tokens(phrase or ""):
+        att = _attached(index, w)
+        if len(att) <= _WORD_VISITS_MAX:
+            out |= att
+    return frozenset(out)
+
+
 def umbrella(index: CatalogIndex, phrase: str | None, type_id: str, within: tuple[str, ...] = ()) -> tuple[str, ...]:
     """The offered visits the caller's words fit exactly as well as `type_id`, sorted; () when the
     words tell `type_id` apart. "my baby's checkup": "baby" and "checkup" attach to Well-Child
@@ -536,6 +553,9 @@ def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
             metros is None or bool(index.metros_by_type[tid] & metros))
 
     ranked = ranked_types(index, phrase, hint)
+    # Each said word brings the few visits it attaches to, even when another word outscores it:
+    # "GI doc wants a scope" ranks GI Consultation alone, yet "scope" names the scope visits.
+    ranked += sorted(said_visits(index, phrase))
     for spec in ([hint] if hint else []) + _lay_specialties(index, tokens(phrase or "")):
         default = index.specialty_default.get(spec)
         ranked += ([default] if default else []) + sorted(t.id for t in index.types.values() if t.specialty == spec)
@@ -765,6 +785,11 @@ def stated_doubt(index: CatalogIndex, phrase: str | None) -> Doubt | None:
                 if options:
                     return Doubt(", ".join(raw[:min(i, at)]), options)
     return None
+
+
+def says_unsure(phrase: str | None) -> bool:
+    """A doubt marker anywhere: "I don't remember if", "not sure", "maybe"."""
+    return any(_doubt_markers(tokens(c)) for c in _CLAUSE.split(phrase or ""))
 
 
 def _doubt_markers(words: list[str]) -> list[tuple[int, int]]:

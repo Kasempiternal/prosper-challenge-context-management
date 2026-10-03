@@ -23,7 +23,7 @@ from .decision import DECLINE, Verdict, gender_of, unanswered
 from .geo import (RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, option_named, over_state_line,
                   resolve_place)
 from .lexicon import (SHORTLIST_ABOVE, Doubt, TypeCandidate, describes_symptom, diagnostic_variant, fasting_answer,
-                      fasting_pair, general_kin, is_screening, match_types, nearest_type, pointed_default, stated_doubt,
+                      fasting_pair, general_kin, is_screening, match_types, nearest_type, pointed_default, said_visits, stated_doubt,
                       type_shortlist, types_named, umbrella, unexplained_words)
 from .names import (STREET_TYPES, ProviderClues, clue_words, hear_place, match_locations, match_providers, only_no,
                     read_confirmation, read_provider_clues, unmatched_first_name)
@@ -35,6 +35,8 @@ TYPE_TIE_GAP = 0.1
 # A runner-up the first answer gave less than this is a long shot: 28 of 68 round 3 checks weighed
 # one at <= 0.01 and none changed an outcome. The check weighs the choice's nearest neighbour instead.
 RIVAL_MIN_P = 0.05
+# An unsure model giving every lexical match less than this doubts the words, not just the choice.
+LEXICAL_DOUBT_P = 0.2
 MAX_OPTIONS = 3
 HANDOFF_AFTER_MISSES = 3
 # An area search widens from the place's own radius to twice that, then to this, before refusing.
@@ -1145,6 +1147,18 @@ class _Resolution:
         if first.failed:
             return first
         ids = [first.act] if first.act else list(first.ask or ())
+        if not ids and lexical:
+            # Unsure, the model still puts what the words matched far behind, ahead of visits other
+            # words of the caller name ("GI doc wants a scope": the scope visits over GI
+            # Consultation). Declining would commit the lexical match it doubts: the caller is
+            # asked between those front-runners and that match.
+            named = said_visits(self.ix, s.heard)
+            front = [t for t, _ in first.top[:2] if t in named and t in pool and t not in lexical]
+            if front and all(dict(first.top).get(t, 0.0) < LEXICAL_DOUBT_P for t in lexical):
+                ids = list(dict.fromkeys([*front, *(t for t in lexical[:1] if t in pool)]))
+                self.notes.append(f"model doubts the lexical {lexical[0]}: asking")
+                self.slots["service"] = replace(s, asks=0, candidates=tuple((t, 1.0) for t in ids))
+                return Verdict(ask=tuple(ids), top=first.top, called=True)
         if not ids or not set(ids) <= set(pool) or lexical == [first.act]:
             return DECLINE
         if shortlisted:
@@ -1459,7 +1473,7 @@ class _Resolution:
             return self._refuse("handoff")
         field = {"service": "service_open",
                  "provider": "provider_retry" if asks == 1 else "provider_spelling",
-                 "location": "location_retry"}[slot_name]
+                 "location": "location_retry" if asks == 1 else "location_zip"}[slot_name]
         return self._ask(field)
 
     def _ask(self, field: str, options: tuple[str, ...] = (), context: str | None = None,
@@ -1475,7 +1489,7 @@ class _Resolution:
     def _finish(self, status: str, say: str, ask: Ask | None = None, offers: tuple[Offer, ...] = (),
                 refusal: Refusal | None = None, confirm: Offer | None = None, keep_pick: bool = False) -> Plan:
         pending_field = {"provider_retry": "provider", "provider_spelling": "provider",
-                         "provider_first_name": "provider", "location_retry": "location",
+                         "provider_first_name": "provider", "location_retry": "location", "location_zip": "location",
                          "location_open": "location", "service_open": "service", "metro_again": "metro"}
         new_req = replace(
             self.req,

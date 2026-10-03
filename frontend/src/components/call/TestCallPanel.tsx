@@ -131,7 +131,7 @@ export function TestCallPanel() {
     <>
       <PanelHeader
         icon={<AudioLines className="size-4" />}
-        eyebrow="Test call"
+        eyebrow={agent ? `Test call · ${agent.name}` : 'Test call'}
         title={<StatusLine status={status} />}
         onClose={() => setRightPanel('inspector')}
         actions={<KeysButton compact />}

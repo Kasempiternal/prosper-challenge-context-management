@@ -379,4 +379,4 @@ OpenAI stress scores are partial: cache misses ask safely and no OpenAI stress n
 - Embeddings had 9 unsafe SF stress outcomes, against Off's 6.
 - Fresh blind round 5 still has confident choices on underspecified requests: MRI region, mental-health medication follow-up and school/sports physicals. One national symptomatic request gives a false refusal with an incorrect distant alternative.
 
-Offline cases feed tool arguments directly. They do not test speech recognition, LLM extraction, interruptions or audio timing. Use [the live-call script](docs/LIVE_CALL_TESTS.md) for that layer. Passing twelve calls cannot prove universal safety.
+Offline cases feed tool arguments directly. They do not test speech recognition, LLM extraction, interruptions or audio timing. Use [the live-call script](docs/live-call-tests.html) for that layer. Passing these calls cannot prove universal safety.
