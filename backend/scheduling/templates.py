@@ -147,6 +147,12 @@ def ring_preface(index: CatalogIndex, location_id: str, distance_mi: float, near
     return f"There's nothing closer to {near}; the nearest is {miles(distance_mi)} away, in {where}. "
 
 
+def kin_preface(index: CatalogIndex, type_id: str) -> str:
+    """Said before offers of a related visit the caller's words also name, when none near has the
+    one they meant: "We don't offer a CT - chest nearby. For a CT scan, ..."."""
+    return f"We don't offer {with_article(type_label(index.types[type_id]))} nearby. "
+
+
 def _clock(dt: datetime) -> str:
     hour = dt.hour % 12 or 12
     return f"{hour}" if dt.minute == 0 else f"{hour}:{dt.minute:02d}"

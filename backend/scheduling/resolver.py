@@ -21,8 +21,8 @@ from .availability import Availability, Slot as TimeSlot
 from .catalog_index import BookableRow, CatalogIndex
 from .decision import DECLINE, Verdict, gender_of, unanswered
 from .geo import RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, over_state_line, resolve_place
-from .lexicon import (SHORTLIST_ABOVE, Doubt, TypeCandidate, match_types, nearest_type, pointed_default,
-                      stated_doubt, type_shortlist, types_named, umbrella, unexplained_words)
+from .lexicon import (SHORTLIST_ABOVE, Doubt, TypeCandidate, fitting_kin, match_types, nearest_type,
+                      pointed_default, stated_doubt, type_shortlist, types_named, umbrella, unexplained_words)
 from .names import (STREET_TYPES, ProviderClues, hear_place, match_locations, match_providers, only_no,
                     read_confirmation, read_provider_clues)
 from .policy import IssueKind, Rule, Violation, check, has_violation
@@ -307,7 +307,10 @@ class _Resolution:
             tier = [c for c in svc if c.score >= top - TYPE_TIE_GAP]
             offered = [c for c in tier if c.type_id not in self.ix.unoffered_types]
             if not offered:
-                return self._refuse_not_offered(tier[0].type_id)
+                instead = self._offered_instead(tier[0].type_id) if all(c.via == "specialty" for c in tier) else DECLINE
+                if not instead.act:
+                    return self._refuse_not_offered(tier[0].type_id)
+                offered = _model_candidates(instead)
             verdict = DECLINE
             if all(c.via == "specialty" for c in offered):
                 # "lung test" only reached Pulmonology's default type; the model may know better.
@@ -340,6 +343,8 @@ class _Resolution:
                 return self._ask_provider(list(self.described_ask))
         if self.geo:
             scope = self._geo_scope(type_ids, provider_ids, svc is not None)
+            if isinstance(scope, Plan) and provider_ids is None and len(type_ids) == 1:
+                scope, type_ids = self._kin_nearby(scope, type_ids[0])
             if isinstance(scope, Plan):
                 return scope
             rows, location_ids = scope
@@ -583,6 +588,29 @@ class _Resolution:
             self.dist = self._distances((anchor,), FINAL_RING_MI)
             return _union(self._rows_at(type_ids, self.dist), prov_rows), site_ids
         return self._ring(place.anchors, type_ids, provider_ids, prov_rows, has_service)
+
+    def _kin_nearby(self, refusal: Plan, type_id: str) -> tuple[Plan | tuple[list[BookableRow], list[str] | None],
+                                                                  list[str]]:
+        """Nothing near the caller has the visit, but the caller's words also name a related one
+        that is ("a CT scan of my chest": no CT - Chest within 50 miles, a CT Scan 3 miles away).
+        That one is searched instead, and the caller is told why; else the refusal stands."""
+        s = self.slots["service"]
+        kin = list(fitting_kin(self.ix, s.heard, type_id)) if refusal.refusal and \
+            refusal.refusal.code == "none_nearby" and s.heard and not s.exact else []
+        if not kin:
+            return refusal, [type_id]
+        state = (self.area, self.dist, self.site_choice, self.widened, self.preface, len(self.notes))
+        self.area, self.dist, self.site_choice, self.widened = None, {}, False, False
+        scope = self._geo_scope(kin, None, True)
+        if isinstance(scope, Plan) or all(has_violation(check(r, self.patient)) for r in scope[0]):
+            self.area, self.dist, self.site_choice, self.widened, self.preface, n = state
+            del self.notes[n:]
+            return refusal, [type_id]
+        self.notes.append(f"no {type_id} nearby: searched {kin}, which the words name too")
+        self.preface = T.kin_preface(self.ix, type_id) + self.preface
+        self.scores = {t: 1.0 for t in kin}
+        self.slots["service"] = replace(s, resolved_id=kin[0] if len(kin) == 1 else None)
+        return scope, kin
 
     def _ring(self, anchors: tuple[Place, ...], type_ids: list[str], provider_ids: list[str] | None,
               prov_rows: list[BookableRow] | None, has_service: bool):
@@ -948,6 +976,27 @@ class _Resolution:
         full = [t for t in (s.within or sorted(self.ix.types)) if t not in self.ix.unoffered_types]
         pool = self._type_pool(full)
         return self._model_types(pool, (), shortlisted=len(pool) < len(full))
+
+    def _offered_instead(self, unoffered: str) -> Verdict:
+        """Only a body word pointed at a visit no clinic offers ("my eyes get itchy and watery" ->
+        eye care): the caller did not ask for that visit, so the model hears the whole phrase over
+        every offered visit and that one. Acts only on an offered visit the check confirms against
+        it; anything else declines, and the caller hears that we do not offer it."""
+        s = self.slots["service"]
+        if not self.type_model or self.type_consulted:
+            return DECLINE
+        self.type_consulted = True
+        full = [t for t in (s.within or sorted(self.ix.types)) if t not in self.ix.unoffered_types]
+        pool = sorted(set(self._type_pool(full, [unoffered])) | {unoffered})
+        first = self.dis.pick_type(s.heard, s.hint, pool)
+        self._consulted("type", first, f"type disambiguator beside unoffered {unoffered}: {first.describe()}")
+        if first.failed or first.act not in set(pool) - {unoffered}:
+            return DECLINE
+        checked = self.dis.check_type(s.heard, s.hint, first, unoffered)
+        if checked is None:
+            return DECLINE
+        self._consulted("type check", checked, f"type check {first.act} vs {unoffered}: {checked.describe()}")
+        return checked if checked.act == first.act else DECLINE
 
     def _verify_types(self, lexical: list[TypeCandidate]) -> Verdict:
         """The lexicon matched, but the caller said more than the matched names and aliases explain

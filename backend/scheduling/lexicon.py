@@ -473,6 +473,21 @@ def umbrella(index: CatalogIndex, phrase: str | None, type_id: str, within: tupl
     return tuple(out) if len(out) > 1 else ()
 
 
+def fitting_kin(index: CatalogIndex, phrase: str | None, type_id: str) -> tuple[str, ...]:
+    """Offered visits besides `type_id` that the caller's words name too, and that the catalog
+    relates to it: a shared distinctive name word, or confusable (catalog_index.confusables). "a CT
+    scan of my chest" names CT - Chest and, in full, CT Scan; "an MRI of my ankle" names no other
+    MRI in full ("ct" is an alias of every CT, but "head" names CT - Head and was not said)."""
+    vocab = _vocab(index)
+    heard = vocab.matched(tokens(phrase or ""))
+    own = set(vocab.name_words[type_id])
+    return tuple(sorted(
+        t for t in index.types
+        if t != type_id and t not in index.unoffered_types
+        and (own & set(vocab.name_words[t]) or t in index.confusables.get(type_id, ()))
+        and vocab.name_words[t] and all(nw in heard for nw in vocab.name_words[t])))
+
+
 def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
                    metros: frozenset[str] | None = None) -> list[str]:
     """Offered types (offered in `metros`, when given) for a model to choose among: at most
