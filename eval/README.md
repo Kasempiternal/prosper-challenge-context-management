@@ -447,7 +447,7 @@ when in doubt, ask; an answer that does not arrive is never committed on.
 
 ### Results (offline, from the committed caches)
 
-Wrong commits per commit; top-1 per evaluated turn. Baseline is `phase1-ui` (fc2682b).
+Wrong commits per commit; top-1 per evaluated turn. Baseline is `phase1-ui` (76587ab).
 
 | set | JEV before | JEV after | no model before | no model after |
 |---|---|---|---|---|
@@ -559,7 +559,7 @@ every dev set in both modes. Accuracy first: when in doubt the resolver asks.
 
 ### Results (offline, from the committed caches)
 
-Wrong commits per commit; top-1 per evaluated turn. "Before" is the reviewed branch (8ae1e25).
+Wrong commits per commit; top-1 per evaluated turn. "Before" is the reviewed round 3 hillclimb, an intermediate state inside `4bf40d5`.
 
 | set | JEV before | JEV after | no model before | no model after |
 |---|---|---|---|---|
@@ -662,7 +662,7 @@ turn (46 -> 45/49). The act rule's thinnest lead is nat2-geo-06 at 0.02 (a 0.26 
 
 ## Held-out round 3: scored once (2026-10-03)
 
-`heldout3` and `national3` were frozen in commit `778f6c3` before any round 3 resolver change
+`heldout3` and `national3` were frozen in commit `085a9e4` before any round 3 resolver change
 landed. They were scored once, after the review fixes and the cleanup, with every chooser. JEV and
 OpenAI ran live (`--live`). Raw outputs are in `eval/results/round3_*.txt`. Nothing below was tuned
 on these sets.
@@ -709,7 +709,7 @@ Other misses are asks, not wrong commits. They include two policy-driven ones:
 **Integrity notes.**
 1. A unit test iterated over every `eval/cases*.jsonl`, so two pytest runs resolved the blind
    sets. They asserted only that no spoken text contains "None", passed silently, and printed
-   nothing. Tests now read dev sets only (`c802930`).
+   nothing. Tests now read dev sets only (`4bf40d5`).
 2. A cleanup worker's code search previewed h3-01 to h3-05 (phrases and expected types). That
    worker changed no decision logic: dev decisions were identical before and after its commits in
    all four modes. Excluding h3-01 to h3-05, heldout3 reads: no model 15/25 wrong, top-1 19/49;
@@ -767,7 +767,7 @@ threshold was re-tuned. The check gate's margin is new, and its value is explain
 
 ### Results (offline, from the committed caches)
 
-Wrong commits per commit; top-1 per evaluated turn. "Before" is `phase1-ui` (aa00deb), replayed from
+Wrong commits per commit; top-1 per evaluated turn. "Before" is `phase1-ui` (025f712), replayed from
 the same caches. heldout3 JEV before reads 43/54 here: in the scored-once live run one request failed
 (42/54).
 
@@ -924,8 +924,8 @@ requests.
 
 ## Held-out round 4: scored once (2026-10-03)
 
-`heldout4` and `national4` were frozen in `99961d5`, before any round 4 fix landed. They were
-scored once on the code at `500e0ce`, with every chooser. JEV and OpenAI ran live. Raw outputs are
+`heldout4` and `national4` were frozen in `99f7150`, before any round 4 fix landed. They were
+scored once on the code at `400f3d7`, with every chooser. JEV and OpenAI ran live. Raw outputs are
 in `eval/results/round4_*.txt`.
 
 | set | mode | wrong commits | top-1 | questions per booking |
