@@ -8549,6 +8549,21 @@
   "latency_ms": 525.2,
   "state": "A patient calling a multi-specialty clinic to book Annual Physical asked for the provider: 'Dr. Chen, the pediatrician'"
  },
+ "4175207fe09aa2546ad33c63e34b96922554b79f5b2f3fe61be93837a4331ee6": {
+  "answer": {
+   "choice": "appt_074",
+   "confidence": 0.57,
+   "probabilities": {
+    "appt_074": 0.72,
+    "appt_075": 0.01,
+    "either": 0.27
+   },
+   "type": "choice"
+  },
+  "input_tokens": 458,
+  "latency_ms": 661.9,
+  "state": "A patient calling a multi-specialty clinic said they want: 'I need to come in for my regular dental checkup, you know the cleaning'"
+ },
  "41e91f4559b841c73b6119d26f9c7977322ae214f362d0b9390a52d7559df4ba": {
   "answer": {
    "choice": "appt_214",
@@ -9676,6 +9691,21 @@
   "input_tokens": 1312,
   "latency_ms": 508.2,
   "state": "A patient calling a multi-specialty clinic said they want: 'my doctor, he send me for cholesterol blood test'"
+ },
+ "4a4f3b9265520e15888b5e28b385bfffdb1052b487782d3ff68c9f9ba11f95a8": {
+  "answer": {
+   "choice": "either",
+   "confidence": 0.64,
+   "probabilities": {
+    "appt_074": 0.12,
+    "appt_075": 0.13,
+    "either": 0.75
+   },
+   "type": "choice"
+  },
+  "input_tokens": 451,
+  "latency_ms": 882.6,
+  "state": "A patient calling a multi-specialty clinic said they want: 'due for my regular six-month dental checkup'"
  },
  "4a80a14c16fed786ce648286b6a8c83261a805a120b99bbade7998e452f30b6d": {
   "answer": {
@@ -12233,6 +12263,21 @@
   "latency_ms": 580.9,
   "state": "A patient calling a multi-specialty clinic to book Pulmonology Consultation asked for the provider: 'Dr. Nguyen, the lady doctor'"
  },
+ "63f2f4743b2c6e269ca16b954e7dd68e5b002380a460930e3efaacd8fbc2e3b3": {
+  "answer": {
+   "choice": "either",
+   "confidence": 0.33,
+   "probabilities": {
+    "appt_074": 0.09,
+    "appt_075": 0.36,
+    "either": 0.55
+   },
+   "type": "choice"
+  },
+  "input_tokens": 448,
+  "latency_ms": 518.2,
+  "state": "A patient calling a multi-specialty clinic said they want: 'need my regular dental checkup'"
+ },
  "63f3c7d87ccb6921b20f0557889c3aec631b35b41f75b2df6ea0945163bcd21e": {
   "answer": {
    "choice": "appt_026",
@@ -13753,6 +13798,21 @@
   "input_tokens": 2482,
   "latency_ms": 884.5,
   "state": "A patient calling a multi-specialty clinic said they want: 'I've got that little device in my chest that keeps my heartbeat steady, and it's due for its check \u2014 my pacer check, you know'"
+ },
+ "706acec766015201bd0ee1df4d791aae13074a245834c022dea144e597ee4e8a": {
+  "answer": {
+   "choice": "either",
+   "confidence": 0.33,
+   "probabilities": {
+    "appt_074": 0.07,
+    "appt_075": 0.37,
+    "either": 0.56
+   },
+   "type": "choice"
+  },
+  "input_tokens": 449,
+  "latency_ms": 555.0,
+  "state": "A patient calling a multi-specialty clinic said they want: 'I need my regular dental checkup'"
  },
  "707449955413f5388dc67c6d521bc0dc1d9c8c17165b4a6ef4893b2f37e1bbaa": {
   "answer": {
@@ -17131,6 +17191,21 @@
   "latency_ms": 703.1,
   "state": "A patient calling a multi-specialty clinic said they want: 'doctor sent me for an A1C blood sugar test'"
  },
+ "83e90d23709635478b88edb8e83eb8dd9defe3a6841179440c48484909a9bc78": {
+  "answer": {
+   "choice": "appt_076",
+   "confidence": 0.69,
+   "probabilities": {
+    "appt_075": 0.04,
+    "appt_076": 0.79,
+    "either": 0.17
+   },
+   "type": "choice"
+  },
+  "input_tokens": 429,
+  "latency_ms": 835.4,
+  "state": "A patient calling a multi-specialty clinic said they want: 'I need my teeth looked at, I've never been there'"
+ },
  "8554d7028a79e8db5fc0eafd84c9e0daceb606134e66a9b9b27b177da4c21f5a": {
   "answer": {
    "choice": "appt_019",
@@ -18689,6 +18764,21 @@
   "input_tokens": 417,
   "latency_ms": 1669.5,
   "state": "A patient calling a multi-specialty clinic said they want: 'my doctor ordered an x-ray of my knee'"
+ },
+ "9303afa6448368acf4c41c2c1d8b8b906755275d2fa331fd3e29c2360bf08209": {
+  "answer": {
+   "choice": "appt_075",
+   "confidence": 0.61,
+   "probabilities": {
+    "appt_074": 0.04,
+    "appt_075": 0.74,
+    "either": 0.22
+   },
+   "type": "choice"
+  },
+  "input_tokens": 454,
+  "latency_ms": 592.5,
+  "state": "A patient calling a multi-specialty clinic said they want: 'just need my checkup for my teeth, the regular one'"
  },
  "9349facdab31d83f3f0576b44796e65200283ceda3d21dac127cfa395efdfaa4": {
   "answer": {
@@ -22047,6 +22137,21 @@
   "latency_ms": 549.7,
   "state": "A patient calling a multi-specialty clinic said they want: 'my doctor, he ordered MRI for my shoulder'"
  },
+ "a9b49066f0d23645358c212d03e9af613c3d22da1c2b88117329a56c48dcb3f7": {
+  "answer": {
+   "choice": "appt_074",
+   "confidence": 0.99,
+   "probabilities": {
+    "appt_074": 1,
+    "appt_075": 0,
+    "either": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 445,
+  "latency_ms": 568.4,
+  "state": "A patient calling a multi-specialty clinic said they want: 'get my teeth scraped'"
+ },
  "a9c3547baf56c018f329967cfbfec3f72425f6ece8a91c8ec8036fbfa78088c6": {
   "answer": {
    "choice": "appt_161",
@@ -24562,6 +24667,21 @@
   "input_tokens": 1068,
   "latency_ms": 527.5,
   "state": "A patient calling a multi-specialty clinic said they want: 'I think I want to get tested for STIs, you know, just to be safe'"
+ },
+ "bb1566340a5bc5cece4a875d2fcb68df19e77030c8c167d3db2b995635e61b89": {
+  "answer": {
+   "choice": "either",
+   "confidence": 0.36,
+   "probabilities": {
+    "appt_074": 0.08,
+    "appt_075": 0.35,
+    "either": 0.57
+   },
+   "type": "choice"
+  },
+  "input_tokens": 448,
+  "latency_ms": 481.4,
+  "state": "A patient calling a multi-specialty clinic said they want: 'just my regular dental checkup'"
  },
  "bb3a134262431bdb1f363dd23b34193de26df0b15106d1373b4205c409564cc6": {
   "answer": {

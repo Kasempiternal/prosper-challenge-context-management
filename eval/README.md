@@ -1083,13 +1083,17 @@ model; none is a wrong commit.
 
 ### Label corrections, round 5
 
-None applied. Two pairs of dev labels disagree about the same words on the same types, and the
-lead decides:
+Two pairs of dev labels disagreed about the same words on the same types. The lead decided after
+the round 5 review; the relabels were applied with the review fixes (below).
 
-| words | label A | label B | what the resolver does now |
+| words | label A | label B | decision |
 |---|---|---|---|
-| "blood work" | h4-27: ask Blood Draw or Fasting Blood Test | main type-14: offer Blood Draw | asks (class 1), so type-14 is a miss |
-| "regular dental checkup" | h3-33: ask Dental Cleaning or Dental Exam | nat2-geo-03, -06, -08, -14, nat2-noloc-01: offer Cleaning or Exam | books Dental Exam, so h3-33 is a wrong commit |
+| "blood work" | h4-27: ask Blood Draw or Fasting Blood Test | main type-14: offer Blood Draw | policy: ask when the visits need different preparation. type-14 now expects the ask (Blood Draw, Fasting Blood Test); street str-11, str-23, str-29 ("blood test", national) expect a service question, whose options there include Lipid Panel |
+| "regular dental checkup" | h3-33: ask Dental Cleaning or Dental Exam | nat2-geo-03, -06, -08, -14, nat2-noloc-01: offer Cleaning or Exam | policy: ask when the visits need different preparation. nat2-geo-03, -08, -14 and nat2-noloc-01 now expect the ask (Dental Cleaning, Dental Exam). nat2-geo-06 keeps its label: "you know the cleaning" names the cleaning, and it now books it |
+
+Same words, same policy, not relabelled (no approval yet): national nat-geo-04, nat-geo-12,
+nat-noloc-03 ("routine blood work", labelled to offer either visit) and nat2-geo-15 ("my checkup
+for my teeth, the regular one"). All four now ask; each is a miss, not a wrong commit.
 
 ### Requests, latency, spend
 
@@ -1102,3 +1106,68 @@ lexically. Resolver alone, no network, p95: main 4.3 ms, national 6.4, national2
 Spend: JEV 181 new cached requests, 234,134 input tokens, $0.0094, plus 124 requests ($0.0078)
 for the triage experiment, kept out of the eval cache. OpenAI 164 new cached requests, 88,689 input
 tokens, $0.013. Both caches are committed.
+
+## Round 5 review fixes
+
+Every probe phrase of the round 5 review is a regression test in
+`backend/tests/scheduling/test_sched_review_r5.py` (related visits: `test_sched_false_refusals.py`),
+run with no model and with stubs that answer every question confidently.
+
+| finding | mechanism | where |
+|---|---|---|
+| 1 related visit (blocker) | A visit farther than 50 miles is never replaced. A more general visit near the caller is asked about beside the far one, both pickable: "The nearest CT - chest is about 229 miles away, in Detroit; a CT scan is 1 mile away, at Hyde Park. Would that work, or should I look in Detroit?" General means: the same specialty and required capability, and a name whose words ("scan" aside) are some but not all of the asked visit's, the rest no age group or purpose (screening, diagnostic). Pelvic floor therapy, pediatric echo, adult ADHD, nuclear stress test, prenatal ultrasound, spine MRI and colonoscopy get no substitute | `lexicon.general_kin`, `resolver._kin_nearby`, `templates.say_refuse` |
+| 2 umbrella and a filter | When the rules leave one of the umbrella's visits and not the one chosen, the search runs again on the choice alone, so its refusal is said ("I can't book a lipid panel with Dr. Leila Sato") | `resolver._without_umbrella` |
+| 3 overfitting | Umbrella words are read against an English function-word list, referrers (nurse, GP, physician, specialist, my doctor), booking verbs (due, scheduled), how often (regular, routine, numbers), and any word naming the visit's specialty ("pediatrician"). A name counts as said in full only with its visit noun ("dental" no longer says Dental Exam). 20 paraphrases of the three dev requests ask with either sure model | `text.FUNCTION_WORDS`, `lexicon._of_request`, `umbrella`, `names.specialties_named` |
+| 4 provider answers | An answer to "which doctor?" that names nobody and has words no fact of those doctors explains ("the cardiologist", "the one who speaks Spanish", "the one my daughter sees") asks again; no chooser is consulted. "instead", "actually" are no description | `resolver._consult_provider`, `names._CLUE_STOPWORDS` |
+| 5 vague answer | An answer to "Is that A or B?" that names neither and whose words fit both alike ("the checkup") asks the same question; three such answers hand off. "the one down the throat" still goes to the model | `resolver._answers_neither`, `_ask_again` |
+| 6a top-weight aliases | Measured, not adopted: removes the "heart checkup" ask and drops the new patient exam from "dental checkup", but loses h4-27 and h4-m05 (JEV heldout4 wrong commits 0 -> 2; 13 of the 20 paraphrases stop asking) | - |
+| 6b fasting | A question between a specialty's plain visit and its fasting one is "Did your doctor say to fast for it?": an opening yes or no, or "fast" with or without a no, answers it; an unsure answer asks again. Not generalized: the catalog has no preparation field, and a lipid panel beside a fasting test has no clean mapping, so that question keeps the names | `lexicon.fasting_pair`, `fasting_answer`, `templates.say_ask` |
+| 6c sick visit | Read off the names: the most general offered visit named for being sick and a visit noun (Sick Visit in both catalogs). Neither catalog's General specialty has an acute visit; a catalog with no such name adds none | `lexicon._sick_visits` |
+| 6d unoffered path | Not changed: the check weighs the pick's answer against the unoffered visit, so it cannot be sent before the pick returns | - |
+| out of scope (a) | The first name is the word before the surname, not the phrase's first word: "actually Dr. Linda Ramirez" now matches the two Dr. Linda Ramirezes and is refused by that name for a sick visit. A full name nobody has is said and asked: "I don't see a Dr. Karen Ramirez. Do you mean Dr. Priya Ramirez?" | `names._score_providers`, `unmatched_first_name`, `resolver._ask_unknown_first_name` |
+| out of scope (b) | A screening (named so, listed under a "screening" alias, or with a "Diagnostic" visit of the same name beside it) chosen while the words describe a finding (lump, pain, abnormal, follow-up...; not negated, "screening" not said) becomes its diagnostic visit; with none, it is asked between the screening and the specialty's default visit. National mammogram for a lump books Diagnostic Mammogram. SF's only Mammogram is marked screening by neither name nor alias, so it still books | `lexicon.is_screening`, `diagnostic_variant`, `describes_symptom`, `resolver._ask_screening` |
+
+Data: "dental checkup" and "dental check up" list Dental Cleaning beside Dental Exam (both 1.0,
+New Patient Exam 0.6); "six month dental checkup", "six month dental check up" and "6 month dental
+checkup" list Cleaning and Exam. Made in `backend/data/aliases.json`; the national aliases.json is
+generated from it (`backend/tools/gen_national_catalog.py --seed 20261002`), and regenerating left
+national catalog.json byte-identical (sha256 2146030501ce...). The plain "six month checkup" was not
+added: a baby's six-month checkup is a well-child visit.
+
+### Results (offline, from the committed caches)
+
+"Before" is the round 5 table above (`44c3527`); labels as relabelled.
+
+| set | JEV before | JEV after | no model before | no model after |
+|---|---|---|---|---|
+| main | 0/46; 103/105 | 0/46; 104/105 | 0/46; 103/105 | 0/46; 104/105 |
+| heldout | 0/6; 12/12 | 0/6; 12/12 | 1/5; 10/12 | 1/5; 10/12 |
+| heldout2 | 0/36; 45/49 | 0/36; 45/49 | 3/25; 29/49 | 3/25; 29/49 |
+| tune | 0/21; 24/26 | 0/21; 24/26 | 4/15; 14/26 | 4/15; 14/26 |
+| heldout3 | **1/38**; 50/54 | **0/37**; 51/54 | 13/26; 24/54 | 12/25; 25/54 |
+| national | 0/34; 51/56 | 0/31; 48/56 | 1/36; 52/56 | 1/33; 49/56 |
+| national2 | 0/36; 51/54 | 0/32; 51/54 | 0/29; 44/54 | 0/24; 43/54 |
+| street | 0/22; 33/36 | 0/22; 36/36 | 0/22; 33/36 | 0/22; 36/36 |
+| national3 | 0/38; 55/56 | 0/38; 55/56 | 4/28; 41/56 | 4/28; 41/56 |
+| heldout4 | 0/38; 59/62 | 0/38; 59/62 | 5/26; 37/62 | 5/26; 37/62 |
+| national4 | 0/35; 52/56 | 0/33; 50/56 | 0/31; 47/56 | 0/31; 47/56 |
+
+JEV wrong commits: 1 -> 0. No-model wrong commits: 31 -> 30, up on no set. OpenAI and embeddings
+ran every set without error; their wrong commits rose on no set (OpenAI heldout4 7/41, national2
+1/31; embeddings national 1/34, national2 1/29).
+
+Changed turns (JEV; no model the same except where noted):
+- h3-33: wrong commit (Dental Exam) -> asks Dental Cleaning or Dental Exam (alias data, finding 3).
+- main type-14, str-11, -23, -29, nat2-geo-03, -08, -14 (t2), nat2-noloc-01 (t2): asks, now labelled so.
+- nat2-geo-06 "you know the cleaning": JEV books the cleaning (was asked); no model asks.
+- nat-geo-04, nat-geo-12, nat-noloc-03 ("routine blood work"), nat2-geo-15: offer -> ask; labels not changed (above).
+- nat4-geo-07, nat4-noloc-02: CT scan offer -> the CT - chest / CT scan question (finding 1). The labels expect an offer.
+- type-14, h2-02, h4-27 ask the fasting question instead of naming the two visits.
+
+Requests: JEV 431 -> 435 over the 558 dev resolve turns (0.77 -> 0.78 per turn); turns three or
+more requests deep: 11 -> 11. Spend: JEV 8 new cached requests, 3,582 input tokens, $0.00015;
+OpenAI 8 new cached requests, 1,530 input tokens, $0.00024. Both caches are committed.
+
+Still open: a lexical tie narrowed by a doctor commits the survivor, as in base ("a blood test for
+my cholesterol" with Dr. Leila Sato books a blood draw); "the one at Richmond or Mission Bay"
+books the Mission Bay Dr. Maria Garcia (the site named with more words wins), as in base.
