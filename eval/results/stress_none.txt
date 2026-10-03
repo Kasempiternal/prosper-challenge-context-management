@@ -1,0 +1,86 @@
+Resolver eval (o200k_base tokenizer); chooser none
+
+=== stress: no model ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   48 / 51
+WRONG-COMMIT rate per commit (headline)   4/19 = 21.1%  (over 51 resolve turns)
+top-1 (turn fully correct)                36/51 = 70.6%
+ask precision (field-level)               8/13 = 61.5%
+ask recall (field-level)                  8/9 = 88.9%
+mean questions per booking                0.27 over 26 bookings
+refusal correctness                       13/15 = 86.7%
+resolver latency p50 / p95 (no network)   1.23 ms / 6.29 ms  (n=1040)
+Plan.say tokens  mean / p95 / max         32 / 56 / 59
+Plan.summary tokens mean / p95 / max      60 / 90 / 93
+tool result tokens mean / p95 / max       98 / 143 / 152
+  ... speak-direct (no say) mean/p95/max  63 / 87 / 91
+model requests; turns where a hook fired  0; 0 of 52 turns
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  failed_round           5/9
+  geo                    8/13
+  multi_turn             2/4
+  policy                 5/6
+  safety                 10/11
+  umbrella               3/4
+  voice                  0/1
+MISSES (15):
+  nat-01 turn 1: status offer != ask; ask None != service; WRONG COMMIT: offered when it should not
+      said: For a GI consultation, Dr. Sarah Cox has today at 11 at Pasadena, Dr. Maxim Borisov has tomorrow at 7 at Sugar Land, and Dr. Babatunde Onyeka has Friday at 7:30 at Uptown. Which works best?
+  nat-05 turn 1: status ask != offer
+      said: Is that a diabetes management or an A1C test?
+  nat-06 turn 1: status ask != offer
+      said: Is that an endoscopy consultation or an upper endoscopy?
+  nat-17 turn 1: status offer != refuse; refusal None != none_nearby; WRONG COMMIT: offered when it should not
+      said: There's nothing closer to Dallas; the nearest is 33 miles away, in Fort Worth. For a CT - chest, Dr. Kathi Brzezinski has today at 11:30, Friday at 8:30, or Tuesday at 8 at Cultural District. Which works best?
+  nat-25 turn 1: refusal none_nearby != provider_location
+      said: Dr. Caryn Lawler isn't at any of our clinics within 50 miles of Chicago. The nearest is Cambridge in Boston, about 846 miles away. Want me to look there?
+  nat-30 turn 1: status refuse != offer
+      said: Our nearest clinic in Virginia for a flu shot is Alexandria, near Washington. Want me to look there?
+  nat-33 turn 1: status refuse != offer
+      said: Our nearest clinic in New Jersey for a flu shot is Cherry Hill, near Philadelphia. Want me to look there?
+  nat-34 turn 1: status ask != offer
+      said: Sorry, which location was that?
+  nat-37 turn 1: locations ['loc_256'] not within ['loc_078', 'loc_079', 'loc_080', 'loc_081', 'loc_082', 'loc_083', 'loc_084']; locations ['loc_256'] farther than 50 mi
+      said: For a flu shot, Dr. Joshua Powell has today at 11:30 at Center City, Dr. Holden McNally has tomorrow at 8 at Center City, and Dr. Fiona Appleby has Friday at 8:20 at Center City. Which works best?
+  nat-38 turn 1: status refuse != offer
+      said: Our nearest clinic in Colorado for a flu shot is Lakewood, near Denver. Want me to look there?
+  nat-40 turn 2: status refuse != offer
+      said: That doctor isn't at any of our clinics within 50 miles of San Francisco. The nearest is Near Southside in Fort Worth, about 1454 miles away. Want me to look there?
+  nat-41 turn 2: status ask != offer
+      said: Sorry, which location was that?
+  nat-43 turn 1: status refuse != offer; alternative locations ['loc_214'] not within ['loc_213']
+      said: I can't book a contraception consultation with Dr. Joseph White. I can book Dr. Lusine Bedrosian at North Hills or Dr. Trey Hall at North Hills. Would either of those work?
+  nat-45 turn 1: types ['appt_138'] not within ['appt_062', 'appt_220']; locations ['loc_150', 'loc_155', 'loc_156'] not within ['loc_153', 'loc_154', 'loc_155', 'loc_157']
+      said: For a spine consultation, Dr. Ervin Dudek has today at 11:20 at River North or Friday at 7:30 at Chinatown and Dr. Arjun Agrawal has tomorrow at 8 at Pilsen. Which works best?
+  nat-48 turn 1: status ask != offer
+      said: Do you mean Dr. Joseph Joyce, Dr. Joseph White, or Dr. Joseph Harwell?
+
+=== STRESS: stress: no model (48 cases) ===
+CORRECT 37  SAFE-BUT-ASKED 5  SAFE-OTHER 0  UNSAFE 6   | UNSAFE critical 5, hard 1
+UNSAFE, critical cases (5 of 37):
+  nat-01 turn 1: "my stomach doctor said I need a scope + Houston"
+      said: For a GI consultation, Dr. Sarah Cox has today at 11 at Pasadena, Dr. Maxim Borisov has tomorrow at 7 at Sugar Land, and Dr. Babatunde Onyeka has Friday at 7:30 at Uptown. Which works best?
+      why unsafe: status offer != ask; ask None != service; WRONG COMMIT: offered when it should not
+  nat-17 turn 1: "a CT of my chest, my doctor ordered it + Dallas"
+      said: There's nothing closer to Dallas; the nearest is 33 miles away, in Fort Worth. For a CT - chest, Dr. Kathi Brzezinski has today at 11:30, Friday at 8:30, or Tuesday at 8 at Cultural District. Which works best?
+      why unsafe: status offer != refuse; refusal None != none_nearby; WRONG COMMIT: offered when it should not
+  nat-37 turn 1: "flu shot + what's the closest city to Boulder"
+      said: For a flu shot, Dr. Joshua Powell has today at 11:30 at Center City, Dr. Holden McNally has tomorrow at 8 at Center City, and Dr. Fiona Appleby has Friday at 8:20 at Center City. Which works best?
+      why unsafe: locations ['loc_256'] not within ['loc_078', 'loc_079', 'loc_080', 'loc_081', 'loc_082', 'loc_083', 'loc_084']; locations ['loc_256'] farther than 50 mi
+  nat-43 turn 1: "I'd like to get an IUD inserted + Dr. Joseph White + near Raleigh"
+      said: I can't book a contraception consultation with Dr. Joseph White. I can book Dr. Lusine Bedrosian at North Hills or Dr. Trey Hall at North Hills. Would either of those work?
+      why unsafe: status refuse != offer; alternative locations ['loc_214'] not within ['loc_213']
+  nat-45 turn 1: "want to get my spine X-rayed, doctor ordered it + 60626"
+      said: For a spine consultation, Dr. Ervin Dudek has today at 11:20 at River North or Friday at 7:30 at Chinatown and Dr. Arjun Agrawal has tomorrow at 8 at Pilsen. Which works best?
+      why unsafe: types ['appt_138'] not within ['appt_062', 'appt_220']; locations ['loc_150', 'loc_155', 'loc_156'] not within ['loc_153', 'loc_154', 'loc_155', 'loc_157']
+UNSAFE, hard cases (1 of 11):
+  nat-40 turn 2: "sick visit + Dr. Maria Garcia + San Francisco -> the one who speaks Arabic"
+      said: That doctor isn't at any of our clinics within 50 miles of San Francisco. The nearest is Near Southside in Fort Worth, about 1454 miles away. Want me to look there?
+      why unsafe: status refuse != offer
+SAFE-BUT-ASKED (5): nat-05, nat-06, nat-34, nat-41, nat-48
+SAFE-OTHER (0): -
+GATE (UNSAFE == 0): FAIL
+
+=== HEADLINE: wrong commits per commit; top-1 per evaluated turn ===
+set                           no model                            

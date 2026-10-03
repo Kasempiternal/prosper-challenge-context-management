@@ -1,0 +1,221 @@
+Resolver eval (o200k_base tokenizer); chooser embed
+
+=== stress_sf: no model ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   40 / 47
+WRONG-COMMIT rate per commit (headline)   6/17 = 35.3%  (over 47 resolve turns)
+top-1 (turn fully correct)                31/47 = 66.0%
+ask precision (field-level)               14/19 = 73.7%
+ask recall (field-level)                  14/16 = 87.5%
+mean questions per booking                0.62 over 16 bookings
+refusal correctness                       11/12 = 91.7%
+resolver latency p50 / p95 (no network)   0.28 ms / 10.15 ms  (n=980)
+Plan.say tokens  mean / p95 / max         26 / 44 / 48
+Plan.summary tokens mean / p95 / max      51 / 83 / 86
+tool result tokens mean / p95 / max       85 / 126 / 129
+  ... speak-direct (no say) mean/p95/max  56 / 79 / 83
+model requests; turns where a hook fired  0; 3 of 49 turns
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  context_word           2/2
+  failed_round           2/9
+  geo                    4/4
+  multi_turn             4/7
+  policy                 5/5
+  umbrella               2/4
+  voice                  3/4
+  wrong_doctor           4/5
+MISSES (14):
+  sf-01 turn 1: status offer != ask; ask None != service; ask options None != ['appt_054', 'appt_055']; WRONG COMMIT: offered when it should not
+      said: For a GI consultation, Dr. Fatima Hernandez has today at 11:20, Friday at 8:40, or Thursday the 15th at 9:20 at North Gate. Which works best?
+  sf-02 turn 1: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+      said: Is that an annual physical or an annual wellness visit?
+  sf-05 turn 1: status ask != offer
+      said: Is that a mole removal or a skin cancer screening?
+  sf-06 turn 1: status ask != offer
+      said: Is that a cardiology consultation or a stress test?
+  sf-07 turn 1: status offer != ask; ask None != service; ask options None != ['appt_072', 'appt_073']; WRONG COMMIT: offered when it should not
+      said: For a pacemaker check, Dr. David Chen has today at 11 at Mission District, tomorrow at 8 at Downtown, or Friday at 8 at Downtown. Which works best?
+  sf-09 turn 1: ask options ['prov_002', 'prov_003', 'prov_008'] != ['prov_002', 'prov_003']
+      said: Do you mean Dr. Maria Garcia in pediatrics, Dr. Maria Garcia in family medicine, or Dr. Carlos Garcia in family medicine?
+      provider clues negated ['not', 'speaks', 'spanish']: asking
+  sf-25 turn 1: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+      said: Is that an annual physical or an annual wellness visit?
+  sf-25 turn 2: status ask != offer
+      said: What's the visit for?
+  sf-26 turn 1: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+      said: Is that an annual physical or an annual wellness visit?
+  sf-26 turn 2: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+      said: Is that an annual physical or an annual wellness visit?
+  sf-28 turn 3: status ask != offer
+      said: Do you mean Dr. David Chen or Dr. Emily Chen?
+      provider clues negated ['no', 'not', 'her', 'other']: asking
+  sf-33 turn 1: status ask != offer
+      said: Is that a COVID-19 vaccine or a flu shot?
+  sf-36 turn 1: status offer != refuse; refusal None != new_patient_provider; WRONG COMMIT: offered when it should not
+      said: For a blood draw, Dr. Leila Sato has Wednesday the 14th at 8, Friday the 16th at 8, or Monday the 19th at 8 at Mission Bay. Which works best?
+  sf-38 turn 1: types ['appt_007'] != appt_017; providers ['prov_002', 'prov_003'] not within ['prov_002', 'prov_012', 'prov_013']; locations ['loc_000', 'loc_007'] not within ['loc_000', 'loc_001', 'loc_002', 'loc_004', 'loc_005']
+      said: For a sick visit, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Mission Bay, or Friday at 8 at Mission Bay. Which works best?
+  sf-39 turn 1: types ['appt_012'] != appt_010
+      said: For a COVID-19 vaccine, Dr. Maria Garcia has today at 11 at Richmond or tomorrow at 8 at Mission Bay and Dr. Carlos Garcia has Friday at 8 at North Beach. Which works best?
+  sf-40 turn 1: types ['appt_078'] != appt_062; providers ['prov_023', 'prov_028'] not within ['prov_014', 'prov_015']; locations ['loc_001', 'loc_004'] not within ['loc_004', 'loc_005']
+      said: For a pulmonology consultation, Dr. Daniel Nguyen has today at 11:20 or tomorrow at 8 at Downtown and Dr. Jennifer Nguyen has Friday at 8:40 at Mission District. Which works best?
+
+=== stress_sf: embeddings ===
+----------------------------------------------------------------------------------------------------
+cases / evaluated turns                   40 / 47
+WRONG-COMMIT rate per commit (headline)   9/20 = 45.0%  (over 47 resolve turns)
+top-1 (turn fully correct)                31/47 = 66.0%
+ask precision (field-level)               13/15 = 86.7%
+ask recall (field-level)                  13/16 = 81.2%
+mean questions per booking                0.44 over 16 bookings
+refusal correctness                       12/12 = 100.0%
+resolver latency p50 / p95 (no network)   0.47 ms / 11.68 ms  (n=980)
+Plan.say tokens  mean / p95 / max         28 / 44 / 48
+Plan.summary tokens mean / p95 / max      53 / 82 / 86
+tool result tokens mean / p95 / max       88 / 125 / 129
+  ... speak-direct (no say) mean/p95/max  57 / 79 / 83
+model requests (rate per resolve turn)    16 (32.7%); local 16, disk cache 0, failed 0
+model latency p50 / p95 / max (local)     6 / 8 / 20 ms
+model input tokens total / per request    0 / 0
+model cost if every request were live     $0.00000
+----------------------------------------------------------------------------------------------------
+by category (cases fully correct):
+  context_word           1/2
+  failed_round           4/9
+  geo                    4/4
+  multi_turn             4/7
+  policy                 5/5
+  umbrella               2/4
+  voice                  3/4
+  wrong_doctor           3/5
+MISSES (14):
+  sf-01 turn 1: status offer != ask; ask None != service; ask options None != ['appt_054', 'appt_055']; WRONG COMMIT: offered when it should not
+      said: For a GI consultation, Dr. Fatima Hernandez has today at 11:20, Friday at 8:40, or Thursday the 15th at 9:20 at North Gate. Which works best?
+      type disambiguator: act appt_053 [appt_053=0.99 appt_055=0.01 appt_054=0.00]
+  sf-02 turn 1: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+      said: Is that an annual physical or an annual wellness visit?
+      type disambiguator: ask ('appt_016', 'appt_042') [appt_016=0.59 appt_042=0.32 appt_015=0.05]
+  sf-05 turn 1: status ask != offer
+      said: Is that a mole removal or a skin cancer screening?
+  sf-07 turn 1: status offer != ask; ask None != service; ask options None != ['appt_072', 'appt_073']; WRONG COMMIT: offered when it should not
+      said: For a pacemaker check, Dr. David Chen has today at 11 at Mission District, tomorrow at 8 at Downtown, or Friday at 8 at Downtown. Which works best?
+      type disambiguator: ask ('appt_073', 'appt_025') [appt_073=0.76 appt_025=0.15 appt_022=0.05]
+  sf-09 turn 1: ask options ['prov_002', 'prov_003', 'prov_008'] != ['prov_002', 'prov_003']
+      said: Do you mean Dr. Maria Garcia in pediatrics, Dr. Maria Garcia in family medicine, or Dr. Carlos Garcia in family medicine?
+      provider clues negated ['not', 'speaks', 'spanish']: asking
+  sf-10 turn 1: status offer != ask; ask None != provider; WRONG COMMIT: offered when it should not
+      said: For an annual physical, Dr. Lucas Chen has tomorrow at 8, Tuesday at 10, or Friday the 16th at 8 at Mission Bay. Which works best?
+      provider chooser on ['daughter', 'recommended']: act prov_047 [prov_047=0.80 prov_012=0.17 prov_004=0.03]
+  sf-13 turn 1: types ['appt_034'] != appt_032
+      said: For a fracture follow-up, Dr. Carlos Nguyen has today at 11 at North Beach, tomorrow at 8:20 at Midtown, or Friday at 8 at Midtown. Which works best?
+      type disambiguator: act appt_034 [appt_034=0.86 appt_065=0.04 appt_032=0.04]
+      type check appt_034 vs appt_032: act appt_034 [appt_034=0.86 appt_065=0.04 appt_032=0.04]
+  sf-25 turn 1: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+      said: Is that an annual physical or an annual wellness visit?
+      type disambiguator: ask ('appt_016', 'appt_042') [appt_016=0.59 appt_042=0.32 appt_015=0.05]
+  sf-25 turn 2: types ['appt_002'] != appt_016; providers ['prov_002', 'prov_003'] not within ['prov_002', 'prov_012', 'prov_013']; locations ['loc_000', 'loc_007'] not within ['loc_000', 'loc_001', 'loc_002', 'loc_004', 'loc_005']
+      said: For an annual physical, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Richmond, or Friday at 8 at Mission Bay. Which works best?
+      type disambiguator: act appt_002 [appt_002=0.96 appt_003=0.04]
+      type check appt_002 vs appt_003: act appt_002 [appt_002=0.96 appt_003=0.04]
+  sf-26 turn 1: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+      said: Is that an annual physical or an annual wellness visit?
+      type disambiguator: ask ('appt_016', 'appt_042') [appt_016=0.59 appt_042=0.32 appt_015=0.05]
+  sf-26 turn 2: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+      said: Is that an annual physical or an annual wellness visit?
+  sf-28 turn 3: status ask != offer
+      said: Do you mean Dr. David Chen or Dr. Emily Chen?
+      provider clues negated ['no', 'not', 'her', 'other']: asking
+  sf-33 turn 1: types ['appt_011'] != appt_012
+      said: For a flu shot, Dr. Maria Garcia has today at 11 at Richmond or tomorrow at 8 at Mission Bay and Dr. Carlos Garcia has Friday at 8 at North Beach. Which works best?
+      type disambiguator: act appt_011 [appt_011=0.92 appt_012=0.07 appt_010=0.01]
+      type check appt_011 vs appt_012: act appt_011 [appt_011=0.92 appt_012=0.07 appt_010=0.01]
+  sf-38 turn 1: types ['appt_007'] != appt_017; providers ['prov_002', 'prov_003'] not within ['prov_002', 'prov_012', 'prov_013']; locations ['loc_000', 'loc_007'] not within ['loc_000', 'loc_001', 'loc_002', 'loc_004', 'loc_005']
+      said: For a sick visit, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Mission Bay, or Friday at 8 at Mission Bay. Which works best?
+      type disambiguator: act appt_017 [appt_017=0.82 appt_038=0.04 appt_015=0.04]
+  sf-39 turn 1: types ['appt_012'] != appt_010
+      said: For a COVID-19 vaccine, Dr. Maria Garcia has today at 11 at Richmond or tomorrow at 8 at Mission Bay and Dr. Carlos Garcia has Friday at 8 at North Beach. Which works best?
+      type disambiguator: open [appt_010=0.44 appt_011=0.33 appt_013=0.13]
+  sf-40 turn 1: types ['appt_078'] != appt_062; providers ['prov_023', 'prov_028'] not within ['prov_014', 'prov_015']; locations ['loc_001', 'loc_004'] not within ['loc_004', 'loc_005']
+      said: For a pulmonology consultation, Dr. Daniel Nguyen has today at 11:20 or tomorrow at 8 at Downtown and Dr. Jennifer Nguyen has Friday at 8:40 at Mission District. Which works best?
+      type disambiguator: open [appt_078=0.57 appt_079=0.07 appt_028=0.07]
+
+=== STRESS: stress_sf: no model (40 cases) ===
+CORRECT 26  SAFE-BUT-ASKED 4  SAFE-OTHER 4  UNSAFE 6   | UNSAFE critical 6, hard 0
+UNSAFE, critical cases (6 of 33):
+  sf-01 turn 1: "my stomach doctor said I need a scope"
+      said: For a GI consultation, Dr. Fatima Hernandez has today at 11:20, Friday at 8:40, or Thursday the 15th at 9:20 at North Gate. Which works best?
+      why unsafe: status offer != ask; ask None != service; ask options None != ['appt_054', 'appt_055']; WRONG COMMIT: offered when it should not
+  sf-07 turn 1: "I need a cholesterol check"
+      said: For a pacemaker check, Dr. David Chen has today at 11 at Mission District, tomorrow at 8 at Downtown, or Friday at 8 at Downtown. Which works best?
+      why unsafe: status offer != ask; ask None != service; ask options None != ['appt_072', 'appt_073']; WRONG COMMIT: offered when it should not
+  sf-36 turn 1: "my doctor, he found problem with my hormones in the blood test, said I need a specialist for hormones and the glands"
+      said: For a blood draw, Dr. Leila Sato has Wednesday the 14th at 8, Friday the 16th at 8, or Monday the 19th at 8 at Mission Bay. Which works best?
+      why unsafe: status offer != refuse; refusal None != new_patient_provider; WRONG COMMIT: offered when it should not
+  sf-38 turn 1: "my 3-year-old daughter, she's had a fever since last night and she keeps tugging at her ear"
+      said: For a sick visit, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Mission Bay, or Friday at 8 at Mission Bay. Which works best?
+      why unsafe: types ['appt_007'] != appt_017; providers ['prov_002', 'prov_003'] not within ['prov_002', 'prov_012', 'prov_013']; locations ['loc_000', 'loc_007'] not within ['loc_000', 'loc_001', 'loc_002', 'loc_004', 'loc_005']
+  sf-39 turn 1: "I need my Tdap booster, it's been more than ten years"
+      said: For a COVID-19 vaccine, Dr. Maria Garcia has today at 11 at Richmond or tomorrow at 8 at Mission Bay and Dr. Carlos Garcia has Friday at 8 at North Beach. Which works best?
+      why unsafe: types ['appt_012'] != appt_010
+  sf-40 turn 1: "doctor wants pictures of my lungs, the chest films"
+      said: For a pulmonology consultation, Dr. Daniel Nguyen has today at 11:20 or tomorrow at 8 at Downtown and Dr. Jennifer Nguyen has Friday at 8:40 at Mission District. Which works best?
+      why unsafe: types ['appt_078'] != appt_062; providers ['prov_023', 'prov_028'] not within ['prov_014', 'prov_015']; locations ['loc_001', 'loc_004'] not within ['loc_004', 'loc_005']
+UNSAFE, hard cases (0 of 7):
+SAFE-BUT-ASKED (4): sf-05, sf-06, sf-28, sf-33
+SAFE-OTHER (4): sf-02, sf-09, sf-25, sf-26
+  sf-02: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+  sf-09: ask options ['prov_002', 'prov_003', 'prov_008'] != ['prov_002', 'prov_003']
+  sf-25: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+  sf-26: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+GATE (UNSAFE == 0): FAIL
+
+=== STRESS: stress_sf: embeddings (40 cases) ===
+CORRECT 26  SAFE-BUT-ASKED 2  SAFE-OTHER 3  UNSAFE 9   | UNSAFE critical 9, hard 0
+UNSAFE, critical cases (9 of 33):
+  sf-01 turn 1: "my stomach doctor said I need a scope"
+      said: For a GI consultation, Dr. Fatima Hernandez has today at 11:20, Friday at 8:40, or Thursday the 15th at 9:20 at North Gate. Which works best?
+      why unsafe: status offer != ask; ask None != service; ask options None != ['appt_054', 'appt_055']; WRONG COMMIT: offered when it should not
+  sf-07 turn 1: "I need a cholesterol check"
+      said: For a pacemaker check, Dr. David Chen has today at 11 at Mission District, tomorrow at 8 at Downtown, or Friday at 8 at Downtown. Which works best?
+      why unsafe: status offer != ask; ask None != service; ask options None != ['appt_072', 'appt_073']; WRONG COMMIT: offered when it should not
+  sf-10 turn 1: "annual physical + Dr. Chen, the one my daughter recommended"
+      said: For an annual physical, Dr. Lucas Chen has tomorrow at 8, Tuesday at 10, or Friday the 16th at 8 at Mission Bay. Which works best?
+      why unsafe: status offer != ask; ask None != provider; WRONG COMMIT: offered when it should not
+  sf-13 turn 1: "My knee still hurts after PT, I want a doctor to look at it"
+      said: For a fracture follow-up, Dr. Carlos Nguyen has today at 11 at North Beach, tomorrow at 8:20 at Midtown, or Friday at 8 at Midtown. Which works best?
+      why unsafe: types ['appt_034'] != appt_032
+  sf-25 turn 2: "my baby's checkup -> the second one"
+      said: For an annual physical, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Richmond, or Friday at 8 at Mission Bay. Which works best?
+      why unsafe: types ['appt_002'] != appt_016; providers ['prov_002', 'prov_003'] not within ['prov_002', 'prov_012', 'prov_013']; locations ['loc_000', 'loc_007'] not within ['loc_000', 'loc_001', 'loc_002', 'loc_004', 'loc_005']
+  sf-33 turn 1: "I need a, uh, a flu, no wait, a COVID shot"
+      said: For a flu shot, Dr. Maria Garcia has today at 11 at Richmond or tomorrow at 8 at Mission Bay and Dr. Carlos Garcia has Friday at 8 at North Beach. Which works best?
+      why unsafe: types ['appt_011'] != appt_012
+  sf-38 turn 1: "my 3-year-old daughter, she's had a fever since last night and she keeps tugging at her ear"
+      said: For a sick visit, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Mission Bay, or Friday at 8 at Mission Bay. Which works best?
+      why unsafe: types ['appt_007'] != appt_017; providers ['prov_002', 'prov_003'] not within ['prov_002', 'prov_012', 'prov_013']; locations ['loc_000', 'loc_007'] not within ['loc_000', 'loc_001', 'loc_002', 'loc_004', 'loc_005']
+  sf-39 turn 1: "I need my Tdap booster, it's been more than ten years"
+      said: For a COVID-19 vaccine, Dr. Maria Garcia has today at 11 at Richmond or tomorrow at 8 at Mission Bay and Dr. Carlos Garcia has Friday at 8 at North Beach. Which works best?
+      why unsafe: types ['appt_012'] != appt_010
+  sf-40 turn 1: "doctor wants pictures of my lungs, the chest films"
+      said: For a pulmonology consultation, Dr. Daniel Nguyen has today at 11:20 or tomorrow at 8 at Downtown and Dr. Jennifer Nguyen has Friday at 8:40 at Mission District. Which works best?
+      why unsafe: types ['appt_078'] != appt_062; providers ['prov_023', 'prov_028'] not within ['prov_014', 'prov_015']; locations ['loc_001', 'loc_004'] not within ['loc_004', 'loc_005']
+UNSAFE, hard cases (0 of 7):
+SAFE-BUT-ASKED (2): sf-05, sf-28
+SAFE-OTHER (3): sf-02, sf-09, sf-26
+  sf-02: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+  sf-09: ask options ['prov_002', 'prov_003', 'prov_008'] != ['prov_002', 'prov_003']
+  sf-26: ask options ['appt_002', 'appt_003'] != ['appt_015', 'appt_016']
+GATE (UNSAFE == 0): FAIL
+
+--- stress_sf: no model vs embeddings ---
+metric                          off                             on
+wrong-commit (per commit)       6/17 = 35.3%                    9/20 = 45.0%
+top-1                           31/47 (66.0%)                   31/47 (66.0%)
+questions per booking           0.62                            0.44
+model requests (rate)           0 (0%)                          16 (33%)
+model latency p50/p95/max       -                               6/8/20 ms
+model $ per run (per 1k turns)  $0.00000 ($0.0000/1k turns)     $0.00000 ($0.0000/1k turns)
+
+=== HEADLINE: wrong commits per commit; top-1 per evaluated turn ===
+set                           no model                            embeddings

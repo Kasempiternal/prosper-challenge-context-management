@@ -58,6 +58,21 @@
   "latency_ms": 543.5,
   "state": "A patient calling a multi-specialty clinic said they want: 'sharp pain in my heel, worst with the first steps every morning'"
  },
+ "007bd4a65ec51b23e53f3037d645beabb7684e24b0988b21b0a4ed4b870885ae": {
+  "answer": {
+   "choice": "either",
+   "confidence": 0.62,
+   "probabilities": {
+    "appt_060": 0.01,
+    "appt_199": 0.24,
+    "either": 0.75
+   },
+   "type": "choice"
+  },
+  "input_tokens": 409,
+  "latency_ms": 565.3,
+  "state": "A patient calling a multi-specialty clinic said they want: 'I want to see a therapist'"
+ },
  "017c61ea129d26607924647ed27aa274fa23e00060a2598bffdd736817730c23": {
   "answer": {
    "choice": "prov_028",
@@ -88,6 +103,92 @@
   "latency_ms": 511.9,
   "state": "A patient calling a multi-specialty clinic said they want: 'an eckg'"
  },
+ "020c6bcff1fd734853e5602245d8f3a4c6f8885de018c5062a9cceb8dc03ecb6": {
+  "answer": {
+   "choice": "appt_032",
+   "confidence": 0.98,
+   "probabilities": {
+    "appt_000": 0,
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_004": 0.01,
+    "appt_005": 0,
+    "appt_006": 0,
+    "appt_007": 0,
+    "appt_008": 0,
+    "appt_009": 0,
+    "appt_010": 0,
+    "appt_011": 0,
+    "appt_012": 0,
+    "appt_013": 0,
+    "appt_014": 0,
+    "appt_015": 0,
+    "appt_016": 0,
+    "appt_017": 0,
+    "appt_018": 0,
+    "appt_019": 0,
+    "appt_020": 0,
+    "appt_021": 0,
+    "appt_022": 0,
+    "appt_023": 0,
+    "appt_024": 0,
+    "appt_025": 0,
+    "appt_026": 0,
+    "appt_027": 0,
+    "appt_028": 0,
+    "appt_029": 0,
+    "appt_030": 0,
+    "appt_031": 0,
+    "appt_032": 0.99,
+    "appt_033": 0,
+    "appt_034": 0,
+    "appt_035": 0,
+    "appt_036": 0,
+    "appt_037": 0,
+    "appt_038": 0,
+    "appt_039": 0,
+    "appt_040": 0,
+    "appt_041": 0,
+    "appt_042": 0,
+    "appt_043": 0,
+    "appt_044": 0,
+    "appt_050": 0,
+    "appt_051": 0,
+    "appt_052": 0,
+    "appt_053": 0,
+    "appt_054": 0,
+    "appt_055": 0,
+    "appt_056": 0,
+    "appt_057": 0,
+    "appt_058": 0,
+    "appt_059": 0,
+    "appt_060": 0,
+    "appt_061": 0,
+    "appt_062": 0,
+    "appt_063": 0,
+    "appt_064": 0,
+    "appt_065": 0,
+    "appt_066": 0,
+    "appt_067": 0,
+    "appt_068": 0,
+    "appt_069": 0,
+    "appt_072": 0,
+    "appt_073": 0,
+    "appt_074": 0,
+    "appt_075": 0,
+    "appt_076": 0,
+    "appt_078": 0,
+    "appt_079": 0,
+    "appt_080": 0,
+    "appt_081": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 2467,
+  "latency_ms": 801.0,
+  "state": "A patient calling a multi-specialty clinic said they want: 'My knee still hurts after PT, I want a doctor to look at it'"
+ },
  "02243c4a6671b2d05a5eaa9f27b80292da465c7ca060850647448a5d28cb00e3": {
   "answer": {
    "choice": "appt_056",
@@ -100,7 +201,7 @@
    "type": "choice"
   },
   "input_tokens": 434,
-  "latency_ms": 497.0,
+  "latency_ms": 494.4,
   "state": "A patient calling a multi-specialty clinic said they want: 'my doctor, he found problem with my hormones in the blood test, said I need a specialist for hormones and the glands'"
  },
  "024624325e90cea6b38788ae4d54f9e346e5ea7c457872214ceb72e672184fd3": {
@@ -374,7 +475,7 @@
    "type": "choice"
   },
   "input_tokens": 1202,
-  "latency_ms": 816.9,
+  "latency_ms": 576.7,
   "state": "A patient calling a multi-specialty clinic said they want: 'I need a thyroid ultrasound, yeah a thyroid ultrasound'"
  },
  "050f46bd079bbcd42a61155b8b6fac2d64731715481455a6fc96d99a4b185a07": {
@@ -1917,7 +2018,7 @@
    "type": "choice"
   },
   "input_tokens": 430,
-  "latency_ms": 1955.0,
+  "latency_ms": 612.4,
   "state": "A patient calling a multi-specialty clinic said they want: 'doctor wants pictures of my lungs, the chest films'"
  },
  "100adaea8081f2cc5de51b2638720302623d245a0719f8aaaca284b3e3aacff6": {
@@ -2375,7 +2476,7 @@
  "15c5670303d12709e97953a8a5b23742d1bdeb81a94c33e0a40863874957951e": {
   "answer": {
    "choice": "appt_017",
-   "confidence": 1,
+   "confidence": 0.99,
    "probabilities": {
     "appt_000": 0,
     "appt_001": 0,
@@ -2455,7 +2556,7 @@
    "type": "choice"
   },
   "input_tokens": 2475,
-  "latency_ms": 537.1,
+  "latency_ms": 517.1,
   "state": "A patient calling a multi-specialty clinic said they want: 'my 3-year-old daughter, she's had a fever since last night and she keeps tugging at her ear'"
  },
  "162e6acd1b920a6e7db09a58aa4a626375792aff3bc8acb2a15fb07240f13549": {
@@ -4041,7 +4142,7 @@
    "type": "choice"
   },
   "input_tokens": 2476,
-  "latency_ms": 826.4,
+  "latency_ms": 561.3,
   "state": "A patient calling a multi-specialty clinic said they want: 'my doctor, he found problem with my hormones in the blood test, said I need a specialist for hormones and the glands'"
  },
  "223b2c5c5e6dd231e7c007ffd15aa1a186e6ec0e93ff55627cf3c61cdd863136": {
@@ -4208,6 +4309,21 @@
   "input_tokens": 1452,
   "latency_ms": 918.8,
   "state": "A patient calling a multi-specialty clinic said they want: 'I need an X-ray of my spine, my doctor ordered it'"
+ },
+ "23873f0201f1eab70ebec4cd809b7e3647c90e10197df73a501d46b024705aca": {
+  "answer": {
+   "choice": "appt_022",
+   "confidence": 0.93,
+   "probabilities": {
+    "appt_020": 0.02,
+    "appt_022": 0.95,
+    "either": 0.03
+   },
+   "type": "choice"
+  },
+  "input_tokens": 436,
+  "latency_ms": 586.2,
+  "state": "A patient calling a multi-specialty clinic said they want: 'my cardiologist ordered a stress test'"
  },
  "23d0ad044fe17d7360cfaf82572eef0517c6057fec5f9cd8d495196ffaccda44": {
   "answer": {
@@ -4398,6 +4514,47 @@
   "latency_ms": 496.6,
   "state": "A patient calling a multi-specialty clinic said they want: 'I'm supposed to get a urine test, my doctor ordered it'"
  },
+ "254d0d9b975f12373786cc9f750fe37888bbfc4c32408ad2964d9aa400cf2b4e": {
+  "answer": {
+   "choice": "appt_226",
+   "confidence": 1,
+   "probabilities": {
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_007": 0,
+    "appt_020": 0,
+    "appt_026": 0,
+    "appt_032": 0,
+    "appt_036": 0,
+    "appt_040": 0,
+    "appt_050": 0,
+    "appt_053": 0,
+    "appt_056": 0,
+    "appt_059": 0,
+    "appt_070": 0,
+    "appt_072": 0,
+    "appt_075": 0,
+    "appt_077": 0,
+    "appt_078": 0,
+    "appt_080": 0,
+    "appt_226": 1,
+    "appt_259": 0,
+    "appt_265": 0,
+    "appt_270": 0,
+    "appt_277": 0,
+    "appt_285": 0,
+    "appt_292": 0,
+    "appt_295": 0,
+    "appt_298": 0,
+    "appt_301": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 1195,
+  "latency_ms": 537.5,
+  "state": "A patient calling a multi-specialty clinic said they want: 'pelvic floor therapy after my delivery'"
+ },
  "25faf839ce0597b6643fc38c092f22aae8af427be097bcdbfc28743db7d61e8e": {
   "answer": {
    "choice": "appt_158",
@@ -4577,16 +4734,16 @@
  "26e6da3e1a2e4bedb05168e5267d2d2c321f627692bc1658deb61da56b17c058": {
   "answer": {
    "choice": "appt_160",
-   "confidence": 0.49,
+   "confidence": 0.6,
    "probabilities": {
-    "appt_044": 0.1,
-    "appt_160": 0.67,
-    "either": 0.23
+    "appt_044": 0.08,
+    "appt_160": 0.73,
+    "either": 0.19
    },
    "type": "choice"
   },
   "input_tokens": 407,
-  "latency_ms": 494.9,
+  "latency_ms": 513.5,
   "state": "A patient calling a multi-specialty clinic said they want: 'I'd like to get an IUD inserted'"
  },
  "2791d014d08126ee93326c1ae41cc7a8a95dbb3f3620fb6e534705dab8142d53": {
@@ -6428,7 +6585,7 @@
    "type": "choice"
   },
   "input_tokens": 431,
-  "latency_ms": 513.3,
+  "latency_ms": 759.3,
   "state": "A patient calling a multi-specialty clinic said they want: 'I need my Tdap booster, it's been more than ten years'"
  },
  "35face6fc9f0ede62a5d68e39e2aeb655f2aca1bbcc26cd5d059ac9f4415cd41": {
@@ -7466,7 +7623,7 @@
    "type": "choice"
   },
   "input_tokens": 407,
-  "latency_ms": 537.3,
+  "latency_ms": 527.9,
   "state": "A patient calling a multi-specialty clinic said they want: 'want to get my spine X-rayed, doctor ordered it'"
  },
  "3c072913500bcc3de9f7338c3fa1f25a0b3d56c1ef74c135649d6fce37ee2164": {
@@ -9510,16 +9667,16 @@
  "48e67f6a07f4e8c6ad42ccebe02a7392479cc1c8f56d362cfadebc31ff15fb11": {
   "answer": {
    "choice": "appt_055",
-   "confidence": 0.74,
+   "confidence": 0.77,
    "probabilities": {
     "appt_053": 0.05,
-    "appt_055": 0.82,
-    "either": 0.13
+    "appt_055": 0.84,
+    "either": 0.11
    },
    "type": "choice"
   },
   "input_tokens": 427,
-  "latency_ms": 554.6,
+  "latency_ms": 479.4,
   "state": "A patient calling a multi-specialty clinic said they want: 'my stomach doctor said I need a scope'"
  },
  "4946dc780c178f77e00185d7694225c587d769b9db5cb8247cb4bdaa4cab95e8": {
@@ -9635,16 +9792,16 @@
  "49edec8b90e2b47e954ad1df91cc244e2e44431dddaa9a373faaffc293372832": {
   "answer": {
    "choice": "appt_017",
-   "confidence": 0.97,
+   "confidence": 0.96,
    "probabilities": {
-    "appt_007": 0.01,
-    "appt_017": 0.98,
-    "either": 0.01
+    "appt_007": 0,
+    "appt_017": 0.97,
+    "either": 0.03
    },
    "type": "choice"
   },
   "input_tokens": 428,
-  "latency_ms": 675.9,
+  "latency_ms": 1337.4,
   "state": "A patient calling a multi-specialty clinic said they want: 'my 3-year-old daughter, she's had a fever since last night and she keeps tugging at her ear'"
  },
  "4a1240ab690da1fab899972f0873cf13104150205869c967cf802794789dc3ce": {
@@ -9792,6 +9949,21 @@
   "input_tokens": 2460,
   "latency_ms": 492.6,
   "state": "A patient calling a multi-specialty clinic said they want: 'my eczema is flaring up'"
+ },
+ "4a88c57ee8800ed611ebfd6cb83bd0fef9961948f26f5cb0b582d03e7f5cc8d8": {
+  "answer": {
+   "choice": "prov_047",
+   "confidence": 0.37,
+   "probabilities": {
+    "prov_004": 0.41,
+    "prov_012": 0.01,
+    "prov_047": 0.58
+   },
+   "type": "choice"
+  },
+  "input_tokens": 423,
+  "latency_ms": 475.7,
+  "state": "A patient calling a multi-specialty clinic to book Annual Physical asked for the provider: 'Dr. Chen, the one my daughter recommended'"
  },
  "4b5babdfa2172aaecdd9d0d926b84fe20c1117d09b5b2917dd57663756272d88": {
   "answer": {
@@ -10682,7 +10854,7 @@
    "type": "choice"
   },
   "input_tokens": 1078,
-  "latency_ms": 514.8,
+  "latency_ms": 567.3,
   "state": "A patient calling a multi-specialty clinic said they want: 'I gotta get a drug test for a new job'"
  },
  "519dc381f6845db0ebff6ef06390719d8db187da48965ebe8a42d1f47c60be51": {
@@ -12828,7 +13000,7 @@
    "type": "choice"
   },
   "input_tokens": 1012,
-  "latency_ms": 523.3,
+  "latency_ms": 464.8,
   "state": "A patient calling a multi-specialty clinic said they want: 'I'd like to get an IUD inserted'"
  },
  "66657a893a917bfe7862911993755039e96fcb81ae63c2759eb881996f94d607": {
@@ -12929,7 +13101,7 @@
  "6681871f4c2640980252a60d2e1fd579db8b90f180c6ed2d44ed59de06f0e097": {
   "answer": {
    "choice": "appt_055",
-   "confidence": 0.93,
+   "confidence": 0.95,
    "probabilities": {
     "appt_000": 0,
     "appt_001": 0,
@@ -12980,8 +13152,8 @@
     "appt_051": 0,
     "appt_052": 0,
     "appt_053": 0.03,
-    "appt_054": 0.03,
-    "appt_055": 0.94,
+    "appt_054": 0.02,
+    "appt_055": 0.95,
     "appt_056": 0,
     "appt_057": 0,
     "appt_058": 0,
@@ -13009,7 +13181,7 @@
    "type": "choice"
   },
   "input_tokens": 2460,
-  "latency_ms": 511.2,
+  "latency_ms": 846.0,
   "state": "A patient calling a multi-specialty clinic said they want: 'my stomach doctor said I need a scope'"
  },
  "66853185638c582140e9f7884f2e0a9af2e49a7ac4ea09f465b9aa9be24de921": {
@@ -13505,7 +13677,7 @@
    "type": "choice"
   },
   "input_tokens": 2466,
-  "latency_ms": 750.7,
+  "latency_ms": 527.3,
   "state": "A patient calling a multi-specialty clinic said they want: 'I need my Tdap booster, it's been more than ten years'"
  },
  "6d5e145f9e46fc5c6489cab7d7a8d0bc413d68c392b8e5646e1578941017d56d": {
@@ -14141,6 +14313,21 @@
   "latency_ms": 627.9,
   "state": "A patient calling a multi-specialty clinic said they want: 'my doctor ordered a CT scan of my chest'"
  },
+ "72f3b41f9609f15b506942e8eafff2d8f5076dc7751fb983ef4a7498e8eb3c89": {
+  "answer": {
+   "choice": "either",
+   "confidence": 0.97,
+   "probabilities": {
+    "appt_015": 0.02,
+    "appt_016": 0,
+    "either": 0.98
+   },
+   "type": "choice"
+  },
+  "input_tokens": 416,
+  "latency_ms": 561.3,
+  "state": "A patient calling a multi-specialty clinic said they want: 'the second one'"
+ },
  "730e8c286d4b1a418697f4d3ee3c91593368009bc60b637b2d4f90d943def175": {
   "answer": {
    "choice": "appt_052",
@@ -14428,6 +14615,55 @@
   "input_tokens": 1027,
   "latency_ms": 523.9,
   "state": "A patient calling a multi-specialty clinic said they want: 'I'm in for a flu shot'"
+ },
+ "746c4c78598b0cabd0a2af6cc507e0ccc3c322a4a76f1aa7c71d9c0381ee0dc7": {
+  "answer": {
+   "choice": "appt_184",
+   "confidence": 0.65,
+   "probabilities": {
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_007": 0,
+    "appt_020": 0,
+    "appt_026": 0,
+    "appt_032": 0,
+    "appt_036": 0,
+    "appt_040": 0,
+    "appt_045": 0,
+    "appt_050": 0,
+    "appt_053": 0.12,
+    "appt_054": 0,
+    "appt_055": 0.21,
+    "appt_056": 0,
+    "appt_059": 0,
+    "appt_070": 0,
+    "appt_072": 0,
+    "appt_075": 0,
+    "appt_077": 0,
+    "appt_080": 0,
+    "appt_142": 0,
+    "appt_182": 0,
+    "appt_183": 0,
+    "appt_184": 0.67,
+    "appt_185": 0,
+    "appt_186": 0,
+    "appt_187": 0,
+    "appt_188": 0,
+    "appt_259": 0,
+    "appt_265": 0,
+    "appt_270": 0,
+    "appt_277": 0,
+    "appt_285": 0,
+    "appt_292": 0,
+    "appt_298": 0,
+    "appt_301": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 1438,
+  "latency_ms": 546.4,
+  "state": "A patient calling a multi-specialty clinic said they want: 'my stomach doctor said I need a scope'"
  },
  "7474f9c07dc45bf2598db570caf22205bdcc254880b7840ab087113fac921bb7": {
   "answer": {
@@ -16888,6 +17124,58 @@
   "latency_ms": 498.6,
   "state": "A patient calling a multi-specialty clinic said they want: 'something for my back pain'"
  },
+ "811b96f0b7ce9c686153e9ea2afa216aebbd0fe5c81860b8f89f4969f0487259": {
+  "answer": {
+   "choice": "appt_294",
+   "confidence": 1,
+   "probabilities": {
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_007": 0,
+    "appt_015": 0,
+    "appt_016": 0,
+    "appt_017": 0,
+    "appt_018": 0,
+    "appt_019": 0,
+    "appt_020": 0,
+    "appt_026": 0,
+    "appt_032": 0,
+    "appt_036": 0,
+    "appt_040": 0,
+    "appt_045": 0,
+    "appt_050": 0,
+    "appt_053": 0,
+    "appt_056": 0,
+    "appt_059": 0,
+    "appt_070": 0,
+    "appt_072": 0,
+    "appt_075": 0,
+    "appt_077": 0,
+    "appt_078": 0,
+    "appt_105": 0,
+    "appt_106": 0,
+    "appt_107": 0,
+    "appt_108": 0,
+    "appt_109": 0,
+    "appt_110": 0,
+    "appt_142": 0,
+    "appt_259": 0,
+    "appt_265": 0,
+    "appt_270": 0,
+    "appt_277": 0,
+    "appt_285": 0,
+    "appt_292": 0,
+    "appt_294": 1,
+    "appt_295": 0,
+    "appt_301": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 1513,
+  "latency_ms": 550.4,
+  "state": "A patient calling a multi-specialty clinic said they want: 'my daughter needs a pediatric echocardiogram'"
+ },
  "8165fd66553e6072ad28c802e8115f6d242efafa84b544868f36505186482c03": {
   "answer": {
    "choice": "appt_232",
@@ -17704,6 +17992,56 @@
   "latency_ms": 558.4,
   "state": "A patient calling a multi-specialty clinic said they want: 'I think I want to get tested for STIs, you know, just to be safe'"
  },
+ "8b2a76e030b7b8cf00f4b94a97955756837f6213bbf20ad975d7d7a9568fe5a5": {
+  "answer": {
+   "choice": "appt_015",
+   "confidence": 0.87,
+   "probabilities": {
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_007": 0,
+    "appt_015": 0.87,
+    "appt_016": 0.13,
+    "appt_017": 0,
+    "appt_018": 0,
+    "appt_019": 0,
+    "appt_020": 0,
+    "appt_026": 0,
+    "appt_032": 0,
+    "appt_036": 0,
+    "appt_040": 0,
+    "appt_050": 0,
+    "appt_053": 0,
+    "appt_056": 0,
+    "appt_059": 0,
+    "appt_070": 0,
+    "appt_072": 0,
+    "appt_075": 0,
+    "appt_078": 0,
+    "appt_080": 0,
+    "appt_096": 0,
+    "appt_097": 0,
+    "appt_105": 0,
+    "appt_106": 0,
+    "appt_107": 0,
+    "appt_108": 0,
+    "appt_109": 0,
+    "appt_110": 0,
+    "appt_142": 0,
+    "appt_265": 0,
+    "appt_270": 0,
+    "appt_277": 0,
+    "appt_285": 0,
+    "appt_295": 0,
+    "appt_301": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 1438,
+  "latency_ms": 569.4,
+  "state": "A patient calling a multi-specialty clinic said they want: 'my baby's checkup'"
+ },
  "8b2e5ac7fe6aedc0ccdbf17db027db18c1cfa49a9ba698d1da547f2deca1db76": {
   "answer": {
    "choice": "appt_035",
@@ -17931,6 +18269,106 @@
   "input_tokens": 2469,
   "latency_ms": 601.4,
   "state": "A patient calling a multi-specialty clinic said they want: 'my son is turning 18 months and needs his checkup for that age'"
+ },
+ "8c668ec0b3c25da04b42023d1ce65524f408762c6c3fd8c03a5d274f7256b06b": {
+  "answer": {
+   "choice": "appt_016",
+   "confidence": 0.3,
+   "probabilities": {
+    "appt_015": 0.35,
+    "appt_016": 0.65
+   },
+   "type": "choice"
+  },
+  "input_tokens": 360,
+  "latency_ms": 601.1,
+  "state": "A patient calling a multi-specialty clinic said they want: 'the second one'"
+ },
+ "8d803497dd389d40d107cb14914f78887fa4fa793bf36d7f8186886f951b7b30": {
+  "answer": {
+   "choice": "appt_015",
+   "confidence": 0.85,
+   "probabilities": {
+    "appt_000": 0,
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_004": 0,
+    "appt_005": 0,
+    "appt_006": 0,
+    "appt_007": 0,
+    "appt_008": 0,
+    "appt_009": 0,
+    "appt_010": 0,
+    "appt_011": 0,
+    "appt_012": 0,
+    "appt_013": 0,
+    "appt_014": 0,
+    "appt_015": 0.86,
+    "appt_016": 0.14,
+    "appt_017": 0,
+    "appt_018": 0,
+    "appt_019": 0,
+    "appt_020": 0,
+    "appt_021": 0,
+    "appt_022": 0,
+    "appt_023": 0,
+    "appt_024": 0,
+    "appt_025": 0,
+    "appt_026": 0,
+    "appt_027": 0,
+    "appt_028": 0,
+    "appt_029": 0,
+    "appt_030": 0,
+    "appt_031": 0,
+    "appt_032": 0,
+    "appt_033": 0,
+    "appt_034": 0,
+    "appt_035": 0,
+    "appt_036": 0,
+    "appt_037": 0,
+    "appt_038": 0,
+    "appt_039": 0,
+    "appt_040": 0,
+    "appt_041": 0,
+    "appt_042": 0,
+    "appt_043": 0,
+    "appt_044": 0,
+    "appt_050": 0,
+    "appt_051": 0,
+    "appt_052": 0,
+    "appt_053": 0,
+    "appt_054": 0,
+    "appt_055": 0,
+    "appt_056": 0,
+    "appt_057": 0,
+    "appt_058": 0,
+    "appt_059": 0,
+    "appt_060": 0,
+    "appt_061": 0,
+    "appt_062": 0,
+    "appt_063": 0,
+    "appt_064": 0,
+    "appt_065": 0,
+    "appt_066": 0,
+    "appt_067": 0,
+    "appt_068": 0,
+    "appt_069": 0,
+    "appt_072": 0,
+    "appt_073": 0,
+    "appt_074": 0,
+    "appt_075": 0,
+    "appt_076": 0,
+    "appt_078": 0,
+    "appt_079": 0,
+    "appt_080": 0,
+    "appt_081": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 2458,
+  "latency_ms": 551.2,
+  "state": "A patient calling a multi-specialty clinic said they want: 'my baby's checkup'"
  },
  "8dd2959a7697d0176bcb8ce12cd58c8cd5c1560833df349cfeb63eee4972cfdb": {
   "answer": {
@@ -19282,6 +19720,21 @@
   "input_tokens": 2454,
   "latency_ms": 539.2,
   "state": "A patient calling a multi-specialty clinic said they want: 'skin check'"
+ },
+ "95776e27cd336e88929063581b2f4b36c1aaa6eb9a3694c5b949d6c305105eec": {
+  "answer": {
+   "choice": "appt_135",
+   "confidence": 0.43,
+   "probabilities": {
+    "appt_032": 0.25,
+    "appt_135": 0.62,
+    "either": 0.13
+   },
+   "type": "choice"
+  },
+  "input_tokens": 428,
+  "latency_ms": 463.7,
+  "state": "A patient calling a multi-specialty clinic said they want: 'my PT says my hip needs to be seen by a specialist'"
  },
  "9598b049f2c09a0037546977c7207971dd34b2f6a40eb24486d3c109db15e581": {
   "answer": {
@@ -20655,6 +21108,47 @@
   "latency_ms": 487.4,
   "state": "A patient calling a multi-specialty clinic said they want: 'the scratch test on my back to find out what I'm allergic to'"
  },
+ "9ee1d8c361cf59439705453641fb8a6539bb273abf2bdf8c748387d6d5cfac8c": {
+  "answer": {
+   "choice": "appt_068",
+   "confidence": 1,
+   "probabilities": {
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_007": 0,
+    "appt_020": 0,
+    "appt_026": 0,
+    "appt_032": 0,
+    "appt_036": 0,
+    "appt_040": 0,
+    "appt_045": 0,
+    "appt_050": 0,
+    "appt_053": 0,
+    "appt_056": 0,
+    "appt_059": 0,
+    "appt_068": 1,
+    "appt_070": 0,
+    "appt_072": 0,
+    "appt_075": 0,
+    "appt_077": 0,
+    "appt_080": 0,
+    "appt_142": 0,
+    "appt_259": 0,
+    "appt_265": 0,
+    "appt_270": 0,
+    "appt_277": 0,
+    "appt_285": 0,
+    "appt_292": 0,
+    "appt_298": 0,
+    "appt_301": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 1187,
+  "latency_ms": 475.5,
+  "state": "A patient calling a multi-specialty clinic said they want: 'I need a mammogram for a lump in my breast'"
+ },
  "9f040ccf9b0458dc3001794c10f4c5d9bc03727f5ca31891bbf14b0f5274a6ff": {
   "answer": {
    "choice": "appt_075",
@@ -20864,6 +21358,92 @@
   "input_tokens": 2468,
   "latency_ms": 539.9,
   "state": "A patient calling a multi-specialty clinic said they want: 'a dental cleaning, can't remember if it's been six months or a year'"
+ },
+ "a0142bcd2f1657ace70f9b6d9cd60171fcc83d3eebbb03b11918e9558efb0050": {
+  "answer": {
+   "choice": "appt_012",
+   "confidence": 1,
+   "probabilities": {
+    "appt_000": 0,
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_004": 0,
+    "appt_005": 0,
+    "appt_006": 0,
+    "appt_007": 0,
+    "appt_008": 0,
+    "appt_009": 0,
+    "appt_010": 0,
+    "appt_011": 0,
+    "appt_012": 1,
+    "appt_013": 0,
+    "appt_014": 0,
+    "appt_015": 0,
+    "appt_016": 0,
+    "appt_017": 0,
+    "appt_018": 0,
+    "appt_019": 0,
+    "appt_020": 0,
+    "appt_021": 0,
+    "appt_022": 0,
+    "appt_023": 0,
+    "appt_024": 0,
+    "appt_025": 0,
+    "appt_026": 0,
+    "appt_027": 0,
+    "appt_028": 0,
+    "appt_029": 0,
+    "appt_030": 0,
+    "appt_031": 0,
+    "appt_032": 0,
+    "appt_033": 0,
+    "appt_034": 0,
+    "appt_035": 0,
+    "appt_036": 0,
+    "appt_037": 0,
+    "appt_038": 0,
+    "appt_039": 0,
+    "appt_040": 0,
+    "appt_041": 0,
+    "appt_042": 0,
+    "appt_043": 0,
+    "appt_044": 0,
+    "appt_050": 0,
+    "appt_051": 0,
+    "appt_052": 0,
+    "appt_053": 0,
+    "appt_054": 0,
+    "appt_055": 0,
+    "appt_056": 0,
+    "appt_057": 0,
+    "appt_058": 0,
+    "appt_059": 0,
+    "appt_060": 0,
+    "appt_061": 0,
+    "appt_062": 0,
+    "appt_063": 0,
+    "appt_064": 0,
+    "appt_065": 0,
+    "appt_066": 0,
+    "appt_067": 0,
+    "appt_068": 0,
+    "appt_069": 0,
+    "appt_072": 0,
+    "appt_073": 0,
+    "appt_074": 0,
+    "appt_075": 0,
+    "appt_076": 0,
+    "appt_078": 0,
+    "appt_079": 0,
+    "appt_080": 0,
+    "appt_081": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 2467,
+  "latency_ms": 604.0,
+  "state": "A patient calling a multi-specialty clinic said they want: 'I need a, uh, a flu, no wait, a COVID shot'"
  },
  "a0506685e76d96acf9c93048d5443e47093eb08d009e9c6e1d19d482247c1ebf": {
   "answer": {
@@ -21373,12 +21953,12 @@
     "type": "noul"
    },
    "prov_046": {
-    "noul": 0.83,
+    "noul": 0.84,
     "type": "noul"
    }
   },
   "input_tokens": 302,
-  "latency_ms": 696.4,
+  "latency_ms": 543.0,
   "state": "Clinic providers: Dr. David Chen; Dr. Emily Chen"
  },
  "a48bb8eb7aa436be80928e38aaa3159fc9af8968ba47884ebb0b757f14522707": {
@@ -21466,6 +22046,21 @@
   "input_tokens": 2484,
   "latency_ms": 1190.0,
   "state": "A patient calling a multi-specialty clinic said they want: 'want to get my hearing looked at \u2014 y'know, you sit in a little quiet booth with headphones and raise your hand every time you hear the beep'"
+ },
+ "a5172efa2b3cda45329d581745b6c25b38f25b05ae02ede034b3aa0632593560": {
+  "answer": {
+   "choice": "appt_015",
+   "confidence": 0.99,
+   "probabilities": {
+    "appt_002": 0,
+    "appt_015": 1,
+    "either": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 430,
+  "latency_ms": 484.5,
+  "state": "A patient calling a multi-specialty clinic said they want: 'my baby's checkup'"
  },
  "a53f43960b3d0ed4618cd358f3562dffaf37b9a336c5ec8966e31f2651a3d339": {
   "answer": {
@@ -21940,6 +22535,92 @@
   "input_tokens": 386,
   "latency_ms": 505.1,
   "state": "A patient calling a multi-specialty clinic to book Cardiology Consultation asked for the provider: 'Dr. Chen, the guy'"
+ },
+ "a8de4f488896ccffa95b0a8654d61c6a0eaf9942e3b6d2a56858a3017672e714": {
+  "answer": {
+   "choice": "appt_073",
+   "confidence": 0.53,
+   "probabilities": {
+    "appt_000": 0,
+    "appt_001": 0,
+    "appt_002": 0.01,
+    "appt_003": 0,
+    "appt_004": 0,
+    "appt_005": 0,
+    "appt_006": 0,
+    "appt_007": 0,
+    "appt_008": 0,
+    "appt_009": 0,
+    "appt_010": 0,
+    "appt_011": 0,
+    "appt_012": 0,
+    "appt_013": 0,
+    "appt_014": 0,
+    "appt_015": 0,
+    "appt_016": 0,
+    "appt_017": 0,
+    "appt_018": 0,
+    "appt_019": 0,
+    "appt_020": 0,
+    "appt_021": 0,
+    "appt_022": 0,
+    "appt_023": 0,
+    "appt_024": 0,
+    "appt_025": 0,
+    "appt_026": 0,
+    "appt_027": 0,
+    "appt_028": 0,
+    "appt_029": 0,
+    "appt_030": 0,
+    "appt_031": 0,
+    "appt_032": 0,
+    "appt_033": 0,
+    "appt_034": 0,
+    "appt_035": 0,
+    "appt_036": 0,
+    "appt_037": 0,
+    "appt_038": 0,
+    "appt_039": 0,
+    "appt_040": 0,
+    "appt_041": 0,
+    "appt_042": 0,
+    "appt_043": 0,
+    "appt_044": 0,
+    "appt_050": 0,
+    "appt_051": 0,
+    "appt_052": 0,
+    "appt_053": 0,
+    "appt_054": 0,
+    "appt_055": 0,
+    "appt_056": 0,
+    "appt_057": 0,
+    "appt_058": 0,
+    "appt_059": 0,
+    "appt_060": 0,
+    "appt_061": 0,
+    "appt_062": 0,
+    "appt_063": 0,
+    "appt_064": 0,
+    "appt_065": 0,
+    "appt_066": 0,
+    "appt_067": 0,
+    "appt_068": 0,
+    "appt_069": 0,
+    "appt_072": 0.44,
+    "appt_073": 0.55,
+    "appt_074": 0,
+    "appt_075": 0,
+    "appt_076": 0,
+    "appt_078": 0,
+    "appt_079": 0,
+    "appt_080": 0,
+    "appt_081": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 2457,
+  "latency_ms": 525.8,
+  "state": "A patient calling a multi-specialty clinic said they want: 'I need a cholesterol check'"
  },
  "a8fcdc4b07c648466f32ebb183874444105921a578ab44a3a5f6e00dd9ab96df": {
   "answer": {
@@ -22619,6 +23300,100 @@
   "input_tokens": 909,
   "latency_ms": 487.9,
   "state": "A patient calling a multi-specialty clinic said they want: 'I've got this itchy red rash spreading on both my arms'"
+ },
+ "ae01445873335ccf0bf810ed2d95fe6d664aa3d3a58009bb121985719dbcdf81": {
+  "answer": {
+   "choice": "appt_156",
+   "confidence": 1,
+   "probabilities": {
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_007": 0,
+    "appt_020": 0,
+    "appt_026": 0,
+    "appt_032": 0,
+    "appt_036": 0,
+    "appt_040": 0,
+    "appt_045": 0,
+    "appt_050": 0,
+    "appt_053": 0,
+    "appt_056": 0,
+    "appt_059": 0,
+    "appt_070": 0,
+    "appt_072": 0,
+    "appt_075": 0,
+    "appt_077": 0,
+    "appt_080": 0,
+    "appt_142": 0,
+    "appt_156": 1,
+    "appt_157": 0,
+    "appt_259": 0,
+    "appt_265": 0,
+    "appt_270": 0,
+    "appt_277": 0,
+    "appt_285": 0,
+    "appt_292": 0,
+    "appt_298": 0,
+    "appt_301": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 1227,
+  "latency_ms": 551.4,
+  "state": "A patient calling a multi-specialty clinic said they want: 'a prenatal ultrasound, I'm 12 weeks'"
+ },
+ "ae38b12db907250cb4cdbd1a9cdedafdbd0eac44f4084e955fc000fa7ef23701": {
+  "answer": {
+   "choice": "appt_294",
+   "confidence": 1,
+   "probabilities": {
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_007": 0,
+    "appt_015": 0,
+    "appt_016": 0,
+    "appt_017": 0,
+    "appt_018": 0,
+    "appt_019": 0,
+    "appt_020": 0,
+    "appt_026": 0,
+    "appt_032": 0,
+    "appt_036": 0,
+    "appt_040": 0,
+    "appt_050": 0,
+    "appt_053": 0,
+    "appt_056": 0,
+    "appt_059": 0,
+    "appt_070": 0,
+    "appt_072": 0,
+    "appt_075": 0,
+    "appt_077": 0,
+    "appt_078": 0,
+    "appt_080": 0,
+    "appt_105": 0,
+    "appt_106": 0,
+    "appt_107": 0,
+    "appt_108": 0,
+    "appt_109": 0,
+    "appt_110": 0,
+    "appt_259": 0,
+    "appt_265": 0,
+    "appt_270": 0,
+    "appt_277": 0,
+    "appt_285": 0,
+    "appt_292": 0,
+    "appt_294": 1,
+    "appt_295": 0,
+    "appt_298": 0,
+    "appt_301": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 1525,
+  "latency_ms": 481.8,
+  "state": "A patient calling a multi-specialty clinic said they want: 'my daughter needs a pediatric echocardiogram'"
  },
  "ae9390a4d45f109964f2de0abd3d3914b541ea14e1820f325ff1d5bccb35db75": {
   "answer": {
@@ -25915,6 +26690,92 @@
   "latency_ms": 774.7,
   "state": "A patient calling a multi-specialty clinic said they want: 'two weeks old'"
  },
+ "c81d666958c528168198a7c6ea41b6f7b95e2711c85dd67153bf0d7b8d0d095a": {
+  "answer": {
+   "choice": "appt_012",
+   "confidence": 1,
+   "probabilities": {
+    "appt_000": 0,
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_004": 0,
+    "appt_005": 0,
+    "appt_006": 0,
+    "appt_007": 0,
+    "appt_008": 0,
+    "appt_009": 0,
+    "appt_010": 0,
+    "appt_011": 0,
+    "appt_012": 1,
+    "appt_013": 0,
+    "appt_014": 0,
+    "appt_015": 0,
+    "appt_016": 0,
+    "appt_017": 0,
+    "appt_018": 0,
+    "appt_019": 0,
+    "appt_020": 0,
+    "appt_021": 0,
+    "appt_022": 0,
+    "appt_023": 0,
+    "appt_024": 0,
+    "appt_025": 0,
+    "appt_026": 0,
+    "appt_027": 0,
+    "appt_028": 0,
+    "appt_029": 0,
+    "appt_030": 0,
+    "appt_031": 0,
+    "appt_032": 0,
+    "appt_033": 0,
+    "appt_034": 0,
+    "appt_035": 0,
+    "appt_036": 0,
+    "appt_037": 0,
+    "appt_038": 0,
+    "appt_039": 0,
+    "appt_040": 0,
+    "appt_041": 0,
+    "appt_042": 0,
+    "appt_043": 0,
+    "appt_044": 0,
+    "appt_050": 0,
+    "appt_051": 0,
+    "appt_052": 0,
+    "appt_053": 0,
+    "appt_054": 0,
+    "appt_055": 0,
+    "appt_056": 0,
+    "appt_057": 0,
+    "appt_058": 0,
+    "appt_059": 0,
+    "appt_060": 0,
+    "appt_061": 0,
+    "appt_062": 0,
+    "appt_063": 0,
+    "appt_064": 0,
+    "appt_065": 0,
+    "appt_066": 0,
+    "appt_067": 0,
+    "appt_068": 0,
+    "appt_069": 0,
+    "appt_072": 0,
+    "appt_073": 0,
+    "appt_074": 0,
+    "appt_075": 0,
+    "appt_076": 0,
+    "appt_078": 0,
+    "appt_079": 0,
+    "appt_080": 0,
+    "appt_081": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 2460,
+  "latency_ms": 530.0,
+  "state": "A patient calling a multi-specialty clinic said they want: 'actually, make it the COVID vaccine instead'"
+ },
  "c83f190471733abadff1167fe05477322ef5ffd57acbb6f5adbf1716c72a58e1": {
   "answer": {
    "choice": "appt_125",
@@ -26326,6 +27187,59 @@
   "latency_ms": 574.0,
   "state": "A patient calling a multi-specialty clinic said they want: 'want to get my spine X-rayed, doctor ordered it'"
  },
+ "cbe94ce46c2894e3fb9cafb12c1ae328c63276a58063d75dfb1e80c3f0e67be4": {
+  "answer": {
+   "choice": "appt_032",
+   "confidence": 0.96,
+   "probabilities": {
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_007": 0,
+    "appt_020": 0,
+    "appt_026": 0,
+    "appt_032": 0.96,
+    "appt_033": 0,
+    "appt_034": 0,
+    "appt_035": 0,
+    "appt_036": 0,
+    "appt_040": 0,
+    "appt_050": 0,
+    "appt_053": 0,
+    "appt_056": 0,
+    "appt_059": 0,
+    "appt_070": 0,
+    "appt_072": 0,
+    "appt_075": 0,
+    "appt_077": 0,
+    "appt_078": 0,
+    "appt_080": 0,
+    "appt_132": 0.04,
+    "appt_133": 0,
+    "appt_134": 0,
+    "appt_135": 0,
+    "appt_136": 0,
+    "appt_137": 0,
+    "appt_138": 0,
+    "appt_139": 0,
+    "appt_140": 0,
+    "appt_141": 0,
+    "appt_259": 0,
+    "appt_265": 0,
+    "appt_270": 0,
+    "appt_277": 0,
+    "appt_285": 0,
+    "appt_292": 0,
+    "appt_295": 0,
+    "appt_298": 0,
+    "appt_301": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 1570,
+  "latency_ms": 897.9,
+  "state": "A patient calling a multi-specialty clinic said they want: 'ok, then an orthopedic consultation for my knee'"
+ },
  "cc0fded1fba89ffd2d235e72226e77766a94d3732b3eef2128f6273ae680eb28": {
   "answer": {
    "choice": "appt_290",
@@ -26721,6 +27635,61 @@
   "latency_ms": 561.7,
   "state": "A patient calling a multi-specialty clinic said they want: 'I got a mole on my back I want cut off'"
  },
+ "cfbfa6c72256b1cfd45a1382374071ef4d168b6382f58df11664f0d0c00ab29b": {
+  "answer": {
+   "choice": "appt_135",
+   "confidence": 0.71,
+   "probabilities": {
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_007": 0,
+    "appt_020": 0,
+    "appt_026": 0,
+    "appt_032": 0.26,
+    "appt_033": 0,
+    "appt_034": 0,
+    "appt_035": 0,
+    "appt_036": 0,
+    "appt_040": 0,
+    "appt_050": 0,
+    "appt_053": 0,
+    "appt_056": 0,
+    "appt_059": 0,
+    "appt_070": 0,
+    "appt_071": 0,
+    "appt_072": 0,
+    "appt_075": 0,
+    "appt_077": 0,
+    "appt_078": 0,
+    "appt_080": 0,
+    "appt_132": 0,
+    "appt_133": 0,
+    "appt_134": 0,
+    "appt_135": 0.73,
+    "appt_136": 0,
+    "appt_137": 0,
+    "appt_138": 0,
+    "appt_139": 0.01,
+    "appt_140": 0,
+    "appt_141": 0,
+    "appt_206": 0,
+    "appt_259": 0,
+    "appt_265": 0,
+    "appt_270": 0,
+    "appt_277": 0,
+    "appt_285": 0,
+    "appt_292": 0,
+    "appt_295": 0,
+    "appt_298": 0,
+    "appt_301": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 1625,
+  "latency_ms": 477.9,
+  "state": "A patient calling a multi-specialty clinic said they want: 'my PT says my hip needs to be seen by a specialist'"
+ },
  "d02d00c98cf35cdd18ae86784ea599db1122cf302e4130a1101c915fc324e0e7": {
   "answer": {
    "choice": "appt_062",
@@ -26899,7 +27868,7 @@
     "appt_059": 0,
     "appt_060": 0,
     "appt_061": 0,
-    "appt_062": 1,
+    "appt_062": 0.99,
     "appt_063": 0,
     "appt_064": 0,
     "appt_065": 0,
@@ -26912,7 +27881,7 @@
     "appt_074": 0,
     "appt_075": 0,
     "appt_076": 0,
-    "appt_078": 0,
+    "appt_078": 0.01,
     "appt_079": 0,
     "appt_080": 0,
     "appt_081": 0
@@ -26920,7 +27889,7 @@
    "type": "choice"
   },
   "input_tokens": 2462,
-  "latency_ms": 493.2,
+  "latency_ms": 476.9,
   "state": "A patient calling a multi-specialty clinic said they want: 'doctor wants pictures of my lungs, the chest films'"
  },
  "d1da431e61f6825a39c4ff81bff236028991d224514084068b0a297e42a62fba": {
@@ -27276,6 +28245,21 @@
   "latency_ms": 488.3,
   "state": "A patient calling a multi-specialty clinic said they want: 'sharp pain in my heel, worst with the first steps every morning'"
  },
+ "d4c7dd70a3a642d32591f1fa0ece556831b707684a6d7b2a49e263cf0a22077b": {
+  "answer": {
+   "choice": "appt_012",
+   "confidence": 0.98,
+   "probabilities": {
+    "appt_011": 0,
+    "appt_012": 0.99,
+    "either": 0.01
+   },
+   "type": "choice"
+  },
+  "input_tokens": 416,
+  "latency_ms": 549.9,
+  "state": "A patient calling a multi-specialty clinic said they want: 'I need a, uh, a flu, no wait, a COVID shot'"
+ },
  "d4e370390a4880aac8e770e2c6e1ca204eadd6687abd68d7b31fb0bc9dc5bed4": {
   "answer": {
    "choice": "appt_220",
@@ -27323,7 +28307,7 @@
    "type": "choice"
   },
   "input_tokens": 1461,
-  "latency_ms": 1808.1,
+  "latency_ms": 537.3,
   "state": "A patient calling a multi-specialty clinic said they want: 'want to get my spine X-rayed, doctor ordered it'"
  },
  "d57200ed83c0b4684f654be60b36fbfb419cb374f609f07820fce82715c7a891": {
@@ -27655,16 +28639,16 @@
     "type": "noul"
    },
    "prov_044": {
-    "noul": 0.17,
+    "noul": 0.16,
     "type": "noul"
    },
    "prov_045": {
-    "noul": 0.84,
+    "noul": 0.85,
     "type": "noul"
    }
   },
   "input_tokens": 346,
-  "latency_ms": 505.0,
+  "latency_ms": 526.2,
   "state": "Clinic providers: Dr. Andre Patel; Dr. Fatima Patel; Dr. Kenji Patel; Dr. Olivia Patel"
  },
  "d9b91b06b0300c0ea7014577b417107ea16acd4303de92f1d4f0840c6db102db": {
@@ -28131,6 +29115,45 @@
   "latency_ms": 545.5,
   "state": "A patient calling a multi-specialty clinic said they want: 'my doctor ordered an A1C, you know, the blood sugar test'"
  },
+ "db67e086b15bf3065eac7d6217da41378aa558a75456659b57f14efa7dcd5d5f": {
+  "answer": {
+   "choice": "appt_199",
+   "confidence": 0.55,
+   "probabilities": {
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_007": 0,
+    "appt_020": 0,
+    "appt_026": 0,
+    "appt_032": 0,
+    "appt_036": 0,
+    "appt_040": 0,
+    "appt_050": 0,
+    "appt_053": 0,
+    "appt_056": 0,
+    "appt_059": 0,
+    "appt_060": 0.42,
+    "appt_070": 0,
+    "appt_072": 0,
+    "appt_075": 0,
+    "appt_078": 0,
+    "appt_080": 0,
+    "appt_142": 0,
+    "appt_199": 0.58,
+    "appt_265": 0,
+    "appt_270": 0,
+    "appt_277": 0,
+    "appt_285": 0,
+    "appt_295": 0,
+    "appt_301": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 1119,
+  "latency_ms": 536.1,
+  "state": "A patient calling a multi-specialty clinic said they want: 'I want to see a therapist'"
+ },
  "dbedbed83a0d5be3d1e0a46d99ad7b6d40448f8e677aac158355e4093eb6cf11": {
   "answer": {
    "choice": "appt_045",
@@ -28321,6 +29344,21 @@
   "input_tokens": 1059,
   "latency_ms": 554.1,
   "state": "A patient calling a multi-specialty clinic said they want: 'I'm supposed to get an X-ray done on my spine, doctor ordered it'"
+ },
+ "dd4734a3b26caacf786faae038ef7261f46b2773fdb662dfe55a64ffc7106c0b": {
+  "answer": {
+   "choice": "appt_032",
+   "confidence": 0.98,
+   "probabilities": {
+    "appt_032": 0.99,
+    "appt_033": 0,
+    "either": 0.01
+   },
+   "type": "choice"
+  },
+  "input_tokens": 446,
+  "latency_ms": 563.6,
+  "state": "A patient calling a multi-specialty clinic said they want: 'My knee still hurts after PT, I want a doctor to look at it'"
  },
  "dd7e6523d49f1194be5a48edbcfe24088bf308978d5f028fbade123544a71f9a": {
   "answer": {
@@ -29044,6 +30082,92 @@
   "input_tokens": 1096,
   "latency_ms": 512.9,
   "state": "A patient calling a multi-specialty clinic said they want: 'I'm calling about a dialysis evaluation'"
+ },
+ "e394a721cd5490a15a2b3a719b9317f078501462bdf1c84555d793b2e142fd31": {
+  "answer": {
+   "choice": "appt_022",
+   "confidence": 1,
+   "probabilities": {
+    "appt_000": 0,
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_004": 0,
+    "appt_005": 0,
+    "appt_006": 0,
+    "appt_007": 0,
+    "appt_008": 0,
+    "appt_009": 0,
+    "appt_010": 0,
+    "appt_011": 0,
+    "appt_012": 0,
+    "appt_013": 0,
+    "appt_014": 0,
+    "appt_015": 0,
+    "appt_016": 0,
+    "appt_017": 0,
+    "appt_018": 0,
+    "appt_019": 0,
+    "appt_020": 0,
+    "appt_021": 0,
+    "appt_022": 1,
+    "appt_023": 0,
+    "appt_024": 0,
+    "appt_025": 0,
+    "appt_026": 0,
+    "appt_027": 0,
+    "appt_028": 0,
+    "appt_029": 0,
+    "appt_030": 0,
+    "appt_031": 0,
+    "appt_032": 0,
+    "appt_033": 0,
+    "appt_034": 0,
+    "appt_035": 0,
+    "appt_036": 0,
+    "appt_037": 0,
+    "appt_038": 0,
+    "appt_039": 0,
+    "appt_040": 0,
+    "appt_041": 0,
+    "appt_042": 0,
+    "appt_043": 0,
+    "appt_044": 0,
+    "appt_050": 0,
+    "appt_051": 0,
+    "appt_052": 0,
+    "appt_053": 0,
+    "appt_054": 0,
+    "appt_055": 0,
+    "appt_056": 0,
+    "appt_057": 0,
+    "appt_058": 0,
+    "appt_059": 0,
+    "appt_060": 0,
+    "appt_061": 0,
+    "appt_062": 0,
+    "appt_063": 0,
+    "appt_064": 0,
+    "appt_065": 0,
+    "appt_066": 0,
+    "appt_067": 0,
+    "appt_068": 0,
+    "appt_069": 0,
+    "appt_072": 0,
+    "appt_073": 0,
+    "appt_074": 0,
+    "appt_075": 0,
+    "appt_076": 0,
+    "appt_078": 0,
+    "appt_079": 0,
+    "appt_080": 0,
+    "appt_081": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 2460,
+  "latency_ms": 517.6,
+  "state": "A patient calling a multi-specialty clinic said they want: 'my cardiologist ordered a stress test'"
  },
  "e3d81fa928955182a033d6bead09ba8d98faa826196c462be6335cda5b13019f": {
   "answer": {
@@ -30159,6 +31283,21 @@
   "latency_ms": 859.1,
   "state": "A patient calling a multi-specialty clinic said they want: 'two weeks old'"
  },
+ "ed2fff3af29554e794bdade1c75ce209e745237cee5129e415f782e18bb6b706": {
+  "answer": {
+   "choice": "appt_073",
+   "confidence": 0.88,
+   "probabilities": {
+    "appt_072": 0.01,
+    "appt_073": 0.92,
+    "either": 0.07
+   },
+   "type": "choice"
+  },
+  "input_tokens": 407,
+  "latency_ms": 595.8,
+  "state": "A patient calling a multi-specialty clinic said they want: 'I need a cholesterol check'"
+ },
  "ed33b0d0bcda1bb810161397310789cee2cdc4b0ba736e00f7b223bf965c9819": {
   "answer": {
    "choice": "appt_009",
@@ -31043,6 +32182,107 @@
   "latency_ms": 511.7,
   "state": "A patient calling a multi-specialty clinic said they want: 'I need an MRI of my lower back, another doctor sent me'"
  },
+ "f2e1b8b41addb9a15880950db30876e860afb6102710eaf506d173982843ed7e": {
+  "answer": {
+   "choice": "either",
+   "confidence": 0.67,
+   "probabilities": {
+    "appt_055": 0.13,
+    "appt_184": 0.09,
+    "either": 0.78
+   },
+   "type": "choice"
+  },
+  "input_tokens": 430,
+  "latency_ms": 482.5,
+  "state": "A patient calling a multi-specialty clinic said they want: 'my stomach doctor said I need a scope'"
+ },
+ "f315d29dc5d003b6fef46fedcea1200d32de3bc69f04cd6dce82704b04e92056": {
+  "answer": {
+   "choice": "appt_004",
+   "confidence": 0.94,
+   "probabilities": {
+    "appt_000": 0,
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_004": 0.94,
+    "appt_005": 0.06,
+    "appt_006": 0,
+    "appt_007": 0,
+    "appt_008": 0,
+    "appt_009": 0,
+    "appt_010": 0,
+    "appt_011": 0,
+    "appt_012": 0,
+    "appt_013": 0,
+    "appt_014": 0,
+    "appt_015": 0,
+    "appt_016": 0,
+    "appt_017": 0,
+    "appt_018": 0,
+    "appt_019": 0,
+    "appt_020": 0,
+    "appt_021": 0,
+    "appt_022": 0,
+    "appt_023": 0,
+    "appt_024": 0,
+    "appt_025": 0,
+    "appt_026": 0,
+    "appt_027": 0,
+    "appt_028": 0,
+    "appt_029": 0,
+    "appt_030": 0,
+    "appt_031": 0,
+    "appt_032": 0,
+    "appt_033": 0,
+    "appt_034": 0,
+    "appt_035": 0,
+    "appt_036": 0,
+    "appt_037": 0,
+    "appt_038": 0,
+    "appt_039": 0,
+    "appt_040": 0,
+    "appt_041": 0,
+    "appt_042": 0,
+    "appt_043": 0,
+    "appt_044": 0,
+    "appt_050": 0,
+    "appt_051": 0,
+    "appt_052": 0,
+    "appt_053": 0,
+    "appt_054": 0,
+    "appt_055": 0,
+    "appt_056": 0,
+    "appt_057": 0,
+    "appt_058": 0,
+    "appt_059": 0,
+    "appt_060": 0,
+    "appt_061": 0,
+    "appt_062": 0,
+    "appt_063": 0,
+    "appt_064": 0,
+    "appt_065": 0,
+    "appt_066": 0,
+    "appt_067": 0,
+    "appt_068": 0,
+    "appt_069": 0,
+    "appt_072": 0,
+    "appt_073": 0,
+    "appt_074": 0,
+    "appt_075": 0,
+    "appt_076": 0,
+    "appt_078": 0,
+    "appt_079": 0,
+    "appt_080": 0,
+    "appt_081": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 2460,
+  "latency_ms": 571.2,
+  "state": "A patient calling a multi-specialty clinic said they want: 'actually I need a follow-up visit instead'"
+ },
  "f35a22f26579b060e1d73aa14819f6a1050789c74430b7e7aef7dea7f26ff068": {
   "answer": {
    "choice": "appt_031",
@@ -31707,6 +32947,45 @@
   "input_tokens": 418,
   "latency_ms": 532.9,
   "state": "A patient calling a multi-specialty clinic said they want: 'I'm supposed to get an X-ray done on my spine, doctor ordered it'"
+ },
+ "f8c18b19338ec7539a15a3d3641ee335a076bf51e30da9e0628f14b4f1842494": {
+  "answer": {
+   "choice": "appt_210",
+   "confidence": 1,
+   "probabilities": {
+    "appt_001": 0,
+    "appt_002": 0,
+    "appt_003": 0,
+    "appt_007": 0,
+    "appt_020": 0,
+    "appt_026": 0,
+    "appt_032": 0,
+    "appt_036": 0,
+    "appt_040": 0,
+    "appt_050": 0,
+    "appt_053": 0,
+    "appt_056": 0,
+    "appt_059": 0,
+    "appt_070": 0,
+    "appt_072": 0,
+    "appt_075": 0,
+    "appt_077": 0,
+    "appt_078": 0,
+    "appt_080": 0,
+    "appt_142": 0,
+    "appt_210": 1,
+    "appt_259": 0,
+    "appt_270": 0,
+    "appt_277": 0,
+    "appt_285": 0,
+    "appt_298": 0,
+    "appt_301": 0
+   },
+   "type": "choice"
+  },
+  "input_tokens": 1121,
+  "latency_ms": 556.3,
+  "state": "A patient calling a multi-specialty clinic said they want: 'a CT of my chest, my doctor ordered it'"
  },
  "f909494c897142f61988a4c47a89bc918c93f885405cae12248c33b60deb7826": {
   "answer": {
