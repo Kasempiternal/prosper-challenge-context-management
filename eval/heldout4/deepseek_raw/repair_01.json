@@ -1,0 +1,23 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h4-01: Existing patient who wants the test where you sit in a quiet booth with headphones on and raise your hand each time you hear a beep, to see how well they hear. They do not know the test's name and do not call it a 'hearing test'. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-05: Existing patient who gets a tight, heavy feeling in the chest when walking uphill; their regular doctor wants them to see a heart specialist, and they say 'heart specialist'. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-08: Existing patient who has been short of breath and coughing for three months; their regular doctor wants them to see a lung specialist, and they say 'lung specialist'. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-23: Existing patient who has a small device in their chest that keeps their heartbeat steady and is due for its regular check; they call it their 'pacer check' and never say the device's full name. Fields: service_phrase = what the caller says they need, in their own words",
+ "response": "[\n  {\"id\": \"h4-01\", \"service_phrase\": \"want to get my hearing looked at — y'know, you sit in a little quiet booth with headphones and raise your hand every time you hear the beep\"},\n  {\"id\": \"h4-05\", \"service_phrase\": \"I keep getting this tight, heavy feeling in my chest when I'm walking uphill, and my doctor wants me to go see a heart specialist\"},\n  {\"id\": \"h4-08\", \"service_phrase\": \"three months now I've been short of breath and coughing, and my regular doctor wants me to see a lung specialist\"},\n  {\"id\": \"h4-23\", \"service_phrase\": \"I've got that little device in my chest that keeps my heartbeat steady, and it's due for its check — my pacer check, you know\"}\n]\n",
+ "parsed": [
+  {
+   "id": "h4-01",
+   "service_phrase": "want to get my hearing looked at — y'know, you sit in a little quiet booth with headphones and raise your hand every time you hear the beep"
+  },
+  {
+   "id": "h4-05",
+   "service_phrase": "I keep getting this tight, heavy feeling in my chest when I'm walking uphill, and my doctor wants me to go see a heart specialist"
+  },
+  {
+   "id": "h4-08",
+   "service_phrase": "three months now I've been short of breath and coughing, and my regular doctor wants me to see a lung specialist"
+  },
+  {
+   "id": "h4-23",
+   "service_phrase": "I've got that little device in my chest that keeps my heartbeat steady, and it's due for its check — my pacer check, you know"
+  }
+ ]
+}

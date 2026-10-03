@@ -716,3 +716,43 @@ Other misses are asks, not wrong commits. They include two policy-driven ones:
    embeddings 14/32, 27/49; OpenAI 7/36, 39/49; JEV 7/37 (18.9%), 38/49.
 
 From here on, `heldout3` and `national3` are dev sets. A fresh blind round judges the next fixes.
+
+## Held-out round 4 (`heldout4`, `national4`)
+
+Frozen on 2026-10-03 and not yet scored. Both sets were authored blind. The author read no resolver code
+(`backend/scheduling/**`), no resolver results (`eval/results/**`) and no README section after the
+round 3 heading. Neither the resolver nor `run_resolver_eval.py` was run on these cases. Both are
+registered as blind in `eval/sets.py`, so no test, tuning run or `--set all` reads them. Labels come
+from catalog queries. DeepSeek (`deepseek/deepseek-v4.1-flash` via `cmdc`) wrote only the caller's
+words. Regenerated phrasings and labels I was unsure of are listed in `eval/heldout4/label_notes.md`.
+
+| set | file | catalog | cases | turns | sha256 of the committed (LF) file |
+|---|---|---|---|---|---|
+| heldout4 | `cases_heldout4.jsonl` | SF | 56 | 62 | `669c339329004373413eee3435862cd0f4c795231eb4dd688d4696014de019e7` |
+| national4 | `cases_national4.jsonl` | national | 48 | 56 | `701102143a9b9a84eda94ed57e4fc8388ea06308b69b34d67f4c7986a2fea007` |
+
+Categories:
+
+- **heldout4**: type 31 (lay test name 4, symptom 7, everyday description 8, abbreviation 3, slang 3,
+  genuine two-way ask 4, not offered 2). Policy 5 (new-patient type 2, referral 1, new-patient
+  provider 2). Provider description 14 (specialty 3, title 2, language 2, full name 2, gender 2,
+  site 3); in 4 of these the description fits 2 or 3 doctors, so the case expects a provider
+  question. Two-turn 6: the agent asks and the caller picks a provider (3) or a service (3).
+- **national4**: geo 18 (city 2, "I'm in" 2, suburb 1, ZIP 2, ZIP3 1, neighborhood 2, "near"
+  neighborhood 2, state only 1, either/or town 2, far place 1, misspelled city 2), symptom 8,
+  duplicate names across metros 6 (3 with a city, 3 answered after a city question), capability by
+  metro 5, new-patient rules 5, no location 3, unoffered 2, ring expansion 1. The seed is 20261004. No
+  scenario shares a type+metro or a provider+type pair with national, national2 or national3 (the
+  `scenarios` step prints 0/48 for each). Every case pins the catalog's sha256.
+
+Generator commands:
+
+```
+backend/.venv/Scripts/python eval/heldout3/build_cases.py --set heldout4 scenarios|phrase|merge
+backend/.venv/Scripts/python eval/heldout3/build_cases.py --set heldout4 repair h4-01,h4-05,h4-08,h4-23
+backend/.venv/Scripts/python eval/national/build_cases.py --set national4 scenarios|phrase|merge
+backend/.venv/Scripts/python eval/validate_case_format.py heldout4 national4   # format only, 0 problems
+```
+
+DeepSeek calls: 10, none of them failed. heldout4 took 5 batches plus 1 repair call covering 4
+scenarios; national4 took 4 batches. After the repair, the leak checks dropped no cases.

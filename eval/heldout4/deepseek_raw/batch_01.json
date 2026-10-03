@@ -1,0 +1,55 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h4-01: Existing patient who wants the test where you sit in a quiet booth with headphones on and raise your hand each time you hear a beep, to check how well they hear. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-02: Existing patient who is due for the yearly screening where each breast is pressed between two plates to look for cancer. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-03: Existing patient who needs the swab test of the cervix that checks for early signs of cervical cancer. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-04: Existing patient whose lung doctor ordered the breathing test where you blow as hard and as long as you can into a tube. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-05: Existing patient who gets a tight, heavy feeling in the chest when walking uphill; their regular doctor wants them to see a heart specialist. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-06: Existing patient with an itchy red rash on both arms for two months that drugstore creams have not helped; their regular doctor wants them to see a skin specialist. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-07: Existing patient whose knee has been clicking and giving way on the stairs for months; their regular doctor referred them to a bone and joint specialist. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-08: Existing patient who has been short of breath and coughing for three months; their regular doctor wants them to see a lung specialist. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-09: Existing patient who sneezes nonstop and has itchy, watery eyes every spring, and the drugstore pills no longer help; their regular doctor told them to see a specialist about it. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-10: Existing patient who has had a stuffed-up nose and pressure behind the cheeks and forehead for months, with one infection after another; their regular doctor wants a specialist to look into it. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-11: Existing patient who has had a sore throat, a fever and body aches for three days and wants to see their regular doctor this week. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-12: Existing patient who wants to go over their recent test results with their doctor on a video call from home instead of coming in. Fields: service_phrase = what the caller says they need, in their own words",
+ "response": "[\n  {\"id\": \"h4-01\", \"service_phrase\": \"the hearing test where you sit in a quiet booth with headphones and raise your hand when you hear a beep\"},\n  {\"id\": \"h4-02\", \"service_phrase\": \"that yearly check where they put each breast between two plates to look for cancer\"},\n  {\"id\": \"h4-03\", \"service_phrase\": \"the swab test down there that checks for early signs of cervical cancer\"},\n  {\"id\": \"h4-04\", \"service_phrase\": \"the breathing test my lung doctor ordered, where you blow hard and long into a tube\"},\n  {\"id\": \"h4-05\", \"service_phrase\": \"I get this tight heavy feeling in my chest when I walk uphill and my doctor wants me to see a specialist\"},\n  {\"id\": \"h4-06\", \"service_phrase\": \"rash, itchy and red on both arms for two months now, creams from the drugstore didn't help, my doctor says see a specialist\"},\n  {\"id\": \"h4-07\", \"service_phrase\": \"my knee keeps clicking and gives way on the stairs, been months, my doctor sent me to a bone and joint specialist\"},\n  {\"id\": \"h4-08\", \"service_phrase\": \"short of breath and coughing for three months, my regular doctor wants me to see a specialist about it\"},\n  {\"id\": \"h4-09\", \"service_phrase\": \"every spring I sneeze nonstop and my eyes get itchy and watery, the drugstore pills don't work anymore, doctor told me to see a specialist\"},\n  {\"id\": \"h4-10\", \"service_phrase\": \"nose has been stuffed up for months with pressure behind my cheeks and forehead and one infection after another, doctor wants a specialist to look into it\"},\n  {\"id\": \"h4-11\", \"service_phrase\": \"sore throat, fever and body aches for three days, I'd like to see my doctor this week\"},\n  {\"id\": \"h4-12\", \"service_phrase\": \"I want to go over my recent test results with my doctor on a video call from home instead of coming in\"}\n]\n",
+ "parsed": [
+  {
+   "id": "h4-01",
+   "service_phrase": "the hearing test where you sit in a quiet booth with headphones and raise your hand when you hear a beep"
+  },
+  {
+   "id": "h4-02",
+   "service_phrase": "that yearly check where they put each breast between two plates to look for cancer"
+  },
+  {
+   "id": "h4-03",
+   "service_phrase": "the swab test down there that checks for early signs of cervical cancer"
+  },
+  {
+   "id": "h4-04",
+   "service_phrase": "the breathing test my lung doctor ordered, where you blow hard and long into a tube"
+  },
+  {
+   "id": "h4-05",
+   "service_phrase": "I get this tight heavy feeling in my chest when I walk uphill and my doctor wants me to see a specialist"
+  },
+  {
+   "id": "h4-06",
+   "service_phrase": "rash, itchy and red on both arms for two months now, creams from the drugstore didn't help, my doctor says see a specialist"
+  },
+  {
+   "id": "h4-07",
+   "service_phrase": "my knee keeps clicking and gives way on the stairs, been months, my doctor sent me to a bone and joint specialist"
+  },
+  {
+   "id": "h4-08",
+   "service_phrase": "short of breath and coughing for three months, my regular doctor wants me to see a specialist about it"
+  },
+  {
+   "id": "h4-09",
+   "service_phrase": "every spring I sneeze nonstop and my eyes get itchy and watery, the drugstore pills don't work anymore, doctor told me to see a specialist"
+  },
+  {
+   "id": "h4-10",
+   "service_phrase": "nose has been stuffed up for months with pressure behind my cheeks and forehead and one infection after another, doctor wants a specialist to look into it"
+  },
+  {
+   "id": "h4-11",
+   "service_phrase": "sore throat, fever and body aches for three days, I'd like to see my doctor this week"
+  },
+  {
+   "id": "h4-12",
+   "service_phrase": "I want to go over my recent test results with my doctor on a video call from home instead of coming in"
+  }
+ ]
+}

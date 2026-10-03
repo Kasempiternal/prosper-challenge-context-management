@@ -1,0 +1,55 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h4-25: Existing patient who wants the latest COVID booster; they call it 'the covid jab'. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-26: Existing patient who sees a psychiatrist here regularly and wants to book their next usual appointment. They do not say what the appointment is for. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-27: Existing patient whose doctor ordered blood work. They do not say what it is for or whether they were told to fast. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-28: Existing patient whose doctor ordered a scan of their head. They do not know what kind of scan it is and do not name one. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-29: A brand-new patient who wants to become a patient here and have a first visit with a regular doctor. They have no particular problem and do not ask for a physical or a checkup. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-30: Existing patient who wants their eyes checked because they think they need new glasses. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-31: Existing patient whose vision has gone cloudy, like looking through a foggy window; their regular doctor wants a specialist to check whether the lens of the eye needs surgery. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-x01: A brand-new patient who has never been seen here needs an MRI of their lower back; an outside doctor referred them. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-x02: A brand-new patient who has never been seen here wants an EKG of their heart. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-x03: Existing patient with no referral who wants to see a neurologist about numbness and tingling in their feet; they say 'neurologist'. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-x04: A brand-new patient who wants her yearly women's exam with the gynecologist here. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-x05: A brand-new patient who wants to talk with the gynecologist here about birth control options. Fields: service_phrase = what the caller says they need, in their own words",
+ "response": "[\n  {\"id\": \"h4-25\", \"service_phrase\": \"the covid jab\"},\n  {\"id\": \"h4-26\", \"service_phrase\": \"my next one with the psychiatrist, the usual\"},\n  {\"id\": \"h4-27\", \"service_phrase\": \"my doctor sent me over for some blood work\"},\n  {\"id\": \"h4-28\", \"service_phrase\": \"doctor wants a scan done of my head\"},\n  {\"id\": \"h4-29\", \"service_phrase\": \"I'd like to sign up here and see a doctor for the first time, no real problem, just want to be a patient\"},\n  {\"id\": \"h4-30\", \"service_phrase\": \"get my eyes checked, I think I need new glasses\"},\n  {\"id\": \"h4-31\", \"service_phrase\": \"my sight's gone all cloudy, like looking through a foggy window, and my doctor wants someone to look and see if the lens in my eye needs surgery\"},\n  {\"id\": \"h4-x01\", \"service_phrase\": \"I need an MRI of my lower back, another doctor sent me\"},\n  {\"id\": \"h4-x02\", \"service_phrase\": \"I need an EKG of my heart\"},\n  {\"id\": \"h4-x03\", \"service_phrase\": \"I want to see a neurologist, my feet keep going numb and tingly\"},\n  {\"id\": \"h4-x04\", \"service_phrase\": \"I'd like my yearly women's exam with the gynecologist\"},\n  {\"id\": \"h4-x05\", \"service_phrase\": \"I want to talk to the gynecologist about birth control options\"}\n]\n",
+ "parsed": [
+  {
+   "id": "h4-25",
+   "service_phrase": "the covid jab"
+  },
+  {
+   "id": "h4-26",
+   "service_phrase": "my next one with the psychiatrist, the usual"
+  },
+  {
+   "id": "h4-27",
+   "service_phrase": "my doctor sent me over for some blood work"
+  },
+  {
+   "id": "h4-28",
+   "service_phrase": "doctor wants a scan done of my head"
+  },
+  {
+   "id": "h4-29",
+   "service_phrase": "I'd like to sign up here and see a doctor for the first time, no real problem, just want to be a patient"
+  },
+  {
+   "id": "h4-30",
+   "service_phrase": "get my eyes checked, I think I need new glasses"
+  },
+  {
+   "id": "h4-31",
+   "service_phrase": "my sight's gone all cloudy, like looking through a foggy window, and my doctor wants someone to look and see if the lens in my eye needs surgery"
+  },
+  {
+   "id": "h4-x01",
+   "service_phrase": "I need an MRI of my lower back, another doctor sent me"
+  },
+  {
+   "id": "h4-x02",
+   "service_phrase": "I need an EKG of my heart"
+  },
+  {
+   "id": "h4-x03",
+   "service_phrase": "I want to see a neurologist, my feet keep going numb and tingly"
+  },
+  {
+   "id": "h4-x04",
+   "service_phrase": "I'd like my yearly women's exam with the gynecologist"
+  },
+  {
+   "id": "h4-x05",
+   "service_phrase": "I want to talk to the gynecologist about birth control options"
+  }
+ ]
+}

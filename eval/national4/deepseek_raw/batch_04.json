@@ -1,0 +1,69 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat4-cap-05: Existing patient (with a referral) who needs Breast Ultrasound and insists on going to the clinic called Towson Care Center in Towson, which they always use. Fields: service_phrase = the service: Breast Ultrasound (said naturally); location_phrase = that specific clinic by name: Towson Care Center (not 'near' it)\n- id nat4-new-01: A brand-new patient who has never been seen at these clinics needs Couples Therapy. They are in Denver. Fields: service_phrase = the service: Couples Therapy (said naturally); location_phrase = the city: Denver\n- id nat4-new-02: A brand-new patient who has never been seen at these clinics needs Weight Management Consultation. They are in San Jose. Fields: service_phrase = the service: Weight Management Consultation (said naturally); location_phrase = the city: San Jose\n- id nat4-new-03: A brand-new patient wants Annual Physical with Dr. Calvin Bartley in Las Vegas (a friend recommended this doctor). Fields: service_phrase = the service: Annual Physical (said naturally); provider_phrase = the doctor's full name: Dr. Calvin Bartley; location_phrase = the city: Las Vegas\n- id nat4-new-04: A brand-new patient wants Diabetic Foot Exam with Dr. Carlos Ilagan in Chicago (a friend recommended this doctor). Fields: service_phrase = the service: Diabetic Foot Exam (said naturally); provider_phrase = the doctor's full name: Dr. Carlos Ilagan; location_phrase = the city: Chicago\n- id nat4-new-05: A brand-new patient who has never been seen here wants Postpartum Visit. They are in San Jose. Fields: service_phrase = the service: Postpartum Visit (said naturally); location_phrase = the city: San Jose\n- id nat4-noloc-01: Existing patient who needs a strep test for a sore throat. They do not say where they are at first; asked which city, they answer Miami. Fields: service_phrase = how the caller asks for a strep test for a sore throat; followup_location_phrase = their answer to 'which city?': Miami\n- id nat4-noloc-02: Existing patient who needs a CT scan of their chest that their doctor ordered. They do not say where they are at first; asked which city, they answer Portland. Fields: service_phrase = how the caller asks for a CT scan of their chest that their doctor ordered; followup_location_phrase = their answer to 'which city?': Portland\n- id nat4-noloc-03: Existing patient who needs an STI test. They do not say where they are at first; asked which city, they answer Detroit. Fields: service_phrase = how the caller asks for an STI test; followup_location_phrase = their answer to 'which city?': Detroit\n- id nat4-unoff-01: Existing patient who wants lithotripsy. They are in San Francisco. Fields: service_phrase = the service: lithotripsy (said naturally); location_phrase = the city: San Francisco\n- id nat4-unoff-02: Existing patient who wants prenatal genetic counseling. They are in Denver. Fields: service_phrase = the service: prenatal genetic counseling (said naturally); location_phrase = the city: Denver\n- id nat4-ring-01: Existing patient who needs eye exam (has any referral needed). They are in Cleveland. Fields: service_phrase = the service: eye exam (said naturally); location_phrase = the city: Cleveland",
+ "response": "```json\n[\n  {\n    \"id\": \"nat4-cap-05\",\n    \"service_phrase\": \"I need a breast ultrasound\",\n    \"location_phrase\": \"I always go to Towson Care Center in Towson\"\n  },\n  {\n    \"id\": \"nat4-new-01\",\n    \"service_phrase\": \"I'm looking for couples therapy\",\n    \"location_phrase\": \"I'm in Denver\"\n  },\n  {\n    \"id\": \"nat4-new-02\",\n    \"service_phrase\": \"I need a weight management consultation\",\n    \"location_phrase\": \"I'm over in San Jose\"\n  },\n  {\n    \"id\": \"nat4-new-03\",\n    \"service_phrase\": \"I want to get an annual physical\",\n    \"provider_phrase\": \"Dr. Calvin Bartley\",\n    \"location_phrase\": \"I'm in Las Vegas\"\n  },\n  {\n    \"id\": \"nat4-new-04\",\n    \"service_phrase\": \"I need to get a diabetic foot exam\",\n    \"provider_phrase\": \"Dr. Carlos Ilagan\",\n    \"location_phrase\": \"I'm near Chicago\"\n  },\n  {\n    \"id\": \"nat4-new-05\",\n    \"service_phrase\": \"I'm looking to schedule a postpartum visit\",\n    \"location_phrase\": \"I'm in San Jose\"\n  },\n  {\n    \"id\": \"nat4-noloc-01\",\n    \"service_phrase\": \"I've got a sore throat and I need a strep test\",\n    \"followup_location_phrase\": \"Miami\"\n  },\n  {\n    \"id\": \"nat4-noloc-02\",\n    \"service_phrase\": \"my doctor ordered a CT scan of my chest\",\n    \"followup_location_phrase\": \"Portland\"\n  },\n  {\n    \"id\": \"nat4-noloc-03\",\n    \"service_phrase\": \"I need to get tested for an STI\",\n    \"followup_location_phrase\": \"Detroit\"\n  },\n  {\n    \"id\": \"nat4-unoff-01\",\n    \"service_phrase\": \"I need lithotripsy\",\n    \"location_phrase\": \"I'm in San Francisco\"\n  },\n  {\n    \"id\": \"nat4-unoff-02\",\n    \"service_phrase\": \"I'm looking for prenatal genetic counseling\",\n    \"location_phrase\": \"I'm in Denver\"\n  },\n  {\n    \"id\": \"nat4-ring-01\",\n    \"service_phrase\": \"I need an eye exam\",\n    \"location_phrase\": \"I'm in Cleveland\"\n  }\n]\n```\n",
+ "parsed": [
+  {
+   "id": "nat4-cap-05",
+   "service_phrase": "I need a breast ultrasound",
+   "location_phrase": "I always go to Towson Care Center in Towson"
+  },
+  {
+   "id": "nat4-new-01",
+   "service_phrase": "I'm looking for couples therapy",
+   "location_phrase": "I'm in Denver"
+  },
+  {
+   "id": "nat4-new-02",
+   "service_phrase": "I need a weight management consultation",
+   "location_phrase": "I'm over in San Jose"
+  },
+  {
+   "id": "nat4-new-03",
+   "service_phrase": "I want to get an annual physical",
+   "provider_phrase": "Dr. Calvin Bartley",
+   "location_phrase": "I'm in Las Vegas"
+  },
+  {
+   "id": "nat4-new-04",
+   "service_phrase": "I need to get a diabetic foot exam",
+   "provider_phrase": "Dr. Carlos Ilagan",
+   "location_phrase": "I'm near Chicago"
+  },
+  {
+   "id": "nat4-new-05",
+   "service_phrase": "I'm looking to schedule a postpartum visit",
+   "location_phrase": "I'm in San Jose"
+  },
+  {
+   "id": "nat4-noloc-01",
+   "service_phrase": "I've got a sore throat and I need a strep test",
+   "followup_location_phrase": "Miami"
+  },
+  {
+   "id": "nat4-noloc-02",
+   "service_phrase": "my doctor ordered a CT scan of my chest",
+   "followup_location_phrase": "Portland"
+  },
+  {
+   "id": "nat4-noloc-03",
+   "service_phrase": "I need to get tested for an STI",
+   "followup_location_phrase": "Detroit"
+  },
+  {
+   "id": "nat4-unoff-01",
+   "service_phrase": "I need lithotripsy",
+   "location_phrase": "I'm in San Francisco"
+  },
+  {
+   "id": "nat4-unoff-02",
+   "service_phrase": "I'm looking for prenatal genetic counseling",
+   "location_phrase": "I'm in Denver"
+  },
+  {
+   "id": "nat4-ring-01",
+   "service_phrase": "I need an eye exam",
+   "location_phrase": "I'm in Cleveland"
+  }
+ ]
+}

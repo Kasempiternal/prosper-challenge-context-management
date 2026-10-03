@@ -1,17 +1,20 @@
-"""Author eval/cases_heldout3.jsonl from the SF catalog, blind to the resolver and its results.
+"""Author the SF held-out sets (eval/cases_heldout3.jsonl, eval/cases_heldout4.jsonl) from the SF
+catalog, blind to the resolver and its results.
 
 The target comes first: each scenario names a catalog appointment type (or the types a scheduler would
 have to ask between) and the patient. Expectations come only from catalog queries below (the booking
 rules in backend/data/README.md). DeepSeek then writes the caller's words from plain-language facts;
 it never sees type names it should echo, aliases, resolver code or the expected answer.
 
-  python eval/heldout3/build_cases.py scenarios          # specs + catalog -> eval/heldout3/scenarios.json
-  python eval/heldout3/build_cases.py phrase             # DeepSeek via cmdc -> eval/heldout3/deepseek_raw/*.json
-  python eval/heldout3/build_cases.py repair ID,ID [tag] # re-ask DeepSeek for drifted phrasings
-  python eval/heldout3/build_cases.py merge              # scenarios + phrasings -> eval/cases_heldout3.jsonl
+  python eval/heldout3/build_cases.py [--set heldout3|heldout4] scenarios          # -> eval/<set>/scenarios.json
+  python eval/heldout3/build_cases.py [--set ...] phrase             # DeepSeek via cmdc -> eval/<set>/deepseek_raw/*.json
+  python eval/heldout3/build_cases.py [--set ...] repair ID,ID [tag] # re-ask DeepSeek for drifted phrasings
+  python eval/heldout3/build_cases.py [--set ...] merge              # scenarios + phrasings -> eval/cases_<set>.jsonl
 
-`phrase` skips batches whose raw file exists, so reruns reproduce the same file at no cost.
-Relabels made after reading a phrasing are recorded in eval/heldout3/label_notes.md.
+A set is a Profile: its single-turn needs and doctor phrases, plus two-turn picks (heldout4 on), where
+turn 1 must ask and the caller's answer picks one option. `phrase` skips batches whose raw file exists,
+so reruns reproduce the same file at no cost. Relabels made after reading a phrasing are recorded in
+eval/<set>/label_notes.md.
 """
 
 from __future__ import annotations
@@ -27,11 +30,7 @@ from pathlib import Path
 from typing import Callable
 
 ROOT = Path(__file__).resolve().parents[2]
-HERE = Path(__file__).resolve().parent
 CATALOG = ROOT / "backend" / "data" / "catalog.json"
-SCENARIOS = HERE / "scenarios.json"
-RAW = HERE / "deepseek_raw"
-OUT = ROOT / "eval" / "cases_heldout3.jsonl"
 
 _spec = importlib.util.spec_from_file_location("national_build", ROOT / "eval" / "national" / "build_cases.py")
 nb = sys.modules["national_build"] = importlib.util.module_from_spec(_spec)
@@ -90,11 +89,27 @@ class Doctor:
     site: str | None = None
 
 
+@dataclass(frozen=True)
+class Pick:
+    """Two turns. Turn 1 (`first`) must ask; asked `question`, the caller says `answer`, which updates
+    `key` and picks `choice` (a type id after a service ask, a provider id after a provider ask). `site`:
+    a clinic the answer names. `must`/`must_not` check the answer's wording."""
+    id: str
+    first: Need | Doctor
+    question: str
+    answer: str
+    key: str
+    choice: str
+    must: tuple[tuple[str, ...], ...]
+    must_not: tuple[str, ...] = ()
+    site: str | None = None
+
+
 def first(p: dict) -> str:
     return p["name"].split()[1]
 
 
-NEEDS = [
+NEEDS3 = [
     # ---- named tests, in lay words ----
     Need("h3-01", "heldout3_type", "test", ("appt_022",), EXISTING,
          f"Existing patient whose heart doctor wants them to do the test where they walk on a treadmill while "
@@ -226,7 +241,7 @@ NEEDS = [
          "A brand-new patient who just moved here and wants to start seeing a gynecologist at this clinic."),
 ]
 
-DOCTORS = [
+DOCTORS3 = [
     Doctor("h3-p01", "specialty", "appt_061", "medication management", EXISTING, "Smith",
            "Dr. Smith, and that it is the psychiatrist (no first name)",
            lambda p: p["specialty"] == "Psychiatry", (("smith",), ("psychiatr*",))),
@@ -274,6 +289,247 @@ DOCTORS = [
            lambda p: first(p) == "Michael" and "loc_006" in p["location_ids"],
            (("michael",), ("sato",), ("sunset",)), site="loc_006"),
 ]
+
+# ---------------- heldout4: round 4, authored blind; targets and clues mostly unused by heldout3 ----------------
+NO_REFERRAL = {"is_new": False, "has_referral": False}
+PA = ("pa", "p.a.", "physician assistant", "physician's assistant")
+
+NEEDS4 = [
+    # ---- named tests, in lay words ----
+    Need("h4-01", "heldout4_type", "test", ("appt_051",), EXISTING,
+         "Existing patient who wants the test where you sit in a quiet booth with headphones on and raise your "
+         "hand each time you hear a beep, to see how well they hear. They do not know the test's name and do "
+         "not call it a 'hearing test'.", must_not=("audiogram", "audiolog*", "hearing test")),
+    Need("h4-02", "heldout4_type", "test", ("appt_068",), EXISTING,
+         f"Existing patient who is due for the yearly screening where each breast is pressed between two plates "
+         f"to look for cancer. {LAY}", must_not=("mammo*",)),
+    Need("h4-03", "heldout4_type", "test", ("appt_043",), EXISTING,
+         f"Existing patient who needs the swab test of the cervix that checks for early signs of cervical "
+         f"cancer. {LAY}", must_not=("pap", "smear")),
+    Need("h4-04", "heldout4_type", "test", ("appt_079",), EXISTING,
+         f"Existing patient whose lung doctor ordered the breathing test where you blow as hard and as long as "
+         f"you can into a tube. {LAY}", must_not=("spirometr*", "lung function", "pulmonary function", "pft")),
+    # ---- symptoms ----
+    Need("h4-05", "heldout4_type", "symptom", ("appt_020",), EXISTING,
+         f"Existing patient who gets a tight, heavy feeling in the chest when walking uphill; their regular "
+         f"doctor wants them to see a heart specialist, and they say 'heart specialist'. {LAY}",
+         must=(("heart",),), must_not=("cardio*",)),
+    Need("h4-06", "heldout4_type", "symptom", ("appt_026",), EXISTING,
+         f"Existing patient with an itchy red rash on both arms for two months that drugstore creams have not "
+         f"helped; their regular doctor wants them to see a skin specialist. {LAY}",
+         must_not=("dermatolog*", "derm")),
+    Need("h4-07", "heldout4_type", "symptom", ("appt_032",), EXISTING,
+         f"Existing patient whose knee has been clicking and giving way on the stairs for months; their regular "
+         f"doctor referred them to a bone and joint specialist. {LAY}", must_not=("ortho*",)),
+    Need("h4-08", "heldout4_type", "symptom", ("appt_078",), EXISTING,
+         f"Existing patient who has been short of breath and coughing for three months; their regular doctor "
+         f"wants them to see a lung specialist, and they say 'lung specialist'. {LAY}",
+         must=(("lung*",),), must_not=("pulmon*",)),
+    Need("h4-09", "heldout4_type", "symptom", ("appt_080",), EXISTING,
+         f"Existing patient who sneezes nonstop and has itchy, watery eyes every spring, and the drugstore pills "
+         f"no longer help; their regular doctor told them to see a specialist about it. {LAY}",
+         must_not=("allerg*", "immunolog*")),
+    Need("h4-10", "heldout4_type", "symptom", ("appt_052",), EXISTING,
+         f"Existing patient who has had a stuffed-up nose and pressure behind the cheeks and forehead for "
+         f"months, with one infection after another; their regular doctor wants a specialist to look into it. "
+         f"{LAY}", must_not=("sinus*", "ent", "otolaryng*", "ear, nose")),
+    Need("h4-11", "heldout4_type", "symptom", ("appt_007",), EXISTING,
+         f"Existing patient who has had a sore throat, a fever and body aches for three days and wants to see "
+         f"their regular doctor this week. {LAY}", must_not=("sick visit", "urgent*")),
+    # ---- everyday descriptions of a visit ----
+    Need("h4-12", "heldout4_type", "colloquial", ("appt_006",), EXISTING,
+         "Existing patient who wants to go over their recent test results with their doctor on a video call "
+         "from home instead of coming in.", must_not=("telehealth", "follow-up", "follow up", "followup")),
+    Need("h4-13", "heldout4_type", "colloquial", ("appt_013",), EXISTING,
+         "Existing patient who is going to Kenya next month and needs to find out which shots and pills they "
+         "need before the trip.", must_not=("vaccin*", "immuniz*", "consult*")),
+    Need("h4-14", "heldout4_type", "colloquial", ("appt_019",), EXISTING,
+         "Existing patient: a parent whose 14-year-old daughter needs a doctor to check her over and sign the "
+         "form so she can play on the soccer team.", must_not=("physical",)),
+    Need("h4-15", "heldout4_type", "colloquial", ("appt_044",), EXISTING,
+         "Existing patient who wants to talk with a doctor about starting birth control, maybe the pill or an "
+         "IUD.", must_not=("contracept*",)),
+    Need("h4-16", "heldout4_type", "colloquial", ("appt_031",), EXISTING,
+         "Existing patient who wants to ask about getting Botox for the wrinkles on their forehead.",
+         must=(("botox",),), must_not=("cosmetic", "consult*")),
+    Need("h4-17", "heldout4_type", "colloquial", ("appt_057",), EXISTING,
+         "Existing patient who sees the hormone specialist here every three months to keep their blood sugar "
+         "under control and is due for the next check; they call it 'my sugar'.", must=(("sugar",),),
+         must_not=("diabet*", "endocrin*", "a1c")),
+    Need("h4-18", "heldout4_type", "colloquial", ("appt_042",), EXISTING,
+         "Existing patient who just found out she is about eight weeks pregnant and needs her first checkup for "
+         "the pregnancy.", must_not=("prenatal", "obstetric*", "ob", "gyn*")),
+    Need("h4-19", "heldout4_type", "colloquial", ("appt_016",), NEW,
+         f"A new patient: a parent whose baby was born last week and needs the baby's first checkup since "
+         f"leaving the hospital. {LAY}", must_not=("newborn",)),
+    # ---- abbreviations and slang ----
+    Need("h4-20", "heldout4_type", "abbreviation", ("appt_023",), EXISTING,
+         "Existing patient whose doctor wants a quick tracing of their heartbeat; they call it an 'ECG'.",
+         must=(("ecg",),), must_not=("ekg", "electrocardio*")),
+    Need("h4-21", "heldout4_type", "abbreviation", ("appt_021",), EXISTING,
+         "Existing patient whose heart doctor ordered an 'echo' of their heart; they say 'echo'.",
+         must=(("echo",),), must_not=("echocardio*", "ultrasound")),
+    Need("h4-22", "heldout4_type", "abbreviation", ("appt_069",), EXISTING,
+         "Existing patient whose doctor ordered a 'DEXA scan' to check whether their bones are thinning; they "
+         "say 'DEXA'.", must=(("dexa",),), must_not=("density",)),
+    Need("h4-23", "heldout4_type", "slang", ("appt_025",), EXISTING,
+         "Existing patient who has a small device in their chest that keeps their heartbeat steady and is due "
+         "for its regular check; they call it their 'pacer check' and never say the device's full name.",
+         must=(("pacer",),), must_not=("pacemaker",)),
+    Need("h4-24", "heldout4_type", "slang", ("appt_066",), EXISTING,
+         "Existing patient whose doctor ordered a 'CAT scan' of their belly; they say 'CAT scan'.",
+         must=(("cat scan",),), must_not=("ct",)),
+    Need("h4-25", "heldout4_type", "slang", ("appt_012",), EXISTING,
+         "Existing patient who wants the latest COVID booster; they call it 'the covid jab'.",
+         must=(("covid",),), must_not=("vaccin*",)),
+    # ---- two types genuinely fit: a scheduler asks ----
+    Need("h4-26", "heldout4_type", "ask_two", ("appt_060", "appt_061"), EXISTING,
+         "Existing patient who sees a psychiatrist here regularly and wants to book their next usual "
+         "appointment. They do not say what the appointment is for.", must=(("psychiatr*",),),
+         must_not=("therap*", "medic*", "meds", "pill*", "prescri*", "evaluat*", "counsel*", "talk*", "dose")),
+    Need("h4-27", "heldout4_type", "ask_two", ("appt_072", "appt_073"), EXISTING,
+         "Existing patient whose doctor ordered blood work. They do not say what it is for or whether they "
+         "were told to fast.", must=(("blood",),),
+         must_not=("fast*", "eat*", "empty stomach", "cbc", "a1c", "cholesterol", "sugar", "glucose", "morning")),
+    Need("h4-28", "heldout4_type", "ask_two", ("appt_063", "appt_066"), EXISTING,
+         "Existing patient whose doctor ordered a scan of their head. They do not know what kind of scan it is "
+         "and do not name one.", must=(("head", "brain"),), must_not=("mri", "ct", "cat", "magnet*", "x-ray*")),
+    Need("h4-29", "heldout4_type", "ask_two", ("appt_000", "appt_001"), NEW,
+         "A brand-new patient who wants to become a patient here and have a first visit with a regular doctor. "
+         "They have no particular problem and do not ask for a physical or a checkup.",
+         must_not=("physical", "checkup", "check-up", "check up", "wellness", "sick", "annual", "yearly")),
+    # ---- nobody here offers it ----
+    Need("h4-30", "heldout4_type", "not_offered", ("appt_045",), EXISTING,
+         "Existing patient who wants their eyes checked because they think they need new glasses."),
+    Need("h4-31", "heldout4_type", "not_offered", ("appt_049",), EXISTING,
+         f"Existing patient whose vision has gone cloudy, like looking through a foggy window; their regular "
+         f"doctor wants a specialist to check whether the lens of the eye needs surgery. {LAY}",
+         must_not=("cataract*",)),
+    # ---- booking rules ----
+    Need("h4-x01", "heldout4_policy", "new_patient_type", ("appt_064",), NEW,
+         "A brand-new patient who has never been seen here needs an MRI of their lower back; an outside doctor "
+         "referred them."),
+    Need("h4-x02", "heldout4_policy", "new_patient_type", ("appt_023",), NEW,
+         "A brand-new patient who has never been seen here wants an EKG of their heart."),
+    Need("h4-x03", "heldout4_policy", "referral", ("appt_036",), NO_REFERRAL,
+         "Existing patient with no referral who wants to see a neurologist about numbness and tingling in their "
+         "feet; they say 'neurologist'.", must=(("neurolog*",),)),
+    Need("h4-x04", "heldout4_policy", "new_patient_provider", ("appt_041",), NEW,
+         "A brand-new patient who wants her yearly women's exam with the gynecologist here."),
+    Need("h4-x05", "heldout4_policy", "new_patient_provider", ("appt_044",), NEW,
+         "A brand-new patient who wants to talk with the gynecologist here about birth control options."),
+]
+
+DOCTORS4 = [
+    Doctor("h4-p01", "specialty", "appt_030", "acne follow-up", EXISTING, "Kim",
+           "Dr. Kim, and that it is the skin doctor (no first name)",
+           lambda p: p["specialty"] == "Dermatology", (("kim",), ("skin", "dermatolog*", "derm"))),
+    Doctor("h4-p02", "specialty", "appt_034", "fracture follow-up", EXISTING, "Rodriguez",
+           "Dr. Rodriguez, and that it is the bone doctor (no first name)",
+           lambda p: p["specialty"] == "Orthopedics", (("rodriguez",), ("bone*", "ortho*"))),
+    Doctor("h4-p03", "specialty", "appt_078", "pulmonology consultation", EXISTING, "Nguyen",
+           "Dr. Nguyen, and that it is the lung doctor (no first name)",
+           lambda p: p["specialty"] == "Pulmonology", (("nguyen",), ("lung*", "pulmon*"))),
+    Doctor("h4-p04", "title", "appt_009", "medication review", EXISTING, "Sato",
+           "Dr. Sato, and that it is the physician assistant (no first name)",
+           lambda p: p["title"] == "PA", (("sato",), PA)),
+    Doctor("h4-p05", "title", "appt_002", "annual physical", NEW, "Sato",
+           "Dr. Sato, and that it is the physician assistant (no first name)",
+           lambda p: p["title"] == "PA", (("sato",), PA)),
+    Doctor("h4-p06", "language", "appt_002", "annual physical", EXISTING, "Patel",
+           "Dr. Patel, the one who speaks Hindi (no first name)",
+           lambda p: "Hindi" in p["languages"], (("patel",), ("hindi",))),
+    Doctor("h4-p07", "language", "appt_007", "sick visit", EXISTING, "Patel",
+           "Dr. Patel, the one who speaks Spanish (no first name)",
+           lambda p: "Spanish" in p["languages"], (("patel",), ("spanish",))),
+    Doctor("h4-p08", "full_name", "appt_003", "annual wellness visit", EXISTING, "Sato",
+           "the doctor's full name, Dr. Michael Sato, and nothing else about him",
+           lambda p: first(p) == "Michael", (("michael",), ("sato",))),
+    Doctor("h4-p09", "full_name", "appt_001", "new patient visit", NEW, "Sato",
+           "the doctor's full name, Dr. Michael Sato, and nothing else about him",
+           lambda p: first(p) == "Michael", (("michael",), ("sato",))),
+    Doctor("h4-p10", "gender", "appt_078", "pulmonology consultation", EXISTING, "Chen",
+           "Dr. Chen, making clear the doctor is a woman, e.g. 'she' or 'the lady doctor' (no first name)",
+           lambda p: first(p) in {"Emily", "Nina"}, (("chen",), ("she", "her", "woman", "lady", "female"))),
+    Doctor("h4-p11", "gender", "appt_032", "orthopedic consultation", EXISTING, "Nguyen",
+           "Dr. Nguyen, making clear the doctor is a man, e.g. 'he' or 'the male one' (no first name)",
+           lambda p: first(p) in {"Daniel", "Carlos"},
+           (("nguyen",), ("he", "him", "his", "man", "male", "guy", "gentleman"))),
+    Doctor("h4-p12", "site", "appt_011", "flu shot", EXISTING, "Patel",
+           "Dr. Patel, the one at the Sunset clinic (no first name)",
+           lambda p: "loc_006" in p["location_ids"], (("patel",), ("sunset",)), site="loc_006"),
+    Doctor("h4-p13", "site", "appt_027", "skin cancer screening", EXISTING, "Smith",
+           "Dr. Smith, the one at the Richmond clinic (no first name)",
+           lambda p: "loc_007" in p["location_ids"], (("smith",), ("richmond",)), site="loc_007"),
+    Doctor("h4-p14", "site", "appt_015", "well-child visit", EXISTING, "Garcia",
+           "Dr. Garcia, the one at the Mission Bay clinic (no first name)",
+           lambda p: "loc_000" in p["location_ids"], (("garcia",), ("mission bay",)), site="loc_000"),
+]
+
+PICKS4 = [
+    Pick("h4-m01", Doctor("h4-m01", "site", "appt_079", "spirometry", EXISTING, "Nguyen",
+                          "Dr. Nguyen, the one at the Richmond clinic (no first name)",
+                          lambda p: "loc_007" in p["location_ids"], (("nguyen",), ("richmond",)), site="loc_007"),
+         "which Dr. Nguyen at Richmond they mean, Dr. Maria Nguyen or Dr. Daniel Nguyen",
+         "Maria; they give only her first name", "provider_phrase", "prov_024", (("maria",),), ("daniel",)),
+    Pick("h4-m02", Doctor("h4-m02", "surname", "appt_002", "annual physical", EXISTING, "Nguyen",
+                          "Dr. Nguyen, and nothing else about the doctor (no first name)",
+                          lambda p: True, (("nguyen",),)),
+         "which Dr. Nguyen they mean, Dr. Nina Nguyen or Dr. Elizabeth Nguyen",
+         "the one at the Downtown clinic; they name only the clinic, not the doctor", "location_phrase",
+         "prov_016", (("downtown",),), ("nina", "elizabeth", "nguyen"), site="loc_004"),
+    Pick("h4-m03", Doctor("h4-m03", "full_name", "appt_007", "sick visit", EXISTING, "Garcia",
+                          "the doctor's full name, Dr. Maria Garcia, and nothing else about her",
+                          lambda p: first(p) == "Maria", (("maria",), ("garcia",))),
+         "which Dr. Maria Garcia they mean, the pediatrician or the nurse practitioner",
+         "the nurse practitioner", "provider_phrase", "prov_003",
+         (("nurse practitioner", "np", "n.p."),), ("pediatric*", "kid*", "child*")),
+    Pick("h4-m04", Need("h4-m04", "heldout4_multiturn", "service_pick", ("appt_066", "appt_067"), EXISTING,
+                        "Existing patient whose doctor ordered a scan of their belly. They do not know what kind of "
+                        "scan it is and do not name one.", must=(("belly", "stomach", "abdom*", "tummy"),),
+                        must_not=("ct", "cat", "ultrasound", "sonogram", "mri", "x-ray*", "xray*")),
+         "whether the scan is a CT scan or an ultrasound", "the ultrasound", "service_phrase", "appt_067",
+         (("ultrasound", "sonogram"),), ("ct", "cat")),
+    Pick("h4-m05", Need("h4-m05", "heldout4_multiturn", "service_pick", ("appt_015", "appt_016"), EXISTING,
+                        "Existing patient: a parent who wants to book their baby's checkup. They do not say how "
+                        "old the baby is.", must=(("baby",),),
+                        must_not=("newborn", "new", "born", "week*", "month*", "year*", "old")),
+         "how old the baby is", "two weeks old", "service_phrase", "appt_016",
+         (("two weeks", "2 weeks", "two-week*", "2-week*"),), ("newborn", "month*")),
+    Pick("h4-m06", Need("h4-m06", "heldout4_multiturn", "service_pick", ("appt_054", "appt_055"), EXISTING,
+                        "Existing patient whose stomach doctor said they need a scope. They do not say which kind.",
+                        must=(("scope",),),
+                        must_not=("colonoscop*", "endoscop*", "colon", "throat", "mouth", "below", "bottom", "rear")),
+         "whether it is the scope that goes down the throat or the one from below", "the one down the throat",
+         "service_phrase", "appt_055", (("throat", "mouth"),), ("colon*", "below", "bottom")),
+]
+
+
+@dataclass(frozen=True)
+class Profile:
+    name: str
+    needs: list[Need]
+    doctors: list[Doctor]
+    picks: list[Pick] = field(default_factory=list)
+
+    @property
+    def dir(self) -> Path:
+        return ROOT / "eval" / self.name
+
+    @property
+    def scenarios(self) -> Path:
+        return self.dir / "scenarios.json"
+
+    @property
+    def raw(self) -> Path:
+        return self.dir / "deepseek_raw"
+
+    @property
+    def out(self) -> Path:
+        return ROOT / "eval" / f"cases_{self.name}.jsonl"
+
+
+PROFILES = {p.name: p for p in (Profile("heldout3", NEEDS3, DOCTORS3), Profile("heldout4", NEEDS4, DOCTORS4, PICKS4))}
 
 
 class Catalog:
@@ -339,7 +595,7 @@ def need_scenario(cat: Catalog, n: Need) -> dict:
     else:
         tid = n.target[0]
         code = cat.refusal(tid, n.patient)
-        wanted = n.kind if n.kind == "not_offered" or n.category == "heldout3_policy" else None
+        wanted = n.kind if n.kind == "not_offered" or n.category.endswith("_policy") else None
         assert code == wanted, f"{n.id}: catalog says {code}, spec says {wanted}"
         exp = {"status": "refuse", "refuse_code": code} if code else offer(cat, tid, n.patient)
     return {"id": n.id, "category": n.category, "kind": n.kind, "patient": n.patient,
@@ -349,7 +605,7 @@ def need_scenario(cat: Catalog, n: Need) -> dict:
             "truth": {"target": list(n.target), "type_names": [cat.types[t]["name"] for t in n.target]}}
 
 
-def doctor_scenario(cat: Catalog, d: Doctor) -> dict:
+def doctor_scenario(cat: Catalog, d: Doctor, category: str) -> dict:
     named = [p for p in cat.provs.values() if p["name"].split()[-1] == d.surname]
     fits = [p for p in named if d.match(p)]
     offering = [p for p in fits if d.type_id in p["appointment_type_ids"]
@@ -363,7 +619,7 @@ def doctor_scenario(cat: Catalog, d: Doctor) -> dict:
         assert offering and cat.types[d.type_id]["new_patients_allowed"], f"{d.id}: nobody fits"
         exp = {"status": "refuse", "refuse_code": "new_patient_provider"}
     first_names = sorted({first(p) for p in named})
-    return {"id": d.id, "category": "heldout3_provider", "kind": d.kind, "patient": d.patient,
+    return {"id": d.id, "category": category, "kind": d.kind, "patient": d.patient,
             "situation": f"Existing patient who wants a {d.service_phrase} with a specific doctor." if not
             d.patient["is_new"] else f"A brand-new patient who wants a {d.service_phrase} with a specific doctor.",
             "fields": {"provider_phrase": f"how the caller names the doctor: {d.clue}"},
@@ -391,15 +647,33 @@ def violations(s: dict, got: dict) -> list[str]:
     return errs
 
 
-def build() -> list[dict]:
+def pick_scenario(cat: Catalog, p: Pick, prof: str) -> dict:
+    s = need_scenario(cat, p.first) if isinstance(p.first, Need) else doctor_scenario(cat, p.first, "")
+    t1 = s["expected"]
+    assert t1["status"] == "ask" and p.choice in t1["ask_options"], f"{p.id}: turn 1 expects {t1}"
+    if t1["ask_field"] == "service":
+        exp = offer(cat, p.choice, s["patient"], site=p.site)
+    else:
+        exp = offer(cat, p.first.type_id, s["patient"], {p.choice}, p.site or p.first.site)
+    follow = f"followup_{p.key}"
+    return {**s, "id": p.id, "category": f"{prof}_multiturn", "kind": f"{t1['ask_field']}_pick",
+            "situation": f"{s['situation']} Asked {p.question}, they answer: {p.answer}.",
+            "fields": {**s["fields"], follow: f"their answer when asked {p.question}: {p.answer}"},
+            "checks": {**s["checks"], follow: {"must": [list(g) for g in p.must], "must_not": list(p.must_not)}},
+            "expect_t1": t1, "expected": exp, "truth": {**s["truth"], "choice": p.choice}}
+
+
+def build(prof: Profile) -> list[dict]:
     cat = Catalog(json.loads(CATALOG.read_text(encoding="utf-8")))
-    return [need_scenario(cat, n) for n in NEEDS] + [doctor_scenario(cat, d) for d in DOCTORS]
+    return ([need_scenario(cat, n) for n in prof.needs]
+            + [doctor_scenario(cat, d, f"{prof.name}_provider") for d in prof.doctors]
+            + [pick_scenario(cat, p, prof.name) for p in prof.picks])
 
 
-def merge(scen: list[dict]) -> None:
+def merge(scen: list[dict], prof: Profile) -> None:
     by_id = {s["id"]: s for s in scen}
     phrasings: dict[str, dict] = {}
-    for path in sorted(RAW.glob("*.json")):
+    for path in sorted(prof.raw.glob("*.json")):
         raw = json.loads(path.read_text(encoding="utf-8"))
         for got in raw["parsed"]:
             s = by_id.get(got.get("id")) if isinstance(got, dict) else None
@@ -416,39 +690,53 @@ def merge(scen: list[dict]) -> None:
             continue
         said = {**got, **s["fixed"]}
         update = {k: said[k] for k in ("service_phrase", "provider_phrase") if k in said}
+        turns = [{"update": update}]
+        for key in s["fields"]:
+            if key.startswith("followup_"):
+                turns[0]["expect"] = s["expect_t1"]
+                turns.append({"update": {key.removeprefix("followup_"): got[key]}})
         lines.append({"id": s["id"], "category": s["category"], "kind": s["kind"], "patient": s["patient"],
-                      "turns": [{"update": update}], "expected": s["expected"], "phrasing_source": got["_file"]})
-    OUT.write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in lines), encoding="utf-8")
-    print(f"wrote {OUT.relative_to(ROOT)}: {len(lines)} cases; dropped {len(drops)}")
+                      "turns": turns, "expected": s["expected"], "phrasing_source": got["_file"]})
+    out = prof.out
+    out.write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in lines), encoding="utf-8")
+    print(f"wrote {out.relative_to(ROOT)}: {len(lines)} cases; dropped {len(drops)}")
     for sid, errs, got in drops:
         print(f"  DROP {sid}: {'; '.join(errs)}  got={got}")
     print("per category:", dict(Counter(c["category"] for c in lines)))
     print("per kind:", dict(Counter(c["kind"] for c in lines)))
-    print("sha256", hashlib.sha256(OUT.read_bytes()).hexdigest())
+    print("sha256", hashlib.sha256(out.read_bytes()).hexdigest())
 
 
 def main() -> None:
     args = sys.argv[1:]
+    name = "heldout3"
+    if args[:1] == ["--set"]:
+        name, args = args[1], args[2:]
+    if name not in PROFILES:
+        sys.exit(f"unknown set {name}; known: {sorted(PROFILES)}")
+    prof = PROFILES[name]
     step = args[0] if args else "scenarios"
     if step == "scenarios":
-        scen = build()
-        HERE.mkdir(parents=True, exist_ok=True)
-        SCENARIOS.write_text(json.dumps(scen, indent=1, ensure_ascii=False), encoding="utf-8")
-        print(f"wrote {SCENARIOS.relative_to(ROOT)}: {len(scen)} scenarios")
+        scen = build(prof)
+        prof.dir.mkdir(parents=True, exist_ok=True)
+        prof.scenarios.write_text(json.dumps(scen, indent=1, ensure_ascii=False), encoding="utf-8")
+        print(f"wrote {prof.scenarios.relative_to(ROOT)}: {len(scen)} scenarios")
         print("per category:", dict(Counter(s["category"] for s in scen)))
         for s in scen:
             e = s["expected"]
-            print(f"  {s['id']:<7} {s['kind']:<20} {e['status']:<7} "
+            t1 = f"after {s['expect_t1']['ask_options']} " if s["expect_t1"] else ""
+            print(f"  {s['id']:<7} {s['kind']:<20} {t1}{e['status']:<7} "
                   f"{e.get('type_id') or e.get('refuse_code') or e.get('ask_options')} "
                   f"{ {k: v for k, v in e.items() if k in ('provider_ids', 'location_ids')} }")
         return
-    scen = json.loads(SCENARIOS.read_text(encoding="utf-8"))
+    scen = json.loads(prof.scenarios.read_text(encoding="utf-8"))
     if step == "phrase":
-        nb.phrase(scen, RAW, preamble=PROMPT)
+        nb.phrase(scen, prof.raw, preamble=PROMPT)
     elif step == "repair":
-        nb.phrase(scen, RAW, only=args[1].split(","), tag=args[2] if len(args) > 2 else "repair", preamble=PROMPT)
+        nb.phrase(scen, prof.raw, only=args[1].split(","), tag=args[2] if len(args) > 2 else "repair",
+                  preamble=PROMPT)
     elif step == "merge":
-        merge(scen)
+        merge(scen, prof)
     else:
         sys.exit(f"unknown step {step}")
 

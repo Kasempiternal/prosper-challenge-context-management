@@ -1,0 +1,73 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat4-sym-07: Existing patient (has any referral needed) who has a toenail growing into the skin at the side of the big toe that is red, swollen and sore. They do not know which kind of doctor they need. They are in Nashville. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Nashville\n- id nat4-sym-08: Existing patient (has any referral needed) who has painful, swollen joints in both hands and a red rash across the cheeks and nose. They do not know which kind of doctor they need. They are in Miami. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Miami\n- id nat4-dup-01: Existing patient who wants COVID-19 Vaccine with Dr. Scott Miller. They do not say where at first; asked which city, they answer Baltimore. Fields: service_phrase = the visit they want: COVID-19 Vaccine (said naturally); provider_phrase = the doctor's full name: Dr. Scott Miller; followup_location_phrase = their answer to 'which city?': Baltimore\n- id nat4-dup-02: Existing patient who wants COVID-19 Vaccine with Dr. Chioma Getachew. They do not say where at first; asked which city, they answer Baltimore. Fields: service_phrase = the visit they want: COVID-19 Vaccine (said naturally); provider_phrase = the doctor's full name: Dr. Chioma Getachew; followup_location_phrase = their answer to 'which city?': Baltimore\n- id nat4-dup-03: Existing patient who wants Pelvic Pain Evaluation with Dr. James Caskey. They do not say where at first; asked which city, they answer New York. Fields: service_phrase = the visit they want: Pelvic Pain Evaluation (said naturally); provider_phrase = the doctor's full name: Dr. James Caskey; followup_location_phrase = their answer to 'which city?': New York\n- id nat4-dup-04: Existing patient who wants Sports Injury Evaluation with Dr. Vijay Joshi, their doctor in Washington, DC. Fields: service_phrase = the visit they want: Sports Injury Evaluation (said naturally); provider_phrase = the doctor's full name: Dr. Vijay Joshi; location_phrase = the city: Washington, DC\n- id nat4-dup-05: Existing patient who wants Dialysis Evaluation with Dr. Laura Gomez, their doctor in Phoenix. Fields: service_phrase = the visit they want: Dialysis Evaluation (said naturally); provider_phrase = the doctor's full name: Dr. Laura Gomez; location_phrase = the city: Phoenix\n- id nat4-dup-06: Existing patient who wants Stress Test with Dr. Omar Sabbagh, their doctor in Boston. Fields: service_phrase = the visit they want: Stress Test (said naturally); provider_phrase = the doctor's full name: Dr. Omar Sabbagh; location_phrase = the city: Boston\n- id nat4-cap-01: Existing patient (with a referral) who needs Breast Ultrasound. They are in Philadelphia. Fields: service_phrase = the service: Breast Ultrasound (said naturally); location_phrase = the city: Philadelphia\n- id nat4-cap-02: Existing patient (with a referral) who needs Epidural Steroid Injection. They are in Charlotte. Fields: service_phrase = the service: Epidural Steroid Injection (said naturally); location_phrase = the city: Charlotte\n- id nat4-cap-03: Existing patient (with a referral) who needs Lung Cancer Screening CT. They are in Detroit. Fields: service_phrase = the service: Lung Cancer Screening CT (said naturally); location_phrase = the city: Detroit\n- id nat4-cap-04: Existing patient who needs a diabetic eye exam. They are in Boston. Fields: service_phrase = how the caller asks for a diabetic eye exam; location_phrase = the city: Boston",
+ "response": "[\n  {\n    \"id\": \"nat4-sym-07\",\n    \"service_phrase\": \"my big toenail's growing into the side, it's red and swollen and sore\",\n    \"location_phrase\": \"I'm in Nashville\"\n  },\n  {\n    \"id\": \"nat4-sym-08\",\n    \"service_phrase\": \"both my hands hurt, the joints are swollen, and I've got a red rash on my face\",\n    \"location_phrase\": \"over by Miami\"\n  },\n  {\n    \"id\": \"nat4-dup-01\",\n    \"service_phrase\": \"I'd like to get the COVID vaccine\",\n    \"provider_phrase\": \"Dr. Scott Miller\",\n    \"followup_location_phrase\": \"Baltimore\"\n  },\n  {\n    \"id\": \"nat4-dup-02\",\n    \"service_phrase\": \"I need the COVID shot\",\n    \"provider_phrase\": \"Dr. Chioma Getachew\",\n    \"followup_location_phrase\": \"Baltimore\"\n  },\n  {\n    \"id\": \"nat4-dup-03\",\n    \"service_phrase\": \"I want to get my pelvic pain looked at\",\n    \"provider_phrase\": \"Dr. James Caskey\",\n    \"followup_location_phrase\": \"New York\"\n  },\n  {\n    \"id\": \"nat4-dup-04\",\n    \"service_phrase\": \"I need a sports injury evaluation\",\n    \"provider_phrase\": \"Dr. Vijay Joshi\",\n    \"location_phrase\": \"Washington, DC\"\n  },\n  {\n    \"id\": \"nat4-dup-05\",\n    \"service_phrase\": \"I'm calling about a dialysis evaluation\",\n    \"provider_phrase\": \"Dr. Laura Gomez\",\n    \"location_phrase\": \"Phoenix\"\n  },\n  {\n    \"id\": \"nat4-dup-06\",\n    \"service_phrase\": \"I need to schedule a stress test\",\n    \"provider_phrase\": \"Dr. Omar Sabbagh\",\n    \"location_phrase\": \"Boston\"\n  },\n  {\n    \"id\": \"nat4-cap-01\",\n    \"service_phrase\": \"I was told I need a breast ultrasound\",\n    \"location_phrase\": \"I'm in Philadelphia\"\n  },\n  {\n    \"id\": \"nat4-cap-02\",\n    \"service_phrase\": \"I need an epidural steroid injection\",\n    \"location_phrase\": \"near Charlotte\"\n  },\n  {\n    \"id\": \"nat4-cap-03\",\n    \"service_phrase\": \"I'm supposed to get a lung cancer screening CT\",\n    \"location_phrase\": \"I'm in Detroit\"\n  },\n  {\n    \"id\": \"nat4-cap-04\",\n    \"service_phrase\": \"I need an eye exam for my diabetes\",\n    \"location_phrase\": \"Boston\"\n  }\n]\n",
+ "parsed": [
+  {
+   "id": "nat4-sym-07",
+   "service_phrase": "my big toenail's growing into the side, it's red and swollen and sore",
+   "location_phrase": "I'm in Nashville"
+  },
+  {
+   "id": "nat4-sym-08",
+   "service_phrase": "both my hands hurt, the joints are swollen, and I've got a red rash on my face",
+   "location_phrase": "over by Miami"
+  },
+  {
+   "id": "nat4-dup-01",
+   "service_phrase": "I'd like to get the COVID vaccine",
+   "provider_phrase": "Dr. Scott Miller",
+   "followup_location_phrase": "Baltimore"
+  },
+  {
+   "id": "nat4-dup-02",
+   "service_phrase": "I need the COVID shot",
+   "provider_phrase": "Dr. Chioma Getachew",
+   "followup_location_phrase": "Baltimore"
+  },
+  {
+   "id": "nat4-dup-03",
+   "service_phrase": "I want to get my pelvic pain looked at",
+   "provider_phrase": "Dr. James Caskey",
+   "followup_location_phrase": "New York"
+  },
+  {
+   "id": "nat4-dup-04",
+   "service_phrase": "I need a sports injury evaluation",
+   "provider_phrase": "Dr. Vijay Joshi",
+   "location_phrase": "Washington, DC"
+  },
+  {
+   "id": "nat4-dup-05",
+   "service_phrase": "I'm calling about a dialysis evaluation",
+   "provider_phrase": "Dr. Laura Gomez",
+   "location_phrase": "Phoenix"
+  },
+  {
+   "id": "nat4-dup-06",
+   "service_phrase": "I need to schedule a stress test",
+   "provider_phrase": "Dr. Omar Sabbagh",
+   "location_phrase": "Boston"
+  },
+  {
+   "id": "nat4-cap-01",
+   "service_phrase": "I was told I need a breast ultrasound",
+   "location_phrase": "I'm in Philadelphia"
+  },
+  {
+   "id": "nat4-cap-02",
+   "service_phrase": "I need an epidural steroid injection",
+   "location_phrase": "near Charlotte"
+  },
+  {
+   "id": "nat4-cap-03",
+   "service_phrase": "I'm supposed to get a lung cancer screening CT",
+   "location_phrase": "I'm in Detroit"
+  },
+  {
+   "id": "nat4-cap-04",
+   "service_phrase": "I need an eye exam for my diabetes",
+   "location_phrase": "Boston"
+  }
+ ]
+}

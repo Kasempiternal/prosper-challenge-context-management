@@ -31,6 +31,8 @@ SETS: dict[str, EvalSet] = {
     "national2": EvalSet("cases_national2.jsonl", national=True),
     "street": EvalSet("cases_street.jsonl", national=True),
     "national3": EvalSet("cases_national3.jsonl", national=True, blind=True),
+    "heldout4": EvalSet("cases_heldout4.jsonl", blind=True),
+    "national4": EvalSet("cases_national4.jsonl", national=True, blind=True),
 }
 DEV = tuple(name for name, s in SETS.items() if not s.blind)
 BLIND_FILES = frozenset(s.file for s in SETS.values() if s.blind)

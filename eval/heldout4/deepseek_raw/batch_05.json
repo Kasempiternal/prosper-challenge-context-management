@@ -1,0 +1,45 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h4-p13: Existing patient who wants a skin cancer screening with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Smith, the one at the Richmond clinic (no first name)\n- id h4-p14: Existing patient who wants a well-child visit with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Garcia, the one at the Mission Bay clinic (no first name)\n- id h4-m01: Existing patient who wants a spirometry with a specific doctor. Asked which Dr. Nguyen at Richmond they mean, Dr. Maria Nguyen or Dr. Daniel Nguyen, they answer: Maria; they give only her first name. Fields: provider_phrase = how the caller names the doctor: Dr. Nguyen, the one at the Richmond clinic (no first name); followup_provider_phrase = their answer when asked which Dr. Nguyen at Richmond they mean, Dr. Maria Nguyen or Dr. Daniel Nguyen: Maria; they give only her first name\n- id h4-m02: Existing patient who wants a annual physical with a specific doctor. Asked which Dr. Nguyen they mean, Dr. Nina Nguyen or Dr. Elizabeth Nguyen, they answer: the one at the Downtown clinic; they name only the clinic, not the doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Nguyen, and nothing else about the doctor (no first name); followup_location_phrase = their answer when asked which Dr. Nguyen they mean, Dr. Nina Nguyen or Dr. Elizabeth Nguyen: the one at the Downtown clinic; they name only the clinic, not the doctor\n- id h4-m03: Existing patient who wants a sick visit with a specific doctor. Asked which Dr. Maria Garcia they mean, the pediatrician or the nurse practitioner, they answer: the nurse practitioner. Fields: provider_phrase = how the caller names the doctor: the doctor's full name, Dr. Maria Garcia, and nothing else about her; followup_provider_phrase = their answer when asked which Dr. Maria Garcia they mean, the pediatrician or the nurse practitioner: the nurse practitioner\n- id h4-m04: Existing patient whose doctor ordered a scan of their belly. They do not know what kind of scan it is and do not name one. Asked whether the scan is a CT scan or an ultrasound, they answer: the ultrasound. Fields: service_phrase = what the caller says they need, in their own words; followup_service_phrase = their answer when asked whether the scan is a CT scan or an ultrasound: the ultrasound\n- id h4-m05: Existing patient: a parent who wants to book their baby's checkup. They do not say how old the baby is. Asked how old the baby is, they answer: two weeks old. Fields: service_phrase = what the caller says they need, in their own words; followup_service_phrase = their answer when asked how old the baby is: two weeks old\n- id h4-m06: Existing patient whose stomach doctor said they need a scope. They do not say which kind. Asked whether it is the scope that goes down the throat or the one from below, they answer: the one down the throat. Fields: service_phrase = what the caller says they need, in their own words; followup_service_phrase = their answer when asked whether it is the scope that goes down the throat or the one from below: the one down the throat",
+ "response": "```json\n[\n  {\n    \"id\": \"h4-p13\",\n    \"provider_phrase\": \"Dr. Smith, the one at the Richmond clinic\"\n  },\n  {\n    \"id\": \"h4-p14\",\n    \"provider_phrase\": \"Dr. Garcia, the one at the Mission Bay clinic\"\n  },\n  {\n    \"id\": \"h4-m01\",\n    \"provider_phrase\": \"Dr. Nguyen, the one at the Richmond clinic\",\n    \"followup_provider_phrase\": \"Maria\"\n  },\n  {\n    \"id\": \"h4-m02\",\n    \"provider_phrase\": \"Dr. Nguyen\",\n    \"followup_location_phrase\": \"the one at the Downtown clinic\"\n  },\n  {\n    \"id\": \"h4-m03\",\n    \"provider_phrase\": \"Dr. Maria Garcia\",\n    \"followup_provider_phrase\": \"the nurse practitioner\"\n  },\n  {\n    \"id\": \"h4-m04\",\n    \"service_phrase\": \"my doctor ordered a scan of my belly\",\n    \"followup_service_phrase\": \"the ultrasound\"\n  },\n  {\n    \"id\": \"h4-m05\",\n    \"service_phrase\": \"I need to book my baby's checkup\",\n    \"followup_service_phrase\": \"two weeks old\"\n  },\n  {\n    \"id\": \"h4-m06\",\n    \"service_phrase\": \"my stomach doctor said I need a scope\",\n    \"followup_service_phrase\": \"the one down the throat\"\n  }\n]\n```\n",
+ "parsed": [
+  {
+   "id": "h4-p13",
+   "provider_phrase": "Dr. Smith, the one at the Richmond clinic"
+  },
+  {
+   "id": "h4-p14",
+   "provider_phrase": "Dr. Garcia, the one at the Mission Bay clinic"
+  },
+  {
+   "id": "h4-m01",
+   "provider_phrase": "Dr. Nguyen, the one at the Richmond clinic",
+   "followup_provider_phrase": "Maria"
+  },
+  {
+   "id": "h4-m02",
+   "provider_phrase": "Dr. Nguyen",
+   "followup_location_phrase": "the one at the Downtown clinic"
+  },
+  {
+   "id": "h4-m03",
+   "provider_phrase": "Dr. Maria Garcia",
+   "followup_provider_phrase": "the nurse practitioner"
+  },
+  {
+   "id": "h4-m04",
+   "service_phrase": "my doctor ordered a scan of my belly",
+   "followup_service_phrase": "the ultrasound"
+  },
+  {
+   "id": "h4-m05",
+   "service_phrase": "I need to book my baby's checkup",
+   "followup_service_phrase": "two weeks old"
+  },
+  {
+   "id": "h4-m06",
+   "service_phrase": "my stomach doctor said I need a scope",
+   "followup_service_phrase": "the one down the throat"
+  }
+ ]
+}

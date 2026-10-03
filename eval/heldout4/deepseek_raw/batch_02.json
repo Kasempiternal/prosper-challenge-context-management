@@ -1,0 +1,55 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h4-13: Existing patient who is going to Kenya next month and needs to find out which shots and pills they need before the trip. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-14: Existing patient: a parent whose 14-year-old daughter needs a doctor to check her over and sign the form so she can play on the soccer team. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-15: Existing patient who wants to talk with a doctor about starting birth control, maybe the pill or an IUD. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-16: Existing patient who wants to ask about getting Botox for the wrinkles on their forehead. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-17: Existing patient who sees the hormone specialist here every three months to keep their blood sugar under control and is due for the next check; they call it 'my sugar'. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-18: Existing patient who just found out she is about eight weeks pregnant and needs her first checkup for the pregnancy. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-19: A new patient: a parent whose baby was born last week and needs the baby's first checkup since leaving the hospital. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-20: Existing patient whose doctor wants a quick tracing of their heartbeat; they call it an 'ECG'. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-21: Existing patient whose heart doctor ordered an 'echo' of their heart; they say 'echo'. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-22: Existing patient whose doctor ordered a 'DEXA scan' to check whether their bones are thinning; they say 'DEXA'. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-23: Existing patient with a pacemaker who is due for the regular check of the device; they call it their 'pacer check'. Fields: service_phrase = what the caller says they need, in their own words\n- id h4-24: Existing patient whose doctor ordered a 'CAT scan' of their belly; they say 'CAT scan'. Fields: service_phrase = what the caller says they need, in their own words",
+ "response": "[\n  {\"id\": \"h4-13\", \"service_phrase\": \"going to Kenya next month, need to find out what shots and pills I need before the trip\"},\n  {\"id\": \"h4-14\", \"service_phrase\": \"um, my daughter's fourteen and she wants to play on the soccer team, so she needs the doctor to look her over and sign the form for that\"},\n  {\"id\": \"h4-15\", \"service_phrase\": \"want to talk to a doctor about starting birth control, maybe the pill or an IUD\"},\n  {\"id\": \"h4-16\", \"service_phrase\": \"asking about getting Botox for the wrinkles on my forehead\"},\n  {\"id\": \"h4-17\", \"service_phrase\": \"I see the hormone specialist here every three months for my sugar, and I'm due for the next check\"},\n  {\"id\": \"h4-18\", \"service_phrase\": \"I just found out I'm about eight weeks pregnant and I need my first check-up for the pregnancy\"},\n  {\"id\": \"h4-19\", \"service_phrase\": \"my baby, born last week, I need the first check-up for the baby since we leave the hospital... I don't know what it is called\"},\n  {\"id\": \"h4-20\", \"service_phrase\": \"my doctor wants a quick tracing of my heartbeat, they call it an ECG\"},\n  {\"id\": \"h4-21\", \"service_phrase\": \"my heart doctor ordered an echo of my heart, an echo\"},\n  {\"id\": \"h4-22\", \"service_phrase\": \"doctor ordered a DEXA scan to check if my bones are thinning\"},\n  {\"id\": \"h4-23\", \"service_phrase\": \"I've got a pacemaker and I'm due for the regular check of it, my pacer check\"},\n  {\"id\": \"h4-24\", \"service_phrase\": \"my doctor ordered a CAT scan of my belly\"}\n]\n",
+ "parsed": [
+  {
+   "id": "h4-13",
+   "service_phrase": "going to Kenya next month, need to find out what shots and pills I need before the trip"
+  },
+  {
+   "id": "h4-14",
+   "service_phrase": "um, my daughter's fourteen and she wants to play on the soccer team, so she needs the doctor to look her over and sign the form for that"
+  },
+  {
+   "id": "h4-15",
+   "service_phrase": "want to talk to a doctor about starting birth control, maybe the pill or an IUD"
+  },
+  {
+   "id": "h4-16",
+   "service_phrase": "asking about getting Botox for the wrinkles on my forehead"
+  },
+  {
+   "id": "h4-17",
+   "service_phrase": "I see the hormone specialist here every three months for my sugar, and I'm due for the next check"
+  },
+  {
+   "id": "h4-18",
+   "service_phrase": "I just found out I'm about eight weeks pregnant and I need my first check-up for the pregnancy"
+  },
+  {
+   "id": "h4-19",
+   "service_phrase": "my baby, born last week, I need the first check-up for the baby since we leave the hospital... I don't know what it is called"
+  },
+  {
+   "id": "h4-20",
+   "service_phrase": "my doctor wants a quick tracing of my heartbeat, they call it an ECG"
+  },
+  {
+   "id": "h4-21",
+   "service_phrase": "my heart doctor ordered an echo of my heart, an echo"
+  },
+  {
+   "id": "h4-22",
+   "service_phrase": "doctor ordered a DEXA scan to check if my bones are thinning"
+  },
+  {
+   "id": "h4-23",
+   "service_phrase": "I've got a pacemaker and I'm due for the regular check of it, my pacer check"
+  },
+  {
+   "id": "h4-24",
+   "service_phrase": "my doctor ordered a CAT scan of my belly"
+  }
+ ]
+}

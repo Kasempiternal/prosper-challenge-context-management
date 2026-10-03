@@ -3,7 +3,7 @@
 Ground truth comes only from catalog queries here (the 6 policies + haversine distance). Caller
 wording comes from DeepSeek, which sees scenario facts in plain language and nothing else.
 
-  python eval/national/build_cases.py [--set national|national2|national3] scenarios  # seeded sampler -> <dir>/scenarios.json
+  python eval/national/build_cases.py [--set national|national2|national3|national4] scenarios  # seeded sampler -> <dir>/scenarios.json
   python eval/national/build_cases.py [--set ...] phrase      # DeepSeek via cmdc -> <dir>/deepseek_raw/*.json
   python eval/national/build_cases.py [--set ...] merge       # scenarios + phrasings -> eval/cases_<set>.jsonl
 
@@ -157,6 +157,43 @@ CAPABILITY_TYPES3 = ["appt_116", "appt_117", "appt_190", "appt_268", "appt_120",
 MISSPELLED3 = {**MISSPELLED, "phoenix-az": "Pheonix", "seattle-wa": "Seatle", "baltimore-md": "Baltimoor",
                "charlotte-nc": "Sharlot", "houston-tx": "Hueston"}
 
+# national4: a fourth held-out draw, authored blind to resolver code and results, over services, symptoms
+# and types that no earlier set sampled from.
+GEO_SERVICES4 = [
+    ("a strep test for a sore throat", ["appt_234"]),
+    ("an STI test", ["appt_104", "appt_072"]),
+    ("a CT scan of their chest that their doctor ordered", ["appt_210", "appt_066"]),
+    ("an ultrasound of their abdomen that their doctor ordered", ["appt_213", "appt_067"]),
+    ("a filling for a cavity", ["appt_235"]),
+    ("an MRI of their ankle that their doctor ordered", ["appt_207"]),
+]
+SYMPTOMS4 = [
+    ("has a mole on their back that has changed shape and gotten darker over a few months",
+     ["appt_026", "appt_027", "appt_128"], ["dermatolog", "skin cancer", "melanoma"]),
+    ("gets up three or four times a night to pee and the stream has gotten weak", ["appt_077", "appt_245"],
+     ["urolog", "prostate", "psa"]),
+    ("has had burning when peeing and needs to go all the time since yesterday",
+     ["appt_007", "appt_084", "appt_008", "appt_230"], ["uti", "urinary tract", "bladder infection", "urinalysis"]),
+    ("has seen blood in their stool a few times and their bowel habits changed over the last month",
+     ["appt_053", "appt_054"], ["gastro", "gi ", "colonoscop", "hemorrhoid"]),
+    ("has felt sad and hopeless for months and lost interest in things they used to enjoy",
+     ["appt_059", "appt_095", "appt_196", "appt_199"], ["psychiatr", "depress", "therap"]),
+    ("has a 2-year-old who says only a few words, far fewer than other kids that age",
+     ["appt_108", "appt_297", "appt_015"], ["autis", "development", "speech"]),
+    ("has a toenail growing into the skin at the side of the big toe that is red, swollen and sore",
+     ["appt_287", "appt_285", "appt_100"], ["ingrown", "podiatr"]),
+    ("has painful, swollen joints in both hands and a red rash across the cheeks and nose",
+     ["appt_259", "appt_261"], ["lupus", "rheumatolog", "arthritis"]),
+]
+NEW_OK_TYPES4 = ["appt_092", "appt_099", "appt_129", "appt_200", "appt_142", "appt_241"]
+NO_NEW_TYPES4 = ["appt_158", "appt_193", "appt_140"]
+UNOFFERED4 = ["appt_181", "appt_248", "appt_167"]
+CAPABILITY_TYPES4 = ["appt_211", "appt_215", "appt_226", "appt_280", "appt_119", "appt_212"]
+MISSPELLED4 = {"indianapolis-in": "Indianapolus", "albuquerque-nm": "Albakerky", "nashville-tn": "Nashvill",
+               "baltimore-md": "Baltimor", "charlotte-nc": "Charlett", "phoenix-az": "Fenix",
+               "seattle-wa": "Seeattle", "new-orleans-la": "New Orlins", "raleigh-nc": "Rawley",
+               "kansas-city-mo": "Kanses City", "denver-co": "Denvor"}
+
 
 @dataclass(frozen=True)
 class FarPlace:
@@ -187,6 +224,9 @@ class Profile:
     # The catalog has 4 twin towns and few cross-metro namesakes. A third set reuses a twin town with the
     # metro no earlier set chose, and admits namesakes who practice in several metros.
     reuse_pools: bool = False
+    # 16 of the 18 cross-metro name groups are used by the first three sets. A fourth set also takes used
+    # groups for the with-city kind, with a type whose provider+type and type+metro no earlier set used.
+    reuse_names: bool = False
 
     @property
     def scenarios(self) -> Path:
@@ -213,6 +253,11 @@ PROFILES = {p.name: p for p in (
             NO_NEW_TYPES3, UNOFFERED3, CAPABILITY_TYPES3, ("a LASIK consultation", ["appt_171"]),
             FarPlace("far_place", "Fargo", "North Dakota", (46.8772, -96.7898), (47.4501, -100.4659)),
             excludes=("national", "national2"), misspelled=MISSPELLED3, reuse_pools=True),
+    Profile("national4", 20261004, "nat4", ROOT / "eval" / "national4", GEO_SERVICES4, SYMPTOMS4, NEW_OK_TYPES4,
+            NO_NEW_TYPES4, UNOFFERED4, CAPABILITY_TYPES4, ("a diabetic eye exam", ["appt_045", "appt_046", "appt_168"]),
+            FarPlace("far_place", "Boise", "Idaho", (43.6150, -116.2023), (44.2405, -114.4788)),
+            excludes=("national", "national2", "national3"), misspelled=MISSPELLED4, reuse_pools=True,
+            reuse_names=True),
 )}
 
 
@@ -310,6 +355,7 @@ class Avoid:
     kind_metros: set = field(default_factory=set)
     twin_choices: set = field(default_factory=set)
     expected_providers: set = field(default_factory=set)
+    provider_types: set = field(default_factory=set)
 
     @classmethod
     def of(cls, cat: Catalog, scen: list[dict]) -> Avoid:
@@ -318,6 +364,7 @@ class Avoid:
             f = facts(cat, s)
             for k in ("metros", "types", "sites", "providers", "names", "places", "pairs"):
                 getattr(a, k).update(f[k])
+            a.provider_types.update(itertools.product(f["providers"], f["types"]))
             a.kind_metros.update((s["kind"], m) for m in f["metros"])
             a.expected_providers.update(s["expected"].get("provider_ids", ()))
             if s["kind"] == "either_or":
@@ -641,6 +688,12 @@ def build(cat: Catalog, prof: Profile, avoid: Avoid) -> list[dict]:
                 and any(distinctive(t) and cat.in_metro(cat.valid_locs([t], EXISTING, {p["id"]}), m)
                         for t in p["appointment_type_ids"])]
 
+    def site_types(p, m):
+        """The provider's distinctive types bookable in the metro; with reuse_names, only unused ones."""
+        return [t for t in p["appointment_type_ids"]
+                if distinctive(t) and cat.in_metro(cat.valid_locs([t], EXISTING, {p["id"]}), m)
+                and (not prof.reuse_names or avoid.fresh([t], m) and (p["id"], t) not in avoid.provider_types)]
+
     shared_dup, other_dup = [], []
     for name, ps in sorted(cat.by_name.items()):
         reused = name in avoid.names
@@ -654,7 +707,7 @@ def build(cat: Catalog, prof: Profile, avoid: Avoid) -> list[dict]:
                     and all(avoid.fresh([t], mm) for mm in pm)), None)
         if hit:
             shared_dup.append(hit)
-        elif not reused:
+        elif not reused or prof.reuse_names and any(site_types(p, m) for p, m in solo_sites(ps)):
             other_dup.append((name, None, None))
     rng.shuffle(shared_dup)
     rng.shuffle(other_dup)
@@ -666,9 +719,8 @@ def build(cat: Catalog, prof: Profile, avoid: Avoid) -> list[dict]:
             mm = rng.choice(unused or sorted(per_metro))
             p = cat.provs[per_metro[mm][0]]
         elif prof.reuse_pools:
-            p, mm = rng.choice(solo_sites(ps))
-            tid = rng.choice([t for t in p["appointment_type_ids"]
-                              if distinctive(t) and cat.in_metro(cat.valid_locs([t], EXISTING, {p["id"]}), mm)])
+            p, mm = rng.choice([(q, m) for q, m in solo_sites(ps) if site_types(q, m)])
+            tid = rng.choice(site_types(p, mm))
         else:
             solo = [p for p in ps if sum(cat.prov_metros(p) == cat.prov_metros(q) for q in ps) == 1]
             p = rng.choice(solo)
@@ -1008,15 +1060,19 @@ def load_scenarios(prof: Profile) -> list[dict]:
     return json.loads(prof.scenarios.read_text(encoding="utf-8"))
 
 
-def overlap(cat: Catalog, scen: list[dict], other: list[dict]) -> list[tuple[str, list[str]]]:
-    """Scenarios that share a (type, metro) pair with a scenario of the other set."""
+def overlap(cat: Catalog, scen: list[dict], other: list[dict], key: str = "pairs") -> list[tuple[str, list[str]]]:
+    """Scenarios that share a (type, metro) pair, or with key="provider_types" a (provider, type) pair,
+    with a scenario of the other set."""
+    def keys(s: dict) -> set:
+        f = facts(cat, s)
+        return f["pairs"] if key == "pairs" else set(itertools.product(f["providers"], f["types"]))
     theirs: dict[tuple[str, str], list[str]] = defaultdict(list)
     for o in other:
-        for pair in facts(cat, o)["pairs"]:
+        for pair in keys(o):
             theirs[pair].append(o["id"])
     hits = []
     for s in scen:
-        ids = sorted({oid for pair in facts(cat, s)["pairs"] for oid in theirs.get(pair, ())})
+        ids = sorted({oid for pair in keys(s) for oid in theirs.get(pair, ())})
         if ids:
             hits.append((s["id"], ids))
     return hits
@@ -1045,11 +1101,12 @@ def main() -> None:
             print(f"  {s['id']:<14} {s['kind']:<28} {e['status']:<7} "
                   f"{e.get('refuse_reason') or e.get('ask_field') or ','.join(e.get('types_any', []))}"
                   f"  locs={len(e.get('location_ids_subset', []))} {s['truth']}")
-        if other:
-            hits = overlap(cat, scen, other)
-            print(f"type+metro overlap with {'+'.join(prof.excludes)}: {len(hits)}/{len(scen)} scenarios")
-            for sid, ids in hits:
-                print(f"  {sid} shares a type+metro with {', '.join(ids)}")
+        for key, what in (("pairs", "type+metro"), ("provider_types", "provider+type")):
+            if other:
+                hits = overlap(cat, scen, other, key)
+                print(f"{what} overlap with {'+'.join(prof.excludes)}: {len(hits)}/{len(scen)} scenarios")
+                for sid, ids in hits:
+                    print(f"  {sid} shares a {what} with {', '.join(ids)}")
         return
     scen = load_scenarios(prof)
     if step == "phrase":

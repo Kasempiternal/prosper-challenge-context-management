@@ -1,0 +1,67 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat4-geo-13: Existing patient who needs an MRI of their ankle that their doctor ordered. They only say which state they live in: North Carolina. Fields: service_phrase = how the caller asks for an MRI of their ankle that their doctor ordered; location_phrase = the state only: North Carolina (no city)\n- id nat4-geo-14: Existing patient who needs an STI test. They live in Lakewood, Ohio. In the first sentence they only say the town name; when asked which one, they say the state. Fields: service_phrase = how the caller asks for an STI test; location_phrase = the town name Lakewood only (no state, no bigger city); followup_location_phrase = their answer to 'which Lakewood?': the state Ohio\n- id nat4-geo-15: Existing patient who needs an MRI of their ankle that their doctor ordered. They live in Pasadena, California. In the first sentence they only say the town name; when asked which one, they say the state. Fields: service_phrase = how the caller asks for an MRI of their ankle that their doctor ordered; location_phrase = the town name Pasadena only (no state, no bigger city); followup_location_phrase = their answer to 'which Pasadena?': the state California\n- id nat4-geo-16: Existing patient who needs an MRI of their ankle that their doctor ordered. They live in Boise, Idaho. Fields: service_phrase = how the caller asks for an MRI of their ankle that their doctor ordered; location_phrase = where they are: Boise, Idaho (say both words)\n- id nat4-geo-17: Existing patient who needs a strep test for a sore throat. They are in New Orleans. Fields: service_phrase = how the caller asks for a strep test for a sore throat\n- id nat4-geo-18: Existing patient who needs an MRI of their ankle that their doctor ordered. They are in Baltimore. Fields: service_phrase = how the caller asks for an MRI of their ankle that their doctor ordered\n- id nat4-sym-01: Existing patient (has any referral needed) who has a mole on their back that has changed shape and gotten darker over a few months. They do not know which kind of doctor they need. They are in Phoenix. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Phoenix\n- id nat4-sym-02: Existing patient (has any referral needed) who gets up three or four times a night to pee and the stream has gotten weak. They do not know which kind of doctor they need. They are in Minneapolis. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Minneapolis\n- id nat4-sym-03: Existing patient (has any referral needed) who has had burning when peeing and needs to go all the time since yesterday. They do not know which kind of doctor they need. They are in Houston. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Houston\n- id nat4-sym-04: Existing patient (has any referral needed) who has seen blood in their stool a few times and their bowel habits changed over the last month. They do not know which kind of doctor they need. They are in Charlotte. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Charlotte\n- id nat4-sym-05: Existing patient (has any referral needed) who has felt sad and hopeless for months and lost interest in things they used to enjoy. They do not know which kind of doctor they need. They are in St. Paul. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: St. Paul\n- id nat4-sym-06: Existing patient (has any referral needed) who has a 2-year-old who says only a few words, far fewer than other kids that age. They do not know which kind of doctor they need. They are in St. Louis. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: St. Louis",
+ "response": "[\n  {\"id\": \"nat4-geo-13\", \"service_phrase\": \"my doctor ordered me an MRI on my ankle\", \"location_phrase\": \"I'm in North Carolina\"},\n  {\"id\": \"nat4-geo-14\", \"service_phrase\": \"I think I want to get tested for STIs, you know, just to be safe\", \"location_phrase\": \"Lakewood\", \"followup_location_phrase\": \"Ohio\"},\n  {\"id\": \"nat4-geo-15\", \"service_phrase\": \"uh, I need an MRI for my ankle, my doc ordered it\", \"location_phrase\": \"Pasadena\", \"followup_location_phrase\": \"California\"},\n  {\"id\": \"nat4-geo-16\", \"service_phrase\": \"need an MRI of my ankle, doctor ordered it\", \"location_phrase\": \"Boise, Idaho\"},\n  {\"id\": \"nat4-geo-17\", \"service_phrase\": \"I need a test for strep, my throat is sore\"},\n  {\"id\": \"nat4-geo-18\", \"service_phrase\": \"my doctor ordered an MRI for my ankle\"},\n  {\"id\": \"nat4-sym-01\", \"service_phrase\": \"there's a mole on my back, it changed shape and got darker over a few months\", \"location_phrase\": \"Phoenix\"},\n  {\"id\": \"nat4-sym-02\", \"service_phrase\": \"I'm up three, four times a night to pee and the stream's gotten weak\", \"location_phrase\": \"Minneapolis\"},\n  {\"id\": \"nat4-sym-03\", \"service_phrase\": \"it burns when I pee and I gotta go all the time, since yesterday\", \"location_phrase\": \"Houston\"},\n  {\"id\": \"nat4-sym-04\", \"service_phrase\": \"I've seen blood in my stool a few times, and my bowel habits changed, over the last month or so\", \"location_phrase\": \"Charlotte\"},\n  {\"id\": \"nat4-sym-05\", \"service_phrase\": \"I feel sad and hopeless for months, I lost interest in things I used to enjoy\", \"location_phrase\": \"St. Paul\"},\n  {\"id\": \"nat4-sym-06\", \"service_phrase\": \"my 2-year-old only says a few words, way fewer than other kids that age\", \"location_phrase\": \"St. Louis\"}\n]\n",
+ "parsed": [
+  {
+   "id": "nat4-geo-13",
+   "service_phrase": "my doctor ordered me an MRI on my ankle",
+   "location_phrase": "I'm in North Carolina"
+  },
+  {
+   "id": "nat4-geo-14",
+   "service_phrase": "I think I want to get tested for STIs, you know, just to be safe",
+   "location_phrase": "Lakewood",
+   "followup_location_phrase": "Ohio"
+  },
+  {
+   "id": "nat4-geo-15",
+   "service_phrase": "uh, I need an MRI for my ankle, my doc ordered it",
+   "location_phrase": "Pasadena",
+   "followup_location_phrase": "California"
+  },
+  {
+   "id": "nat4-geo-16",
+   "service_phrase": "need an MRI of my ankle, doctor ordered it",
+   "location_phrase": "Boise, Idaho"
+  },
+  {
+   "id": "nat4-geo-17",
+   "service_phrase": "I need a test for strep, my throat is sore"
+  },
+  {
+   "id": "nat4-geo-18",
+   "service_phrase": "my doctor ordered an MRI for my ankle"
+  },
+  {
+   "id": "nat4-sym-01",
+   "service_phrase": "there's a mole on my back, it changed shape and got darker over a few months",
+   "location_phrase": "Phoenix"
+  },
+  {
+   "id": "nat4-sym-02",
+   "service_phrase": "I'm up three, four times a night to pee and the stream's gotten weak",
+   "location_phrase": "Minneapolis"
+  },
+  {
+   "id": "nat4-sym-03",
+   "service_phrase": "it burns when I pee and I gotta go all the time, since yesterday",
+   "location_phrase": "Houston"
+  },
+  {
+   "id": "nat4-sym-04",
+   "service_phrase": "I've seen blood in my stool a few times, and my bowel habits changed, over the last month or so",
+   "location_phrase": "Charlotte"
+  },
+  {
+   "id": "nat4-sym-05",
+   "service_phrase": "I feel sad and hopeless for months, I lost interest in things I used to enjoy",
+   "location_phrase": "St. Paul"
+  },
+  {
+   "id": "nat4-sym-06",
+   "service_phrase": "my 2-year-old only says a few words, way fewer than other kids that age",
+   "location_phrase": "St. Louis"
+  }
+ ]
+}
