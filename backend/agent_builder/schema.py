@@ -11,6 +11,9 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
+from scheduling.choosers import NAMES
+from scheduling.model_client import TURN_BUDGET_MS
+
 DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"  # ElevenLabs "Rachel"
 DEFAULT_MODEL = "gpt-4o"
 
@@ -75,37 +78,26 @@ class Node:
         )
 
 
-@dataclass
-class JevConfig:
-    enabled: bool = True
-    timeout_ms: int = 2500
-
-    @classmethod
-    def from_dict(cls, d: dict) -> "JevConfig":
-        return cls(enabled=d.get("enabled", True), timeout_ms=d.get("timeout_ms", 2500))
-
-
-CHOOSERS = ("jev", "openai", "embed", "none")
+CHOOSERS = NAMES
 
 
 @dataclass
 class ResolverConfig:
     """How the scheduling tools behave. speak_direct: templated offers/questions go straight
     to TTS and skip the LLM's second round trip. chooser: the model that answers the resolver's
-    ambiguous cases; absent, it is "jev" when jev.enabled (the default) and "none" otherwise.
-    timeout_ms: the per-turn budget of a networked chooser; absent, jev.timeout_ms."""
+    ambiguous cases. timeout_ms: the per-turn budget of a networked chooser."""
 
     speak_direct: bool = True
-    jev: JevConfig = field(default_factory=JevConfig)
     chooser: str = "jev"
-    timeout_ms: int = 2500
+    timeout_ms: int = TURN_BUDGET_MS
 
     @classmethod
     def from_dict(cls, d: dict) -> "ResolverConfig":
-        jev = JevConfig.from_dict(d.get("jev") or {})
-        return cls(speak_direct=d.get("speak_direct", True), jev=jev,
-                   chooser=d.get("chooser") or ("jev" if jev.enabled else "none"),
-                   timeout_ms=d.get("timeout_ms", jev.timeout_ms))
+        # The one place a legacy {"jev": {"enabled", "timeout_ms"}} block is still read.
+        legacy = d.get("jev") if isinstance(d.get("jev"), dict) else {}
+        return cls(speak_direct=d.get("speak_direct", True),
+                   chooser=d.get("chooser") or ("jev" if legacy.get("enabled", True) else "none"),
+                   timeout_ms=d.get("timeout_ms", legacy.get("timeout_ms", TURN_BUDGET_MS)))
 
 
 @dataclass

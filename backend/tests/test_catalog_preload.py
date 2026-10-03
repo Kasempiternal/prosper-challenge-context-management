@@ -46,7 +46,7 @@ def test_preload_embeds_every_type_and_site_for_the_embeddings_chooser(tmp_path,
     embedded: list[str] = []
 
     class RecordingEmbedder:
-        def embed(self, texts):
+        def warm(self, texts):
             embedded.extend(texts)
 
     monkeypatch.setattr(context, "shared_embedder", lambda: RecordingEmbedder())

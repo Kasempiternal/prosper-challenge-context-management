@@ -8,15 +8,14 @@ offered or confirmed may break a catalog rule, and resolve never raises.
 
 import json
 import random
+from pathlib import Path
 
 import pytest
 
+from fake_models import RandomHooks
 from scheduling.availability import MockAvailability
-from scheduling.decision import DECLINE, Verdict
 from scheduling.request import Request, Update, merge
 from scheduling.resolver import resolve
-
-from pathlib import Path
 
 CATALOG = Path(__file__).resolve().parents[2] / "data" / "catalog.json"
 SEEDS = (0, 1, 2)
@@ -43,35 +42,6 @@ def oracle(type_id, provider_id, location_id, patient) -> list[str]:
     if (not t["new_patients_allowed"] or not p["accepting_new_patients"]) and patient.is_new is not False:
         broken.append("not confirmed established")
     return broken
-
-
-class Adversary:
-    """Model hooks that answer at random: decline, act or pair, on candidates or on any id."""
-
-    def __init__(self, rng: random.Random):
-        self.rng = rng
-
-    def _verdict(self, candidates: list[str], universe: list[str]) -> Verdict:
-        pool = candidates if candidates and self.rng.random() < 0.6 else universe
-        roll = self.rng.random()
-        if roll < 0.3:
-            return DECLINE
-        if roll < 0.7:
-            return Verdict(act=self.rng.choice(pool), called=True)
-        a, b = self.rng.choice(pool), self.rng.choice(universe)
-        return Verdict(ask=(a, b), called=True)
-
-    def pick_type(self, phrase, hint, candidate_ids):
-        return self._verdict(list(candidate_ids), list(TYPES))
-
-    def check_type(self, phrase, hint, first, rival):
-        return self._verdict([first.act or first.ask[0], rival], list(TYPES))
-
-    def pick_provider(self, phrase, type_id, candidate_ids):
-        return self._verdict(list(candidate_ids), list(PROVIDERS))
-
-    def provider_genders(self, candidate_ids):
-        return {p: self.rng.choice((0.02, 0.5, 0.98)) for p in candidate_ids if self.rng.random() < 0.7}
 
 
 SERVICES = ([t["name"] for t in RAW["appointment_types"]] + list(ALIASES["aliases"])
@@ -107,7 +77,7 @@ def random_update(rng: random.Random) -> dict:
 @pytest.mark.parametrize("seed", SEEDS)
 def test_nothing_offered_or_confirmed_breaks_a_catalog_rule(index, seed):
     rng = random.Random(seed)
-    adversary = Adversary(rng)
+    adversary = RandomHooks(rng, {"type": list(TYPES), "provider": list(PROVIDERS)})
     commits = 0
     for _ in range(CONVERSATIONS_PER_SEED):
         av = MockAvailability(index)

@@ -7,7 +7,7 @@ from pipecat.flows import NO_RESPONSE
 from pipecat.frames.frames import TTSSpeakFrame
 
 from agent_tools import build_tool, make_context, stt_keyterms
-from agent_tools.context import BACKEND_DIR, RecordingDisambiguator, shared_availability
+from agent_tools.context import BACKEND_DIR, ModelHooks, shared_availability
 from agent_tools.keyterms import LAY_TERMS
 from agent_tools.scheduling_tools import (REFUSED_PREFACE, TAKEN_PREFACE, EdgeOutcome, book_confirmed, new_request,
                                           spoken_ref)
@@ -376,15 +376,15 @@ class ConsultingTypes:
         self.client = client
 
     def pick_type(self, phrase, hint, candidate_ids):
-        from scheduling.jev import JevCall
-        self.client.calls.append(JevCall("k", "live", 540.0, 900, "type", 0.79))
+        from scheduling.model_client import ModelCall
+        self.client.calls.append(ModelCall("k", "live", 540.0, 900, purpose="type", p=0.79, usd=900 * 0.04 / 1_000_000))
         return Verdict(top=(("appt_002", 0.79), ("appt_003", 0.21)), called=True)
 
 
 def _jev_ctx(make_ctx, types):
     ctx = make_ctx()
     ctx.model_client = FakeJevClient()
-    ctx.disambiguator = RecordingDisambiguator(types, NoDisambiguator())
+    ctx.hooks = ModelHooks(types, NoDisambiguator())
     return ctx
 
 
@@ -478,7 +478,7 @@ def test_national_keyterms_keep_the_lay_terms(monkeypatch):
 def test_each_model_request_is_reported_for_the_dev_view(make_ctx):
     ctx, fm = make_ctx(), FakeFlowManager()
     ctx.model_client = FakeJevClient()
-    ctx.disambiguator = RecordingDisambiguator(ConsultingTypes(ctx.model_client), NoDisambiguator())
+    ctx.hooks = ModelHooks(ConsultingTypes(ctx.model_client), NoDisambiguator())
     events = []
 
     async def on_event(event):
@@ -507,11 +507,16 @@ class CheckedTypes:
 def test_the_dev_view_reports_the_check_and_its_final_p(make_ctx, events):
     ctx, fm = make_ctx(), FakeFlowManager()
     ctx.model_client = FakeJevClient()
-    ctx.disambiguator = RecordingDisambiguator(CheckedTypes(), NoDisambiguator())
+    ctx.hooks = ModelHooks(CheckedTypes(), NoDisambiguator())
     call(ctx, fm, "update_request", {"is_new": False, "service_phrase": "my zorbly thing"})
-    assert [v.p for v in ctx.disambiguator.verdicts] == [0.97, 0.71]
     decision = next(e for e in events if e["type"] == "resolver_decision")
     assert decision["model"]["p"] == 0.71
+
+    from scheduling.request import Request, Update, merge
+    from scheduling.resolver import resolve
+    plan = resolve(ctx.index, merge(Request(), Update.from_args({"is_new": False, "service_phrase": "my zorbly thing"})),
+                   ctx.availability, CheckedTypes())
+    assert [(purpose, v.p) for purpose, v in plan.consults] == [("type", 0.97), ("type check", 0.71)]
 
 
 def test_a_gender_question_no_chooser_can_ask_is_no_model_use(make_ctx, events):
@@ -519,5 +524,4 @@ def test_a_gender_question_no_chooser_can_ask_is_no_model_use(make_ctx, events):
     result, _ = call(ctx, fm, "update_request", {"is_new": False, "has_referral": True, "provider_phrase": "Dr. Chen, the woman",
                                                  "service_phrase": "cardiology consultation"})
     assert result["ask"]["field"] == "provider"
-    assert ctx.disambiguator.verdicts == []
     assert next(e for e in events if e["type"] == "resolver_decision")["model"] == {"used": False}

@@ -6,17 +6,13 @@ the backend's resolver_mode / model_call messages through the real RTVI adapter.
     python frontend/scripts/screenshots_chooser.py [base_url]
 """
 
-import sys
-from pathlib import Path
+from playwright.sync_api import Browser
 
-from playwright.sync_api import Browser, Page, sync_playwright
+from shots import app_script, base_url, new_page, run, shot
 
-BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:5174"
-OUT = Path(__file__).resolve().parent.parent / "screenshots"
-BRAVE = r"C:\Users\izotz\AppData\Local\BraveSoftware\Brave-Browser\Application\brave.exe"
+BASE = base_url("http://localhost:5174")
 
-SIMULATE_LIVE = """async () => {
-  const loaded = (path) => performance.getEntriesByType('resource').map((e) => e.name).findLast((n) => n.includes(path)) ?? path
+SIMULATE_LIVE = app_script("""
   const { useCall, parseFlowEvent } = await import(loaded('/src/store/call.ts'))
   const { useTelemetry } = await import(loaded('/src/store/telemetry.ts'))
   const { toSignals } = await import(loaded('/src/lib/telemetry.ts'))
@@ -32,32 +28,18 @@ SIMULATE_LIVE = """async () => {
   const feed = (raw) => { const e = parseFlowEvent(raw); if (e) useCall.getState().ingest(e) }
   feed({ type: 'node_entered', node: 'schedule', state: {} })
   feed({ type: 'resolver_decision', status: 'offer', ms: 640, say: 'For a hearing test, Dr. Ana Ruiz has Tuesday at 9. Does that work?',
-         offers: ['1 Tue 09:00 Midtown Dr. Ana Ruiz'], model: { used: true, provider: 'openai', p: 1, ms: 640 }, tokens: { result: 81 } })
-}"""
+         offers: ['1 Tue 09:00 Midtown Dr. Ana Ruiz'], model: { used: true, provider: 'openai', p: 1, ms: 640 }, tokens: { result: 81 } })""")
 
-
-END_CALL = """async () => {
-  const loaded = (path) => performance.getEntriesByType('resource').map((e) => e.name).findLast((n) => n.includes(path)) ?? path
+END_CALL = app_script("""
   const { useCall } = await import(loaded('/src/store/call.ts'))
-  useCall.getState().end()
-}"""
-
-
-def shot(page: Page, name: str, theme: str) -> None:
-    page.wait_for_timeout(700)
-    path = OUT / f"40-chooser-{name}-{theme}.png"
-    page.screenshot(path=str(path))
-    print(path)
+  useCall.getState().end()""")
 
 
 def capture(browser: Browser, theme: str, errors: list[str]) -> None:
-    context = browser.new_context(viewport={"width": 1600, "height": 960}, device_scale_factor=1)
-    context.add_init_script(
-        f"localStorage.setItem('agent-studio:theme', '{theme}'); localStorage.setItem('agent-studio:dev-view', '0')"
-    )
-    page = context.new_page()
-    page.on("console", lambda m: m.type == "error" and errors.append(f"[{theme}] {m.text}"))
-    page.on("pageerror", lambda e: errors.append(f"[{theme}] {e}"))
+    page = new_page(browser, theme, errors, dev_view=False)
+
+    def snap(name: str) -> None:
+        shot(page, f"40-chooser-{name}-{theme}", 700)
 
     page.goto(BASE)
     page.wait_for_selector(".react-flow__node", timeout=15000)
@@ -69,11 +51,11 @@ def capture(browser: Browser, theme: str, errors: list[str]) -> None:
     page.wait_for_selector("text=Ready to test")
     group = page.get_by_role("radiogroup", name="Disambiguator")
     assert group.get_by_role("radio", name="JEV").get_attribute("aria-checked") == "true"
-    shot(page, "idle-jev", theme)
+    snap("idle-jev")
 
     group.get_by_role("radio", name="OpenAI").click()
     assert group.get_by_role("radio", name="OpenAI").get_attribute("aria-checked") == "true"
-    shot(page, "idle-openai", theme)
+    snap("idle-openai")
 
     page.keyboard.press("d")
     page.wait_for_selector("role=group[name='Voice pipeline']")
@@ -81,7 +63,7 @@ def capture(browser: Browser, theme: str, errors: list[str]) -> None:
     page.wait_for_selector("text=This call: OpenAI")
     assert group.get_by_role("radio", name="Embeddings").is_disabled()
     page.get_by_role("tab", name="Decisions").click()
-    shot(page, "live-openai", theme)
+    snap("live-openai")
 
     page.evaluate(END_CALL)
     page.get_by_role("button", name="Agent settings").click()
@@ -89,24 +71,10 @@ def capture(browser: Browser, theme: str, errors: list[str]) -> None:
     settings.get_by_role("radio", name="Embeddings").click()
     assert page.locator("#resolver-timeout").is_disabled()
     page.locator("#resolver-timeout").evaluate("(el) => el.scrollIntoView({ block: 'center' })")
-    shot(page, "settings-embed", theme)
+    snap("settings-embed")
 
-    context.close()
-
-
-def main() -> None:
-    OUT.mkdir(exist_ok=True)
-    errors: list[str] = []
-    with sync_playwright() as p:
-        browser = p.chromium.launch(executable_path=BRAVE, headless=True)
-        for theme in ("light", "dark"):
-            capture(browser, theme, errors)
-        browser.close()
-    if errors:
-        print("Console errors:")
-        for e in errors:
-            print(" ", e)
+    page.context.close()
 
 
 if __name__ == "__main__":
-    main()
+    run(capture)

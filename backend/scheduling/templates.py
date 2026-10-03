@@ -8,7 +8,7 @@ from datetime import datetime
 
 from .catalog_index import AppointmentType, CatalogIndex
 from .geo import US_STATES
-from .names import STREET_TYPES
+from .names import street_of
 from .text import normalize
 
 _STATE_NAMES = {abbrev: name for abbrev, name, _, _ in US_STATES}
@@ -60,35 +60,36 @@ def site_label(index: CatalogIndex, location_id: str) -> str:
     return loc.short_name
 
 
-_STREET_TYPE_NAMES = {"st": "Street", "ave": "Avenue", "av": "Avenue", "blvd": "Boulevard", "rd": "Road",
-                      "dr": "Drive", "ln": "Lane", "pl": "Place", "ct": "Court", "pkwy": "Parkway", "hwy": "Highway",
-                      "ter": "Terrace", "cir": "Circle"}
+def city_of(index: CatalogIndex, location_id: str) -> str:
+    """The city a site is said to be in: its metro, else its own city."""
+    loc = index.locations[location_id]
+    metro = index.metros.get(loc.metro_id)
+    return metro.name if metro and metro.name else loc.city
 
 
-def _address_parts(address: str) -> tuple[str, str, str]:
-    """"3330 Market St" -> ("3330", "Market", "Street"); "7095 Broadway" -> ("7095", "Broadway", "")."""
-    words = address.split()
-    number = words.pop(0) if words and words[0].isdigit() else ""
-    kind = words[-1].rstrip(".") if len(words) > 1 and words[-1].rstrip(".").lower() in STREET_TYPES else ""
-    if kind:
-        words.pop()
-    return number, " ".join(words), _STREET_TYPE_NAMES.get(kind.lower(), kind)
+def site_in_city(index: CatalogIndex, location_id: str) -> str:
+    """"Downtown in Oakland"; the site alone when it has no city to name."""
+    city = city_of(index, location_id)
+    return f"{site_label(index, location_id)} in {city}" if city else site_label(index, location_id)
 
 
-def street_label(index: CatalogIndex, location_id: str) -> str:
-    """"Market Street", as said aloud."""
-    _, name, kind = _address_parts(index.locations[location_id].address)
-    return f"{name} {kind}".strip()
+def _at(sites: str) -> str:
+    """" at Mission Bay", or " there" when no site was named: never a phrase around an empty label."""
+    return f" at {sites}" if sites else " there"
+
+
+def _site_names(index: CatalogIndex, ids: list[str]) -> list[str]:
+    """Short names, with the neighborhood when two are the same."""
+    labels = [index.locations[i].short_name for i in ids]
+    return [site_label(index, i) for i in ids] if len(set(labels)) < len(labels) else labels
 
 
 def _distinct_site_labels(index: CatalogIndex, ids: list[str]) -> list[str]:
-    parts = [_address_parts(index.locations[i].address) for i in ids]
-    if len(ids) > 1 and len({p[1] for p in parts}) == 1 and len({p[0] for p in parts} - {""}) == len(ids):
+    streets = [street_of(index.locations[i]) for i in ids]
+    if len(ids) > 1 and len({s.name for s in streets}) == 1 and len({s.number for s in streets} - {None}) == len(ids):
         # Sites on one street are told apart by number: "Downtown at 1812 Market".
-        return [f"{index.locations[i].short_name} at {num} {name}" for i, (num, name, _) in zip(ids, parts)]
-    labels = [index.locations[i].short_name for i in ids]
-    if len(set(labels)) < len(labels):
-        labels = [site_label(index, i) for i in ids]
+        return [f"{index.locations[i].short_name} at {s.number} {s.name}" for i, s in zip(ids, streets)]
+    labels = _site_names(index, ids)
     if len(set(labels)) < len(labels):
         labels = [f"{lab} on {index.locations[i].address.split(' ', 1)[-1]}" for lab, i in zip(labels, ids)]
     return labels
@@ -96,11 +97,8 @@ def _distinct_site_labels(index: CatalogIndex, ids: list[str]) -> list[str]:
 
 def named_sites(index: CatalogIndex, ids: tuple[str, ...], on_street: bool = False) -> str:
     """The clinics the caller named, as said back to them: "Willow Glen on Market Street"."""
-    labels = [index.locations[i].short_name for i in ids]
-    if len(set(labels)) < len(labels):
-        labels = [site_label(index, i) for i in ids]
-    streets = {street_label(index, i) for i in ids}
-    return join_or(labels) + (f" on {streets.pop()}" if on_street and len(streets) == 1 else "")
+    streets = {street_of(index.locations[i]).said for i in ids}
+    return join_or(_site_names(index, list(ids))) + (f" on {streets.pop()}" if on_street and len(streets) == 1 else "")
 
 
 def state_name(abbrev: str) -> str:
@@ -125,8 +123,8 @@ def ring_preface(index: CatalogIndex, location_id: str, distance_mi: float, near
     A clinic in another of our cities is named by that city."""
     loc = index.locations[location_id]
     metro = index.metros.get(loc.metro_id)
-    if metro and metro.name and near_metros and loc.metro_id not in near_metros:
-        where = metro.name
+    if near_metros and loc.metro_id not in near_metros and city_of(index, location_id):
+        where = city_of(index, location_id)
     elif loc.city and normalize(loc.city) not in (normalize(near), normalize(metro.name) if metro else ""):
         where = loc.city
     else:
@@ -243,8 +241,9 @@ def say_refuse(index: CatalogIndex, code: str, *, type_id: str | None = None, wh
                alternatives: tuple[tuple[str, str, str], ...] = (), alt_type_id: str | None = None,
                needs_referral: bool = False, near: str | None = None, near_kind: str | None = None,
                radius_mi: float | None = None, nearest_mi: float | None = None) -> str:
-    """`at`: the clinics the caller named (location_type, provider_location); `location_id`: the
-    nearest clinic that has the visit (none_nearby)."""
+    """`at`: the clinics the caller named (location_type, provider_location, and none_nearby when
+    nothing near a named clinic has the visit); `location_id`: the nearest clinic that has it
+    (none_nearby)."""
     what = with_article(type_label(index.types[type_id])) if type_id else "that"
     What = what[0].upper() + what[1:]
     loc = named_sites(index, at, on_street)
@@ -268,23 +267,22 @@ def say_refuse(index: CatalogIndex, code: str, *, type_id: str | None = None, wh
     if code == "provider_location":
         if provider_id:
             sites = join_and([index.locations[l].short_name for l in index.providers[provider_id].location_ids])
-            return f"{who} isn't at {loc}; {who} sees patients at {sites}.{alt}"
-        return f"{who} isn't at {loc}.{alt}"
+            return f"{who} isn't{_at(loc)}; {who} sees patients at {sites}.{alt}"
+        return f"{who} isn't{_at(loc)}.{alt}"
     if code == "location_type":
-        return f"We can't do {what} at {loc}.{alt}"
+        return f"We can't do {what}{_at(loc)}.{alt}"
     if code == "no_availability":
         return f"I don't see any openings for {what} in the next three weeks with those preferences. Want me to try other days?"
     if code == "none_nearby":
         where = f"in {near}" if near_kind == "state" else f"within {miles(radius_mi or 0)} of {near}"
         if who:
             s = f"{who[0].upper()}{who[1:]} isn't at any of our clinics {where}."
+        elif loc:
+            s = f"We can't do {what} at {loc}, or anywhere within {miles(radius_mi or 0)} of it."
         else:
             s = f"We don't offer {what} {where}." if type_id else f"We don't have a clinic {where}."
         if location_id:
-            loc = index.locations[location_id]
-            metro = index.metros.get(loc.metro_id)
-            city = metro.name if metro and metro.name else loc.city
-            s += f" The nearest is {site_label(index, location_id)} in {city}, about {miles(nearest_mi or 0)} away."
+            s += f" The nearest is {site_in_city(index, location_id)}, about {miles(nearest_mi or 0)} away."
             if alternatives:
                 s += " Want me to look there?"
         return s
@@ -303,7 +301,7 @@ def _alternatives_sentence(index: CatalogIndex, alternatives: tuple[tuple[str, s
     def where(l: str) -> str:
         metro = index.metros.get(index.locations[l].metro_id)
         away = home and metro and metro.name and metro.id not in home
-        return f"{site_label(index, l)} in {metro.name}" if away else site_label(index, l)
+        return site_in_city(index, l) if away else site_label(index, l)
     parts = [f"{index.providers[p].name} at {where(l)}" for _, p, l in alternatives]
     question = "Would that work?" if len(parts) == 1 else "Would either of those work?"
     return f" I can book {join_or(parts)}. {question}"

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Callable, Iterable
 
 import jellyfish
 
+from .per_index import per_index
 from .text import normalize, phonetic_keys, stem, tokens
 
 if TYPE_CHECKING:
@@ -18,10 +19,15 @@ if TYPE_CHECKING:
 _TITLE_WORDS = {"dr", "doctor", "doc", "the", "with", "md", "np", "pa", "do", "nurse", "practitioner"}
 _LOCATION_GENERIC = {"health", "center", "centre", "clinic", "family", "specialty", "medical", "group",
                      "community", "care", "the", "one", "office", "location", "in", "at", "on"}
-# Never evidence for a site: "Lincoln Avenue" names Lincoln, and "avenue" must not reach The Avenues.
-STREET_TYPES = frozenset({"st", "street", "ave", "av", "avenue", "blvd", "boulevard", "rd", "road", "dr", "drive",
-                          "ln", "lane", "way", "pl", "place", "ct", "court", "pkwy", "parkway", "hwy", "highway",
-                          "ter", "terrace", "cir", "circle"})
+# Street types as written in an address -> as said aloud. Never evidence for a site: "Lincoln
+# Avenue" names Lincoln, and "avenue" must not reach The Avenues.
+STREET_TYPE_NAMES = {
+    "st": "Street", "street": "Street", "ave": "Avenue", "av": "Avenue", "avenue": "Avenue", "blvd": "Boulevard",
+    "boulevard": "Boulevard", "rd": "Road", "road": "Road", "dr": "Drive", "drive": "Drive", "ln": "Lane",
+    "lane": "Lane", "way": "Way", "pl": "Place", "place": "Place", "ct": "Court", "court": "Court",
+    "pkwy": "Parkway", "parkway": "Parkway", "hwy": "Highway", "highway": "Highway", "ter": "Terrace",
+    "terrace": "Terrace", "cir": "Circle", "circle": "Circle"}
+STREET_TYPES = frozenset(STREET_TYPE_NAMES)
 MIN_PROVIDER_SCORE = 0.78
 MIN_LOCATION_SCORE = 0.4
 TIE_GAP = 0.08
@@ -33,6 +39,11 @@ class NameCandidate:
     id: str
     score: float
     via: str  # "exact" | "fuzzy" | "phonetic" | "first"; locations: "exact" | "street" | "address"
+
+    @property
+    def by_street(self) -> bool:
+        """A location the caller named by its street or address, not by its name."""
+        return self.via in ("street", "address")
 
 
 # eq=False: identity hash, so the per-index word cache below can key on the index.
@@ -192,9 +203,13 @@ def _score_providers(ni: NameIndex, words: list[str], within: list[str] | None) 
 # "family" (vs Emily) land at 0.78-0.83. Short function words still collide through sound
 # keys ("who" ~ Wei, "saw" ~ Sofia, "i" ~ Wei), so they are never names.
 _NAME_WORD_SCORE = 0.88
-# Yes and no words too: "no, Lucas Chen" must not read "no" as the first name.
-_NEVER_NAMES = {"who", "he", "she", "her", "him", "his", "saw", "one", "the", "yes", "yeah", "yep", "no", "nope",
-                "not"}
+_YES = frozenset({"yes", "yeah", "yep", "yup", "yea", "correct", "right", "exactly", "sure", "ok", "okay", "mhm",
+                  "mmhmm", "uhhuh"})
+_NO = frozenset({"no", "nope", "nah", "wrong", "different"})
+# Yes and no words too, and the sounds of one ("uh-huh", "mm-hmm"): "no, Lucas Chen" must not read
+# "no" as the first name, and a bare "nah" or "yup" is no Dr. Na or Dr. Yap.
+_NEVER_NAMES = frozenset({"who", "he", "she", "her", "him", "his", "saw", "one", "the", "not", "uh", "huh", "mm",
+                          "hmm"}) | _YES | _NO
 
 
 def is_catalog_name(index: CatalogIndex, word: str) -> bool:
@@ -327,8 +342,6 @@ def read_provider_clues(index: CatalogIndex, phrase: str | None, candidate_ids: 
     return ProviderClues(words, tuple(p.id for p in providers), tuple(facts), gender, rest)
 
 
-_YES = frozenset({"yes", "yeah", "yep", "yup", "yea", "correct", "right", "exactly", "sure", "ok", "okay", "mhm"})
-_NO = frozenset({"no", "nope", "nah", "wrong", "different"})
 _CONFIRM_FILLER = frozenset({"that", "s", "it", "is", "the", "one", "her", "him", "she", "he", "um", "uh", "huh",
                              "please", "i", "mean", "meant", "who", "doctor", "dr", "a", "someone", "somebody",
                              "else", "isn", "wasn", "don", "doesn", "didn"})
@@ -358,33 +371,40 @@ def _sites_named(index: CatalogIndex, words: list[str], street_words: frozenset[
     return sites, {w for lid in sites for w in hits[lid]}
 
 
-def _specialty_cues(index: CatalogIndex) -> dict[str, frozenset[str]]:
-    hit = _CUES.get(id(index))
-    if hit is None or hit[0] is not index:
-        cues: dict[str, set[str]] = defaultdict(set)
-        for spec in index.specialties:
-            for w in tokens(spec) + tokens(index.specialty_spoken.get(spec, "")):
-                cues[w].add(spec)
-        for term, spec in index.lay_terms.items():
-            if " " not in term:
-                cues[term].add(spec)
-        hit = _CUES[id(index)] = (index, {w: frozenset(s) for w, s in cues.items()
-                                          if w not in _SPECIALTY_FILLER and w not in _CLUE_STOPWORDS and len(w) > 2})
-    return hit[1]
+# eq=False: identity hash, so _specialties_named can cache per catalog.
+@dataclass(frozen=True, eq=False)
+class _Cues:
+    """The words that name a specialty: its name, its spoken form, a one-word lay term."""
+
+    specialties: dict[str, frozenset[str]]  # cue -> the specialties it names
+    stems: tuple[tuple[str, str], ...]      # (cue, stem of the cue)
 
 
-_CUES: dict[int, tuple[CatalogIndex, dict[str, frozenset[str]]]] = {}
+@per_index
+def _specialty_cues(index: CatalogIndex) -> _Cues:
+    cues: dict[str, set[str]] = defaultdict(set)
+    for spec in index.specialties:
+        for w in tokens(spec) + tokens(index.specialty_spoken.get(spec, "")):
+            cues[w].add(spec)
+    for term, spec in index.lay_terms.items():
+        if " " not in term:
+            cues[term].add(spec)
+    kept = {w: frozenset(s) for w, s in cues.items()
+            if w not in _SPECIALTY_FILLER and w not in _CLUE_STOPWORDS and len(w) > 2}
+    return _Cues(kept, tuple((w, stem(w)) for w in kept))
 
 
-def _specialties_named(cues: dict[str, frozenset[str]], word: str) -> frozenset[str]:
+@lru_cache(maxsize=8192)
+def _specialties_named(cues: _Cues, word: str) -> frozenset[str]:
     """"pediatrician" names Pediatrics, "cardiologist" Cardiology, "kids" Pediatrics (a lay term):
     the same word, or a shared stem of at least six letters covering most of the shorter word."""
+    word_stem = stem(word)
     out: set[str] = set()
-    for cue, specs in cues.items():
+    for cue, cue_stem in cues.stems:
         common = len(os.path.commonprefix([cue, word]))
         shared_stem = common >= 6 and common >= 0.75 * min(len(cue), len(word))
-        if cue in (word, word.removesuffix("s")) or stem(cue) == stem(word) or shared_stem:
-            out |= specs
+        if cue in (word, word.removesuffix("s")) or cue_stem == word_stem or shared_stem:
+            out |= cues.specialties[cue]
     return frozenset(out)
 
 
@@ -397,15 +417,29 @@ def _location_words(loc: Location) -> frozenset[str]:
 @dataclass(frozen=True, slots=True)
 class Street:
     number: int | None
-    words: tuple[str, ...]  # the street's name: ("market",), ("medical", "center"), ("2nd",)
+    words: tuple[str, ...]  # the street's name, to match: ("market",), ("medical", "center"), ("2nd",)
+    name: str = ""          # the street's name as written: "Market", "N Lamar"
+    kind: str = ""          # its type as said aloud: "Street", "Boulevard"; "" for "7095 Broadway"
+
+    @property
+    def said(self) -> str:
+        """"Market Street", as said aloud."""
+        return f"{self.name} {self.kind}".strip()
 
 
 @lru_cache(maxsize=8192)
 def street_of(loc: Location) -> Street:
-    """"3330 Market St" -> Street(3330, ("market",))."""
+    """"3330 Market St" -> Street(3330, ("market",), "Market", "Street")."""
     words = tokens(loc.address)
     number = int(words.pop(0)) if words and words[0].isdigit() else None
-    return Street(number, tuple(w for w in words if w not in STREET_TYPES))
+    written = loc.address.split()
+    if written and written[0].isdigit():
+        written.pop(0)
+    kind = written[-1].rstrip(".") if len(written) > 1 and written[-1].rstrip(".").lower() in STREET_TYPES else ""
+    if kind:
+        written.pop()
+    return Street(number, tuple(w for w in words if w not in STREET_TYPES), " ".join(written),
+                  STREET_TYPE_NAMES.get(kind.lower(), kind))
 
 
 @dataclass(frozen=True, slots=True)
@@ -498,11 +532,15 @@ def match_locations(index: CatalogIndex, phrase: str | None, within: Iterable[st
         # "The 3330 one", answering "Downtown at 1812 Market or Willow Glen at 3330 Market?"
         return [NameCandidate(i, 1.0, "address") for i in within
                 if street_of(index.locations[i]).number == heard.number]
-    if len(words) > 1 and any("".join(words) in _location_words(loc) for loc in index.locations.values()):
+    site_words = _site_words(index)
+    if len(words) > 1 and "".join(words) in site_words.named:
         words = ["".join(words)]  # "down town" -> "downtown"
+    reached = set().union(*(_sites_sounding(site_words, w) for w in words))
     pool = [index.locations[i] for i in within] if within else list(index.locations.values())
     scored, on_street = [], []
     for loc in pool:
+        if loc.id not in reached:
+            continue
         name_words = _location_words(loc)
         street = street_of(loc).words
         hits, street_hits, said_street = 0.0, 0.0, set()
@@ -528,6 +566,35 @@ def match_locations(index: CatalogIndex, phrase: str | None, within: Iterable[st
     if within and not tier:
         return match_locations(index, phrase)
     return tier
+
+
+# eq=False: identity hash, so _sites_sounding can cache per catalog.
+@dataclass(frozen=True, eq=False)
+class _SiteWords:
+    """Each distinct word of the catalog's site names and of their streets, with the sites using it."""
+
+    named: dict[str, tuple[str, ...]]
+    on_street: dict[str, tuple[str, ...]]
+
+
+@per_index
+def _site_words(index: CatalogIndex) -> _SiteWords:
+    named: dict[str, list[str]] = defaultdict(list)
+    on_street: dict[str, list[str]] = defaultdict(list)
+    for loc in index.locations.values():
+        for w in _location_words(loc):
+            named[w].append(loc.id)
+        for w in street_of(loc).words:
+            on_street[w].append(loc.id)
+    return _SiteWords({w: tuple(ids) for w, ids in named.items()}, {w: tuple(ids) for w, ids in on_street.items()})
+
+
+@lru_cache(maxsize=8192)
+def _sites_sounding(site_words: _SiteWords, heard: str) -> frozenset[str]:
+    """Sites with a name or street word that is `heard` as said or as misheard: the only sites
+    match_locations can score."""
+    return frozenset(lid for table in (site_words.named, site_words.on_street) for w, ids in table.items()
+                     if _same_word(heard, w) for lid in ids)
 
 
 def _by_house_number(on_street: list[Location], number: int) -> list[str]:

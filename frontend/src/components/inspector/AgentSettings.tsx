@@ -2,7 +2,7 @@ import { Settings2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { catalogCounts, catalogOptions, useCatalogs } from '../../lib/catalogs'
-import { effectiveChooser, effectiveTimeoutMs } from '../../lib/chooser'
+import { DEFAULT_TIMEOUT_MS, effectiveChooser } from '../../lib/chooser'
 import { fieldErrors } from '../../lib/issues'
 import { useEditor } from '../../store/editor'
 import type { AgentConfig, ResolverConfig, Voice } from '../../types/agent'
@@ -195,7 +195,7 @@ function Scheduling({ catalog, resolver, errs, onCatalogChange, onChange }: Sche
                   inputMode="numeric"
                   disabled={!networked}
                   className="[appearance:textfield] pr-9 text-right font-mono tabular-nums disabled:opacity-50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  placeholder={String(effectiveTimeoutMs(resolver))}
+                  placeholder={String(DEFAULT_TIMEOUT_MS)}
                   invalid={errs('resolver').length > 0}
                   value={resolver.timeout_ms ?? ''}
                   onChange={(e) => {

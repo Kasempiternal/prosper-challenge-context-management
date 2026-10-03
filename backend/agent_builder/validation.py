@@ -108,22 +108,9 @@ def _validate_resolver(resolver: Any, err) -> None:
         err("resolver.speak_direct", "speak_direct must be true or false.")
     if "chooser" in resolver and resolver["chooser"] not in CHOOSERS:
         err("resolver.chooser", f"chooser must be one of {', '.join(CHOOSERS)}.")
-    if "timeout_ms" in resolver:
-        _validate_timeout(resolver["timeout_ms"], "resolver.timeout_ms", err)
-    jev = resolver.get("jev")
-    if jev is None:
-        return
-    if not isinstance(jev, dict):
-        err("resolver.jev", "jev must be an object.")
-        return
-    if "enabled" in jev and not isinstance(jev["enabled"], bool):
-        err("resolver.jev.enabled", "enabled must be true or false.")
-    _validate_timeout(jev.get("timeout_ms", 2500), "resolver.jev.timeout_ms", err)
-
-
-def _validate_timeout(timeout: Any, path: str, err) -> None:
+    timeout = resolver.get("timeout_ms", 1)
     if not isinstance(timeout, int) or isinstance(timeout, bool) or not 1 <= timeout <= 30000:
-        err(path, "timeout_ms must be an integer between 1 and 30000.")
+        err("resolver.timeout_ms", "timeout_ms must be an integer between 1 and 30000.")
 
 
 def _validate_node(node: dict, path: str, node_names: set[str], err) -> None:

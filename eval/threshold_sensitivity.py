@@ -16,8 +16,8 @@ import scheduling.decision as D  # noqa: E402
 from scheduling.catalog_index import CatalogIndex  # noqa: E402
 from scheduling.decision import CheckGate, Gate, Verdict  # noqa: E402
 from scheduling.jev import JevProviderChooser, JevSiteChooser, JevTypeDisambiguator  # noqa: E402
+from sets import DEV  # noqa: E402
 
-SETS = ("main", "heldout", "heldout2", "tune", "national", "national2", "street")
 STEP = 0.05
 
 
@@ -31,7 +31,7 @@ class MarginGate(CheckGate):
 
     def decide(self, first, rival, check):
         verdict = super().decide(first, rival, check)
-        if first.act and check.answered and check.either < self.twins:
+        if first.act and check is not None and check.either < self.twins:
             if check.chosen > check.rival + self.margin:
                 return Verdict(act=first.act, top=verdict.top, called=True)
             return Verdict(ask=(first.act, rival), top=verdict.top, called=True)
@@ -41,8 +41,8 @@ class MarginGate(CheckGate):
 def outcomes(check_gate: CheckGate, gender_sure: float, indexes: dict) -> tuple[dict, int]:
     D.GENDER_SURE = gender_sure
     out, failed = {}, 0
-    for name in SETS:
-        index = indexes[E.NATIONAL_CATALOG if name in E.NATIONAL_SETS else E.SF_CATALOG]
+    for name in DEV:
+        index = indexes[E.catalog_of(name)]
         client = E.make_client("jev")
         hooks = {"disambiguator": JevTypeDisambiguator(index, client, Gate(), check_gate),
                  "chooser": JevProviderChooser(index, client), "site_chooser": JevSiteChooser(index, client)}

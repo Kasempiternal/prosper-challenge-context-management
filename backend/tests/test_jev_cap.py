@@ -3,8 +3,8 @@ import json
 import httpx
 import pytest
 
-from agent_tools.context import load_index, resolve_catalog_path, warm_up_criteria
-from scheduling.jev import MAX_CHOICE_OPTIONS, JevClient, JevTypeDisambiguator, type_criteria
+from agent_tools.context import load_index, resolve_catalog_path
+from scheduling.jev import MAX_CHOICE_OPTIONS, JevClient, JevTypeDisambiguator, type_criteria, warm_up_criteria
 from scheduling.lexicon import SHORTLIST_SIZE, ranked_types
 
 
@@ -74,7 +74,7 @@ def test_warm_up_sends_a_shortlist_shaped_request(catalog):
     index = load_index(resolve_catalog_path(catalog))
     recorder = Recorder()
     criteria = warm_up_criteria(index)
-    call = client(recorder).warm_up(criteria)
+    call = client(recorder).warm_up(index)
 
     assert call is not None and call.source == "live"
     body = recorder.bodies[0]

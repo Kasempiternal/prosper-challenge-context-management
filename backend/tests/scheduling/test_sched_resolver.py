@@ -1,7 +1,7 @@
 import pytest
 
 from scheduling.request import Request, Update, merge
-from scheduling.resolver import resolve
+from scheduling.resolver import NoDisambiguator, resolve
 
 EXISTING_REF = {"is_new": False, "has_referral": True}
 NEW_REF = {"is_new": True, "has_referral": True}
@@ -69,7 +69,7 @@ def test_confusable_types_ask_either_or_without_disambiguator(converse):
 def test_disambiguator_used_only_for_confusable_ties(index, availability):
     from scheduling.decision import Verdict
 
-    class Sure:
+    class Sure(NoDisambiguator):
         calls = []
 
         def pick_type(self, phrase, hint, candidate_ids):
@@ -97,7 +97,7 @@ def test_disambiguator_used_only_for_confusable_ties(index, availability):
 def test_declining_disambiguator_still_asks(index, availability):
     from scheduling.decision import Verdict
 
-    class Unsure:
+    class Unsure(NoDisambiguator):
         def pick_type(self, phrase, hint, candidate_ids):
             return Verdict(called=True)
 

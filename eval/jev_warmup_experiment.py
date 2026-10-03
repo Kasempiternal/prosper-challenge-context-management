@@ -34,7 +34,7 @@ def trial(kind: str, criteria: dict[str, str]) -> dict:
     tag = uuid.uuid4().hex[:6]
     out = {"kind": kind, "at": datetime.now().isoformat(timespec="seconds"), "pre_ms": None, "real_ms": []}
     if kind == "warm":
-        call = client.warm_up(criteria)
+        call = client.warm_up_on(criteria)
         out["pre_ms"] = client.calls[-1].latency_ms if client.calls else None
         out["pre_ok"] = call is not None
     elif kind == "small":

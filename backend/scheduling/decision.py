@@ -6,6 +6,7 @@ Thresholds were chosen on eval/cases_tune.jsonl only; see eval/README.md.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,12 @@ DECLINE = Verdict()
 FAILED = Verdict(called=True, failed=True)
 
 
+def unanswered(candidates: Iterable[str]) -> Verdict:
+    """A model was asked and no usable answer came. Never committed on: the caller is asked among
+    `candidates`, what the resolver understood without that answer."""
+    return Verdict(ask=tuple(candidates), called=True, failed=True)
+
+
 @dataclass(frozen=True)
 class Gate:
     act_p: float = 0.8
@@ -60,15 +67,11 @@ class Gate:
 @dataclass(frozen=True)
 class Check:
     """A second, focused question after a choice: does the caller mean `chosen`, `rival`, or do
-    their words fit both alike ("either")? answered=False: it was asked and no answer came."""
+    their words fit both alike ("either")?"""
 
     chosen: float = 0.0
     rival: float = 0.0
     either: float = 0.0
-    answered: bool = True
-
-
-UNANSWERED = Check(answered=False)
 
 
 @dataclass(frozen=True)
@@ -89,15 +92,15 @@ class CheckGate:
     settle: float = 0.65
     settle_either: float = 0.5
 
-    def decide(self, first: Verdict, rival: str, check: Check) -> Verdict:
+    def decide(self, first: Verdict, rival: str, check: Check | None) -> Verdict:
         """`first` acted or asked; `rival` is the option the check weighed against its top. The
-        result's `top` is the check's answer; an unanswered check asks."""
+        result's `top` is the check's answer; a check that never came (None) asks."""
         chosen = first.act or first.ask[0]
         pair = first.ask or (chosen, rival)
-        top = ((chosen, round(check.chosen, 3)), (rival, round(check.rival, 3)), ("either", round(check.either, 3)))
-        if not check.answered:
+        if check is None:
             # A confident choice is confirmed with the caller; the rival may be a long shot.
-            return Verdict(ask=(chosen,) if first.act else pair, called=True, failed=True)
+            return unanswered((chosen,) if first.act else pair)
+        top = ((chosen, round(check.chosen, 3)), (rival, round(check.rival, 3)), ("either", round(check.either, 3)))
         if first.act:
             if check.either >= self.twins or check.chosen <= check.rival:
                 return Verdict(ask=pair, top=top, called=True)

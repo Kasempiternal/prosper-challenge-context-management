@@ -10,36 +10,25 @@ Usage: backend/.venv/Scripts/python eval/compare_choosers.py [--live]
 from __future__ import annotations
 
 import argparse
-import hashlib
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from run_resolver_eval import (CHOOSER_LABEL, EVAL, NATIONAL_CATALOG, SF_CATALOG, evaluate, is_wrong_commit,  # noqa: E402
-                               load_set, make_client, make_hooks, pct, run_case)
+from run_resolver_eval import (CHOOSER_LABEL, COMPARISON_LABELS, EVAL, catalog_of, comparison_row,  # noqa: E402
+                               evaluate, is_wrong_commit, load_set, make_client, make_hooks)
 from scheduling.catalog_index import CatalogIndex  # noqa: E402
+from scheduling.choosers import NAMES as CHOOSERS  # noqa: E402
 from scheduling.embed_chooser import MODEL as EMBED_MODEL, TEMPERATURE  # noqa: E402
 from scheduling.openai_chooser import MODEL as OPENAI_MODEL  # noqa: E402
 
-SETS = (("national2", NATIONAL_CATALOG, "held-out national2"), ("heldout2", SF_CATALOG, "held-out SF (heldout2)"))
-CHOOSERS = ("jev", "openai", "embed", "none")
+SETS = (("national2", "held-out national2"), ("heldout2", "held-out SF (heldout2)"))
 OUT = EVAL / "results" / "chooser_comparison.txt"
+LABELS = COMPARISON_LABELS + ["failed requests"]
 
 
-def row(m: dict) -> dict:
-    calls = m["jev_calls"]
-    ms = [c.latency_ms for c in calls if c.source in ("live", "cache")]
-    usd = sum(c.usd for c in calls)
-    return {
-        "wrong-commit": f"{m['wrong_commits']}/{m['commits']} ({m['wrong_commits'] / max(m['commits'], 1):.1%})",
-        "top-1": f"{m['correct']}/{m['evaluated']} ({m['correct'] / max(m['evaluated'], 1):.1%})",
-        "q/booking": f"{m['qpb']:.2f}",
-        "model rate": f"{len(calls) / max(m['all_turns'], 1):.0%} ({len(calls)})",
-        "p50/p95 ms": f"{pct(ms, 50):.0f}/{pct(ms, 95):.0f}" if ms else "-",
-        "$/1k turns": f"${usd / max(m['all_turns'], 1) * 1000:.4f}",
-        "failed": sum(1 for c in calls if c.source == "failed"),
-    }
+def row(m: dict) -> list[str]:
+    return comparison_row(m) + [str(sum(1 for c in m["jev_calls"] if c.source == "failed"))]
 
 
 def main() -> None:
@@ -52,12 +41,9 @@ def main() -> None:
              "OpenAI: network round trip recorded in the cache; embeddings: local CPU).", ""]
     misses = []
     spent = {"requests": 0, "input": 0, "output": 0, "usd": 0.0}
-    for name, catalog, label in SETS:
-        if name == "national2":
-            pinned = {c.get("catalog_sha256") for c in load_set(name)}
-            assert pinned == {hashlib.sha256(catalog.read_bytes()).hexdigest()}, "national catalog changed"
-        index = CatalogIndex.load(catalog)
+    for name, label in SETS:
         cases = load_set(name)
+        index = CatalogIndex.load(catalog_of(name))
         table = {}
         for chooser in CHOOSERS:
             client = make_client(chooser, live=args.live and chooser == "openai")
@@ -80,14 +66,13 @@ def main() -> None:
             for case, turns in m["failures"]:
                 for i, t in enumerate(turns):
                     if t["kind"] == "resolve" and t["errs"] and is_wrong_commit(t["plan"], t["errs"]):
-                        notes = [n for n in t["plan"].notes if "disambiguator" in n or "chooser" in n]
                         misses.append(f"  {label} / {CHOOSER_LABEL[chooser]}: {case['id']} turn {i + 1}: "
-                                      f"{'; '.join(t['errs'])}" + "".join(f"\n      {n}" for n in notes))
-        cols = list(next(iter(table.values())))
+                                      f"{'; '.join(t['errs'])}" + "".join(f"\n      {purpose}: {v.describe()}"
+                                                                         for purpose, v in t["plan"].consults))
         lines.append(f"== {label}: {len(cases)} cases ==")
-        lines.append(f"{'mode':<12}" + "".join(f"{c:<18}" for c in cols))
-        for chooser, r in table.items():
-            lines.append(f"{CHOOSER_LABEL[chooser]:<12}" + "".join(f"{str(r[c]):<18}" for c in cols))
+        lines.append(f"{'metric':<32}" + "".join(f"{CHOOSER_LABEL[c]:<30}" for c in table))
+        for k, metric in enumerate(LABELS):
+            lines.append(f"{metric:<32}" + "".join(f"{r[k]:<30}" for r in table.values()))
         lines.append("")
     lines.append("Wrong commits (every mode):")
     lines.extend(misses or ["  none"])

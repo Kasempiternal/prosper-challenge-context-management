@@ -70,7 +70,7 @@ In both scheduler agents: `start` (greeting to schedule) and `book_another` (boo
 - `precondition` names a guard from `EDGE_GUARDS`: `offer_confirmed`.
 - `action` names an action from `EDGE_ACTIONS`: `book_confirmed`, `new_request`. An action's parameters must be listed in the edge's `required`. `new_request` needs `request`.
 - `catalog` is a path inside `backend/` that exists. It is required when any node has `tools` or any edge has an `action`.
-- `resolver.speak_direct` and `resolver.jev.enabled` are booleans. `resolver.chooser` is one of `jev`, `openai`, `embed`, `none`. `resolver.timeout_ms` and `resolver.jev.timeout_ms` are integers from 1 to 30000.
+- `resolver.speak_direct` is a boolean. `resolver.chooser` is one of `jev`, `openai`, `embed`, `none`. `resolver.timeout_ms` is an integer from 1 to 30000.
 
 ## Phase 2 fields
 
@@ -78,9 +78,8 @@ In both scheduler agents: `start` (greeting to schedule) and `book_another` (boo
 |---|---|
 | `catalog` | Catalog JSON the scheduling tools load. Indexed once per process. A catalog with `metros` and site coordinates enables geography. One without them loads as one implicit metro. |
 | `resolver.speak_direct` | Templated offers, questions, refusals and the booking confirmation go straight to TTS. The tool result carries `spoken` (what the caller heard) instead of `say`, and the LLM is not called again for that turn. |
-| `resolver.chooser` | The model behind the resolver's type, provider and site hooks; every one feeds the same confidence gate. `jev`: Command Code JEV (needs `CMD_API_KEY`). `openai`: gpt-4o-mini answers one option key and its token logprobs are the distribution (needs `OPENAI_API_KEY`). `embed`: local fastembed `BAAI/bge-small-en-v1.5` cosine similarity, softmax T=0.0125, no network. `none`: no model, ambiguity becomes a question. Absent: `jev` when `resolver.jev.enabled` (the default), else `none`. A chooser whose key or package is missing runs as `none`. The Test call panel and agent settings switch it. |
-| `resolver.timeout_ms` | Per-turn budget of a networked chooser (`jev`, `openai`), no retry; one request may use at most 1.5 s of it. On a timeout the resolver asks the caller instead of committing. Absent: `resolver.jev.timeout_ms`, then 2500. |
-| `resolver.jev` | Legacy: `enabled` picks the default chooser when `chooser` is absent; `timeout_ms` is the fallback budget. |
+| `resolver.chooser` | The model behind the resolver's type, provider and site hooks; every one feeds the same confidence gate. `jev`: Command Code JEV (needs `CMD_API_KEY`). `openai`: gpt-4o-mini answers one option key and its token logprobs are the distribution (needs `OPENAI_API_KEY`). `embed`: local fastembed `BAAI/bge-small-en-v1.5` cosine similarity, softmax T=0.0125, no network. `none`: no model, ambiguity becomes a question. Absent: `jev`. A chooser whose key or package is missing runs as `none`. The Test call panel and agent settings switch it. |
+| `resolver.timeout_ms` | Per-turn budget of a networked chooser (`jev`, `openai`), no retry; one request may use at most 1.5 s of it. On a timeout the resolver asks the caller instead of committing. Absent: 2500. A legacy `resolver.jev` block (`enabled`, `timeout_ms`) is read as `chooser` and `timeout_ms` when those are absent. |
 | node `tools` | Code-defined tools attached by name. The handler owns the parameter schema. The UI shows it read-only. |
 | node `context_strategy` | `"reset"` clears the LLM context on entry. The node prompt carries a `{{ summary }}` placeholder rendered from flow state. |
 | edge `precondition` | While the guard returns a reason, calling the edge returns `{"status": "error", "error": <reason>}` and no transition happens. `offer_confirmed` holds only when flow state `status == "confirm"`: the caller picked an offer and heard it read back. |

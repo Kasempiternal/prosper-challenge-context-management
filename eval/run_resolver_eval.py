@@ -4,10 +4,9 @@ Usage:
   backend/.venv/Scripts/python eval/run_resolver_eval.py [--set main|heldout|heldout2|tune|all|national|national2|street]
                                                         [--catalog PATH] [--jev off|on] [--live] [--verbose]
 
---set national  eval/cases_national.jsonl against the national catalog. Refuses to run unless the
-           catalog's sha256 equals the one pinned in every case. `all` stays the SF sets.
---set national2 the same for eval/cases_national2.jsonl, a second national draw (held-out until round 3).
---set street    the same for eval/cases_street.jsonl: street names, house numbers and addresses (dev set).
+Every set, its file and its catalog are in eval/sets.py. A national set runs against the national
+catalog and refuses to run unless the catalog's sha256 equals the one pinned in every case. `all`
+is the SF dev sets.
 
 --jev off  no model; no network.
 --jev on   JEV answers come from eval/.jev_cache.json (offline, deterministic). The no-JEV run is
@@ -29,6 +28,7 @@ import math
 import statistics
 import sys
 import time
+from functools import lru_cache
 from pathlib import Path
 
 import tiktoken
@@ -36,44 +36,54 @@ import tiktoken
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
+from dotenv import load_dotenv  # noqa: E402
+
 from scheduling.availability import MockAvailability  # noqa: E402
 from scheduling.catalog_index import CatalogIndex  # noqa: E402
+from scheduling.choosers import CHOOSERS  # noqa: E402
 from scheduling.decision import Gate  # noqa: E402
-from scheduling.embed_chooser import EmbedChooser, EmbedClient, shared_embedder  # noqa: E402
-from scheduling.jev import JevClient, JevProviderChooser, JevSiteChooser, JevTypeDisambiguator  # noqa: E402
-from scheduling.openai_chooser import MODEL as OPENAI_MODEL, OpenAIChoiceClient  # noqa: E402
+from scheduling.model_client import REQUEST_TIMEOUT_S, TURN_BUDGET_MS  # noqa: E402
+from scheduling.openai_chooser import MODEL as OPENAI_MODEL  # noqa: E402
 from scheduling.lookup import lookup  # noqa: E402
 from scheduling.request import Request, Update, merge  # noqa: E402
 from scheduling.resolver import Plan, plan_json, resolve  # noqa: E402
+from sets import SETS  # noqa: E402
 
 EVAL = ROOT / "eval"
 CACHE = EVAL / ".jev_cache.json"
 OPENAI_CACHE = EVAL / ".openai_cache.json"
 OPENAI_LIVE_LIMIT = 600
-CHOOSER_LABEL = {"jev": "JEV", "openai": "OpenAI", "embed": "embeddings", "none": "no model"}
-SETS = ("main", "heldout", "heldout2", "tune", "heldout3")
-NATIONAL_SETS = ("national", "national2", "street", "national3")
+CHOOSER_LABEL = {name: c.label for name, c in CHOOSERS.items()}
 SF_CATALOG = ROOT / "backend" / "data" / "catalog.json"
 NATIONAL_CATALOG = ROOT / "backend" / "data" / "national" / "catalog.json"
 LATENCY_REPEATS = 20
 ENC = tiktoken.get_encoding("o200k_base")  # gpt-4o / gpt-4.1 tokenizer
 COMMIT = {"offer", "confirm"}
-# Resolver notes of a model hook firing, and the wider set a miss printout shows.
-MODEL_NOTES = ("type disambiguator", "type check", "provider chooser", "provider gender", "site chooser")
-DECISION_NOTES = MODEL_NOTES + ("provider facts", "provider clues", "provider prov_")
+# The resolver notes a miss printout shows: the model hooks' and the provider facts behind them.
+DECISION_NOTES = ("type disambiguator", "type check", "provider chooser", "provider gender", "site chooser",
+                  "provider facts", "provider clues", "provider prov_")
 
 
-def load_set(name: str) -> list[dict]:
-    path = {"heldout2": EVAL / "cases_heldout2.jsonl", "tune": EVAL / "cases_tune.jsonl",
-            "national": EVAL / "cases_national.jsonl",
-            "national2": EVAL / "cases_national2.jsonl", "street": EVAL / "cases_street.jsonl",
-            "heldout3": EVAL / "cases_heldout3.jsonl",
-            "national3": EVAL / "cases_national3.jsonl"}.get(name, EVAL / "cases.jsonl")
-    cases = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    if name == "main":
-        return [c for c in cases if c["category"] != "heldout"]
-    if name == "heldout":
-        return [c for c in cases if c["category"] == "heldout"]
+def catalog_of(name: str) -> Path:
+    return NATIONAL_CATALOG if SETS[name].national else SF_CATALOG
+
+
+@lru_cache(maxsize=None)
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load_set(name: str, catalog: Path | None = None) -> list[dict]:
+    """The set's cases. A national set's cases must all pin `catalog` (default: the set's own)."""
+    s = SETS[name]
+    cases = [json.loads(line) for line in (EVAL / s.file).read_text(encoding="utf-8").splitlines() if line.strip()]
+    if s.heldout is not None:
+        cases = [c for c in cases if (c["category"] == "heldout") == s.heldout]
+    if s.national:
+        catalog = catalog or catalog_of(name)
+        pinned = {c.get("catalog_sha256") for c in cases}
+        if pinned != {_sha256(catalog)}:
+            raise SystemExit(f"{catalog} has sha256 {_sha256(catalog)}; {s.file} is pinned to {sorted(map(str, pinned))}")
     return cases
 
 
@@ -96,6 +106,8 @@ def check_plan(plan: Plan, exp: dict, index=None) -> list[str]:
     errs = []
     if "None" in plan.say:
         errs.append("spoke a Python None")
+    if " at ." in plan.say or "at ," in plan.say or "  " in plan.say:
+        errs.append("spoke an empty site phrase or a double space")
     if plan.status != exp["status"]:
         errs.append(f"status {plan.status} != {exp['status']}")
     picks = list(plan.offers) + ([plan.confirm] if plan.confirm else [])
@@ -145,7 +157,9 @@ def is_wrong_commit(plan: Plan, errs: list[str]) -> bool:
     return plan.status in COMMIT and bool(errs)
 
 
-def run_case(index, case: dict, hooks: dict, timings: list[float] | None = None):
+def run_case(index, case: dict, hooks: dict, timings: list[float] | None = None, client=None):
+    """Per turn: the plan (or lookup facts), the errors against the expectation, and with `client`
+    the model requests the turn made."""
     av = MockAvailability(index)
     req = Request()
     turns = []
@@ -162,12 +176,14 @@ def run_case(index, case: dict, hooks: dict, timings: list[float] | None = None)
         if i == 0:
             args = {**case.get("patient", {}), **args}
         req = merge(req, Update.from_args(args))
+        n_calls = len(client.calls) if client else 0
         t0 = time.perf_counter()
         plan = resolve(index, req, av, **hooks)
         if timings is not None:
             timings.append((time.perf_counter() - t0) * 1000)
         req = plan.req
-        turns.append({"kind": "resolve", "plan": plan, "exp": exp, "errs": check_plan(plan, exp, index) if exp else None})
+        turns.append({"kind": "resolve", "plan": plan, "exp": exp, "errs": check_plan(plan, exp, index) if exp else None,
+                      "calls": client.calls[n_calls:] if client else []})
     return turns
 
 
@@ -177,18 +193,11 @@ def pct(xs, p):
 
 
 def make_hooks(index, client, gate: Gate = Gate()) -> dict:
-    """client: a JevClient or OpenAIChoiceClient (both answer the JEV hooks' questions), or an
-    EmbedClient."""
-    if client is None:
-        return {}
-    if client.provider == "embed":
-        hook = EmbedChooser(index, client, gate)
-        return {"disambiguator": hook, "chooser": hook, "site_chooser": hook}
-    return {"disambiguator": JevTypeDisambiguator(index, client, gate), "chooser": JevProviderChooser(index, client, gate),
-            "site_chooser": JevSiteChooser(index, client, gate)}
+    """The resolver hooks of whichever chooser `client` belongs to (None: no model)."""
+    return CHOOSERS[client.provider].hooks_for(index, client, gate) if client else {}
 
 
-def evaluate(index, cases: list[dict], hooks: dict, client: JevClient | None, latency_repeats: int = LATENCY_REPEATS) -> dict:
+def evaluate(index, cases: list[dict], hooks: dict, client, latency_repeats: int = LATENCY_REPEATS) -> dict:
     evaluated = correct = wrong_commits = commits = resolve_turns = 0
     asks_made = asks_expected = asks_tp = 0
     refusals_expected = refusals_right = 0
@@ -198,14 +207,17 @@ def evaluate(index, cases: list[dict], hooks: dict, client: JevClient | None, la
     failures = []
     n_calls_before = len(client.calls) if client else 0
     jev_turns = 0
+    turn_live_ms = []  # per turn with network requests: their summed latency
 
     for case in cases:
-        turns = run_case(index, case, hooks)
+        turns = run_case(index, case, hooks, client=client)
         case_ok = True
         for t in turns:
             if t["kind"] == "resolve":
                 plan = t["plan"]
-                jev_turns += any(n.startswith(MODEL_NOTES) for n in plan.notes)
+                jev_turns += bool(plan.consults)
+                if any(c.source == "live" for c in t["calls"]):
+                    turn_live_ms.append(sum(c.latency_ms for c in t["calls"] if c.source == "live"))
                 say_tok.append(tokens(plan.say))
                 summary_tok.append(tokens(plan.summary))
                 result_tok.append(tokens(plan_json(plan)))
@@ -253,7 +265,7 @@ def evaluate(index, cases: list[dict], hooks: dict, client: JevClient | None, la
         "bookings": len(questions_per_booking),
         "timings": timings, "say_tok": say_tok, "summary_tok": summary_tok, "result_tok": result_tok,
         "direct_tok": direct_tok, "by_cat": by_cat, "failures": failures,
-        "jev_turns": jev_turns, "all_turns": all_turns, "jev_calls": calls,
+        "jev_turns": jev_turns, "all_turns": all_turns, "jev_calls": calls, "turn_live_ms": turn_live_ms,
     }
 
 
@@ -262,16 +274,25 @@ def _jev_rows(m: dict) -> list[tuple[str, str]]:
     if not calls:
         return [("model requests; turns where a hook fired", f"0; {m['jev_turns']} of {m['all_turns']} turns")]
     live = [c.latency_ms for c in calls if c.source == "live"]
+    local = [c.latency_ms for c in calls if c.source == "local"]
     recorded = [c.latency_ms for c in calls if c.source == "cache"]
     failed = sum(1 for c in calls if c.source == "failed")
     in_tok = [c.input_tokens for c in calls if c.source != "failed"]
     rows = [
         ("model requests (rate per resolve turn)", f"{len(calls)} ({len(calls) / max(m['all_turns'], 1):.1%}); "
-                                                  f"live {len(live)}, disk cache {len(recorded)}, failed {failed}"),
+                                                  + (f"local {len(local)}, " if local else f"live {len(live)}, ")
+                                                  + f"disk cache {len(recorded)}, failed {failed}"),
     ]
     if live:
         rows.append(("model latency p50 / p95 / max (live)", f"{pct(live, 50):.0f} / {pct(live, 95):.0f} / {max(live):.0f} ms"))
-        rows.append(("  ... over the 1.2 s live budget", f"{sum(1 for x in live if x > 1200)} of {len(live)}"))
+        rows.append((f"  ... over the {REQUEST_TIMEOUT_S:g} s request timeout",
+                     f"{sum(1 for x in live if x > REQUEST_TIMEOUT_S * 1000)} of {len(live)}"))
+        per_turn = m["turn_live_ms"]
+        rows.append((f"  ... turns past the {TURN_BUDGET_MS / 1000:g} s turn budget",
+                     f"{sum(1 for x in per_turn if x > TURN_BUDGET_MS)} of {len(per_turn)} (summed request time)"))
+    if local:
+        rows.append(("model latency p50 / p95 / max (local)", f"{pct(local, 50):.0f} / {pct(local, 95):.0f} / "
+                                                              f"{max(local):.0f} ms"))
     if recorded:
         rows.append(("model latency p50 / p95 / max (recorded)", f"{pct(recorded, 50):.0f} / {pct(recorded, 95):.0f} / "
                                                                 f"{max(recorded):.0f} ms  (as measured when cached)"))
@@ -361,7 +382,7 @@ def print_headline(results: dict, model: str = "JEV") -> None:
 
 def comparison_row(m: dict) -> list[str]:
     """Latency is as measured when each request was fetched (live now, or recorded in the cache)."""
-    ms = [c.latency_ms for c in m["jev_calls"] if c.source in ("live", "cache")]
+    ms = [c.latency_ms for c in m["jev_calls"] if c.source in ("live", "cache", "local")]
     usd = sum(c.usd for c in m["jev_calls"])
     return [wrong_commit(m),
             f"{m['correct']}/{m['evaluated']} ({m['correct'] / max(m['evaluated'], 1):.1%})",
@@ -385,22 +406,18 @@ def print_comparison(name: str, off: dict, on: dict, chooser: str = "jev") -> No
 
 def make_client(chooser: str, live: bool = False, openai_model: str = OPENAI_MODEL):
     """Offline settings: patient timeout, no per-turn budget, so the cache gets filled. The live
-    call path uses each client's call defaults; see "over the live budget"."""
-    if chooser == "jev":
-        return JevClient.from_env(mode="live" if live else "cache", cache_path=CACHE, timeout_s=2.5, retries=1,
-                                  turn_budget_s=None)
-    if chooser == "openai":
-        return OpenAIChoiceClient.from_env(mode="auto" if live else "cache", cache_path=OPENAI_CACHE, model=openai_model,
-                                           timeout_s=10.0, turn_budget_s=None, live_limit=OPENAI_LIVE_LIMIT)
-    if chooser == "embed":
-        return EmbedClient(shared_embedder())
-    return None
+    call path uses each client's call defaults; see "over the request timeout"."""
+    load_dotenv(ROOT / "backend" / ".env")
+    settings = {"jev": dict(mode="live" if live else "cache", cache_path=CACHE, timeout_s=2.5, retries=1),
+                "openai": dict(mode="auto" if live else "cache", cache_path=OPENAI_CACHE, model=openai_model,
+                               timeout_s=10.0, live_limit=OPENAI_LIVE_LIMIT)}
+    return CHOOSERS[chooser].make_client(turn_budget_s=None, **settings.get(chooser, {}))
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--set", default="all", choices=(*SETS, "all", *NATIONAL_SETS))
-    ap.add_argument("--catalog", type=Path, help="catalog.json (default: SF, or national for --set national)")
+    ap.add_argument("--set", default="all", choices=(*SETS, "all"))
+    ap.add_argument("--catalog", type=Path, help="catalog.json (default: the set's, see eval/sets.py)")
     ap.add_argument("--jev", choices=("off", "on"), help="alias: on = --chooser jev, off = --chooser none")
     ap.add_argument("--chooser", choices=tuple(CHOOSER_LABEL))
     ap.add_argument("--openai-model", default=OPENAI_MODEL)
@@ -413,15 +430,10 @@ def main() -> None:
     if args.live and chooser not in ("jev", "openai"):
         ap.error("--live needs --chooser jev or openai")
 
-    catalog = args.catalog or (NATIONAL_CATALOG if args.set in NATIONAL_SETS else SF_CATALOG)
-    if args.set in NATIONAL_SETS:
-        actual = hashlib.sha256(catalog.read_bytes()).hexdigest()
-        pinned = {c.get("catalog_sha256") for c in load_set(args.set)}
-        if pinned != {actual}:
-            ap.error(f"{catalog} has sha256 {actual}; cases_{args.set}.jsonl is pinned to {sorted(map(str, pinned))}")
+    names = tuple(n for n, s in SETS.items() if s.in_all) if args.set == "all" else (args.set,)
+    catalog = args.catalog or catalog_of(names[0])
+    sets = {name: load_set(name, catalog) for name in names}
     index = CatalogIndex.load(catalog)
-    # `all` stays the four SF sets it always meant; heldout3 is scored by name.
-    names = tuple(s for s in SETS if s != "heldout3") if args.set == "all" else (args.set,)
     client = make_client(chooser, args.live, args.openai_model)
     if chooser == "embed":
         client.warm_up(index)  # as the live startup preload does; not counted in the latencies
@@ -431,8 +443,7 @@ def main() -> None:
 
     results = {}
     try:
-        for name in names:
-            cases = load_set(name)
+        for name, cases in sets.items():
             off = evaluate(index, cases, {}, None)
             on = evaluate(index, cases, hooks, client) if client else None
             results[name] = (off, on)
@@ -452,7 +463,7 @@ def main() -> None:
     if client:
         for name, (off, on) in results.items():
             print_comparison(name, off, on, chooser)
-        live = [c for c in client.calls if c.source == "live"] if chooser != "embed" else []
+        live = [c for c in client.calls if c.source == "live"]
         if live:
             spent = sum(c.input_tokens for c in live)
             print(f"\nLIVE this run: {len(live)} requests, {spent} input tokens, ${sum(c.usd for c in live):.5f}")

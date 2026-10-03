@@ -2,24 +2,25 @@
 
   python eval/validate_case_format.py heldout3 national3
 
-run_resolver_eval.py is read with `ast`, never imported: the set names (SETS, NATIONAL_SETS), the file
-load_set maps each name to, and the expectation keys check_plan reads. For each case it checks that
+The set names, their files and catalogs come from eval/sets.py, and the expectation keys
+check_plan reads from sets.EXPECT_KEYS (no resolver code is imported). For each case it checks that
 keys are known, every type/provider/location id exists in the set's catalog, and that national cases
 pin catalog_sha256 to the catalog (catalog.meta.json and the file's actual bytes).
 """
 
 from __future__ import annotations
 
-import ast
 import hashlib
 import json
-import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 EVAL = ROOT / "eval"
-RUNNER = EVAL / "run_resolver_eval.py"
+sys.path.insert(0, str(EVAL))
+
+from sets import BLIND_FILES, EXPECT_KEYS, SETS  # noqa: E402
+
 SF = ROOT / "backend" / "data" / "catalog.json"
 NATIONAL = ROOT / "backend" / "data" / "national" / "catalog.json"
 NATIONAL_META = ROOT / "backend" / "data" / "national" / "catalog.meta.json"
@@ -27,32 +28,12 @@ TOP_KEYS = {"id", "category", "kind", "catalog_sha256", "patient", "turns", "exp
 STATUSES = {"offer", "ask", "refuse", "confirm"}
 
 
-def runner_facts() -> tuple[tuple, tuple, dict[str, str], set[str]]:
-    src = RUNNER.read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    consts, files, keys = {}, {}, set()
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) \
-                and node.targets[0].id in ("SETS", "NATIONAL_SETS"):
-            consts[node.targets[0].id] = ast.literal_eval(node.value)
-        if isinstance(node, ast.FunctionDef) and node.name == "load_set":
-            d = next(n for n in ast.walk(node) if isinstance(n, ast.Dict))
-            files = {k.value: v.right.value for k, v in zip(d.keys, d.values)}
-            default = next(n for n in ast.walk(node) if isinstance(n, ast.Call)
-                           and getattr(n.func, "attr", "") == "get").args[1].right.value
-            files["main"] = files["heldout"] = default
-        if isinstance(node, ast.FunctionDef) and node.name == "check_plan":
-            body = ast.get_source_segment(src, node)
-            keys |= set(re.findall(r'exp\["(\w+)"\]', body)) | set(re.findall(r'"(\w+)" in exp\b', body)) \
-                | set(re.findall(r'exp\.get\("(\w+)"', body))
-    return consts["SETS"], consts["NATIONAL_SETS"], files, keys
-
-
 def known_update_keys(skip: set[str]) -> set[str]:
-    """Update keys used by the committed case files this run is not validating."""
+    """Update keys used by the committed dev case files this run is not validating; blind files are
+    never read for it."""
     out = set()
     for path in EVAL.glob("cases*.jsonl"):
-        if path.name in skip:
+        if path.name in skip or path.name in BLIND_FILES:
             continue
         for line in path.read_text(encoding="utf-8").splitlines():
             if line.strip():
@@ -89,15 +70,13 @@ def load_catalog(path: Path) -> dict:
             "locations": {x["id"] for x in raw["locations"]}}
 
 
-def validate(name: str, sets, national_sets, files, keys, update_keys) -> list[str]:
-    if name not in sets and name not in national_sets:
-        return [f"{name}: not in SETS or NATIONAL_SETS of run_resolver_eval.py"]
-    if name not in files:
-        return [f"{name}: load_set has no file for it"]
-    path = EVAL / files[name]
+def validate(name: str, keys, update_keys) -> list[str]:
+    if name not in SETS:
+        return [f"{name}: not a set in eval/sets.py"]
+    path = EVAL / SETS[name].file
     if not path.exists():
-        return [f"{name}: load_set maps to missing {path.name}"]
-    national = name in national_sets
+        return [f"{name}: eval/sets.py maps it to missing {path.name}"]
+    national = SETS[name].national
     cat = load_catalog(NATIONAL if national else SF)
     pinned = json.loads(NATIONAL_META.read_text(encoding="utf-8"))["sha256"] if national else None
     actual = hashlib.sha256(NATIONAL.read_bytes()).hexdigest() if national else None
@@ -144,11 +123,11 @@ def main() -> None:
     names = sys.argv[1:]
     if not names:
         sys.exit("usage: validate_case_format.py SET [SET ...]")
-    sets, national_sets, files, keys = runner_facts()
+    keys = set(EXPECT_KEYS)
     print(f"check_plan expectation keys: {sorted(keys)}")
-    update_keys = known_update_keys({files[n] for n in names if n in files})
+    update_keys = known_update_keys({SETS[n].file for n in names if n in SETS})
     print(f"update keys seen in other case files: {sorted(update_keys)}")
-    errs = [e for name in names for e in validate(name, sets, national_sets, files, keys, update_keys)]
+    errs = [e for name in names for e in validate(name, keys, update_keys)]
     for e in errs:
         print("  " + e)
     sys.exit(1 if errs else 0)

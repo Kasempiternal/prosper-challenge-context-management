@@ -7,10 +7,8 @@
   "catalog": "data/catalog.json",
   "resolver": {
     "speak_direct": true,
-    "jev": {
-      "enabled": true,
-      "timeout_ms": 2500
-    }
+    "chooser": "jev",
+    "timeout_ms": 2500
   },
   "initial_node": "greeting",
   "nodes": [

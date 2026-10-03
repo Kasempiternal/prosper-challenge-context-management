@@ -175,25 +175,17 @@ def test_live_mode_refreshes_cache(tmp_path):
     assert old.calls == []
 
 
-def _noul_server(values: dict[str, float], seen: list):
-    def handler(request):
-        body = json.loads(request.content)
-        seen.append(body)
-        answers = {name: {"type": "noul", "noul": values[name]} for name in body["questions"]}
-        return httpx.Response(200, json={"answers": answers, "usage": {"input_tokens": 400, "output_tokens": 9}})
-    return httpx.MockTransport(handler)
-
-
 def test_nouls_ask_every_question_in_one_request_and_cache_it(tmp_path):
-    path, seen = tmp_path / "cache.json", []
-    live = JevClient("k", mode="auto", cache_path=path, transport=_noul_server({"a": 0.9, "b": 0.2}, seen))
+    path, server = tmp_path / "cache.json", Server(nouls={"Is a": 0.9, "Is b": 0.2})
+    live = _client(server, cache_path=path)
     assert live.nouls("state", {"a": "Is a?", "b": "Is b?"}, purpose="provider gender") == {"a": 0.9, "b": 0.2}
     live.save()
-    assert len(seen) == 1 and set(seen[0]["questions"]) == {"a", "b"}
+    assert len(server.requests) == 1 and set(server.requests[0]["questions"]) == {"a", "b"}
     assert (live.calls[0].purpose, live.calls[0].source, live.calls[0].p) == ("provider gender", "live", None)
-    offline = JevClient("k", mode="cache", cache_path=path, transport=_noul_server({}, seen))
+    offline_server = Server()
+    offline = _client(offline_server, mode="cache", cache_path=path)
     assert offline.nouls("state", {"a": "Is a?", "b": "Is b?"}) == {"a": 0.9, "b": 0.2}
-    assert len(seen) == 1
+    assert offline_server.requests == []
 
 
 def test_a_single_choice_records_its_purpose_and_top_probability():
@@ -426,8 +418,27 @@ def test_an_answer_to_a_type_question_is_heard_among_the_options_asked(index, av
     first, second = _talk(index, availability, server, {"is_new": False, "service_phrase": "checkup"},
                           {"service_phrase": "the physical, for my job"})
     assert first.ask.options == ("appt_002", "appt_003")
-    assert set(server.requests[0]["questions"]["pick"]["criteria"]) == {"appt_002", "appt_003"}
+    choice, check = sorted(server.requests, key=lambda r: "either" in r["questions"]["pick"]["criteria"])
+    assert set(choice["questions"]["pick"]["criteria"]) == {"appt_002", "appt_003"}
+    assert set(check["questions"]["pick"]["criteria"]) == {"appt_002", "appt_003", "either"}
     assert _types(second) == {"appt_002"}
+
+
+def test_a_lexical_tie_sends_its_check_alongside_the_choice(index, availability):
+    server = Server({"for my job": {"appt_002": 0.95, "appt_003": 0.05}})
+
+    def slow(request):
+        time.sleep(0.4)
+        return server(request)
+
+    client = JevClient("k", transport=httpx.MockTransport(slow))
+    client.begin_turn()
+    started = time.perf_counter()
+    plan = _plan(index, availability, {"is_new": False, "service_phrase": "routine checkup for my job"}, client=client)
+    assert time.perf_counter() - started < 0.7  # one round trip, not two
+    assert _types(plan) == {"appt_002"}
+    assert [(c.purpose, c.source) for c in client.calls] == [("type", "live"), ("type check", "live")]
+    assert sorted(len(r["questions"]["pick"]["criteria"]) for r in server.requests) == [3, 74]
 
 
 def test_a_model_that_agrees_with_the_lexical_match_needs_no_check(index, availability):
@@ -725,9 +736,11 @@ def test_a_check_that_settles_outside_the_options_asks(index, availability):
 
 
 def test_openai_has_no_gender_question_so_none_is_asked(index):
+    from scheduling.choosers import CHOOSERS
     from scheduling.openai_chooser import OpenAIChoiceClient
 
-    assert JevProviderChooser(index, OpenAIChoiceClient("k")).provider_genders(["prov_000", "prov_046"]) is None
+    hooks = CHOOSERS["openai"].hooks_for(index, OpenAIChoiceClient("k"), Gate())
+    assert hooks["chooser"].provider_genders(["prov_000", "prov_046"]) is None
 
 
 def _assert_passes(plan, index):
@@ -826,7 +839,7 @@ def test_turn_budget_shared_by_both_consults():
 def test_warm_up_has_its_own_longer_timeout():
     client = JevClient("k", timeout_s=0.1, transport=_slow(0.4))
     client.begin_turn()
-    assert client.warm_up({"a": "A"}) is not None
+    assert client.warm_up_on({"a": "A"}) is not None
     assert client.choice("x", "q?", {"a": "A"}) is None
 
 

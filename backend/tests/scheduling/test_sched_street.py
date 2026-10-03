@@ -10,7 +10,7 @@ from scheduling import templates as T
 from scheduling.availability import MockAvailability
 from scheduling.catalog_index import CatalogIndex
 from scheduling.geo import resolve_place
-from scheduling.names import hear_place, match_locations, street_of
+from scheduling.names import hear_place, match_locations, match_providers, street_of
 from scheduling.request import Request, Update, merge
 from scheduling.resolver import resolve
 from eval_cases import dev_case_files
@@ -61,7 +61,7 @@ def test_every_address_names_its_clinic(nat):
 def test_every_street_names_the_clinics_on_it_in_that_city(nat):
     on_street = defaultdict(set)
     for loc in nat.locations.values():
-        on_street[(loc.metro_id, T.street_label(nat, loc.id))].add(loc.id)
+        on_street[(loc.metro_id, street_of(loc).said)].add(loc.id)
     for (metro_id, street), ids in on_street.items():
         phrase = f"the clinic on {street} in {nat.metros[metro_id].name}"
         # "Washington" is also a state with its own 1st Avenue: the resolver asks which city.
@@ -129,12 +129,28 @@ def test_refusal_names_the_street_clinics_never_none(nat):
 def test_pinned_site_without_the_visit_anywhere_near_names_the_nearest(nat):
     plan = _say(nat, "x-ray", "the one on Lincoln Avenue in Salt Lake")
     assert plan.refusal.code == "none_nearby" and plan.refusal.alternatives[0][2] == "loc_076"
-    assert plan.say.startswith("We can't do an x-ray at Sugar House on Lincoln Avenue. ")
+    assert plan.say == ("We can't do an x-ray at Sugar House on Lincoln Avenue, or anywhere within 50 miles of it. "
+                        "The nearest is Henderson in Las Vegas, about 366 miles away. Want me to look there?")
 
 
 def test_location_refusal_template_formats_every_named_site(nat):
     say = T.say_refuse(nat, "location_type", type_id="appt_072", at=("loc_013", "loc_014"))
     assert say == "We can't do a blood draw at Downtown or Willow Glen."
+
+
+def test_a_refusal_with_no_named_site_says_there_not_at_nothing(nat):
+    assert T.say_refuse(nat, "location_type", type_id="appt_072") == "We can't do a blood draw there."
+    assert T.say_refuse(nat, "provider_location", who="Dr. Na") == "Dr. Na isn't there."
+
+
+@pytest.mark.parametrize("answer", ["nah", "yup", "sure", "right", "okay", "uh-huh", "mm-hmm"])
+def test_a_yes_or_no_word_alone_names_no_doctor(nat, answer):
+    assert match_providers(nat, answer) == []
+
+
+def test_match_providers_still_hears_the_doctors_those_words_sound_like(nat):
+    assert {c.id for c in match_providers(nat, "Dr. Na")} >= {"prov_1878", "prov_3948"}
+    assert {c.id for c in match_providers(nat, "Dr. Yap")} >= {"prov_2869", "prov_3168"}
 
 
 def _case_sets():
@@ -159,4 +175,4 @@ def test_no_eval_turn_speaks_a_python_none(cases, catalog):
 def test_street_of_parses_catalog_addresses(nat):
     assert (street_of(nat.locations["loc_152"]).number, street_of(nat.locations["loc_152"]).words) == (
         3956, ("medical", "center"))
-    assert T.street_label(nat, "loc_152") == "Medical Center Drive"
+    assert street_of(nat.locations["loc_152"]).said == "Medical Center Drive"

@@ -125,7 +125,7 @@ def _decision_event(ctx: ToolContext, plan: Plan, result: dict, elapsed_ms: floa
         event["candidates"] = result["ask"]
     if plan.refusal:
         event["reason"] = plan.refusal.code
-    called = [v for v in ctx.disambiguator.verdicts if v.called]
+    called = [v for _, v in plan.consults if v.called]
     if called:
         # The last verdict is the one that decided: a type check's, when the choice was checked.
         event["model"] = {"used": True, "provider": ctx.provider, "p": called[-1].p, "ms": round(elapsed_ms)}
@@ -141,9 +141,9 @@ async def _resolve_with_filler(ctx: ToolContext, req: Request, flow_manager: Flo
     hit returns in microseconds, so this is a network call), tell the caller to hold on."""
     ctx.model_client.begin_turn()
     task = asyncio.ensure_future(asyncio.to_thread(resolve, ctx.index, req, ctx.availability,
-                                                   ctx.disambiguator, ctx.disambiguator, ctx.disambiguator))
+                                                   ctx.hooks, ctx.hooks, ctx.hooks))
     done, _ = await asyncio.wait({task}, timeout=FILLER_AFTER_S)
-    if not done and ctx.disambiguator.consulting:
+    if not done and ctx.hooks and ctx.hooks.consulting:
         await flow_manager.worker.queue_frame(TTSSpeakFrame(text=FILLER))
     return await task
 
@@ -190,9 +190,8 @@ def _with_day_word(args: dict, today: date) -> dict:
 
 
 async def _resolve(ctx: ToolContext, req: Request, flow_manager: FlowManager) -> Plan:
-    ctx.disambiguator.verdicts.clear()
     if ctx.model_client is None:
-        return resolve(ctx.index, req, ctx.availability, ctx.disambiguator, ctx.disambiguator, ctx.disambiguator)
+        return resolve(ctx.index, req, ctx.availability, ctx.hooks, ctx.hooks, ctx.hooks)
     first_call = len(ctx.model_client.calls)
     plan = await _resolve_with_filler(ctx, req, flow_manager)
     # One event per request: a hook may make several (a choice, then its check).

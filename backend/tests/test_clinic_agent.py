@@ -92,9 +92,8 @@ def test_bad_catalog(clinic, catalog, message):
 
 
 def test_bad_resolver_config(clinic):
-    clinic["resolver"] = {"speak_direct": "yes", "jev": {"enabled": 1, "timeout_ms": 0}}
-    assert [e["path"] for e in validate_agent(clinic)] == [
-        "resolver.speak_direct", "resolver.jev.enabled", "resolver.jev.timeout_ms"]
+    clinic["resolver"] = {"speak_direct": "yes", "chooser": "jev", "timeout_ms": True}
+    assert [e["path"] for e in validate_agent(clinic)] == ["resolver.speak_direct", "resolver.timeout_ms"]
 
 
 def test_bad_respond_immediately(clinic):

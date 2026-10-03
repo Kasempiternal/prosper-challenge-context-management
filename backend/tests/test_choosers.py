@@ -13,9 +13,8 @@ from agent_tools.context import load_index, make_context, resolve_catalog_path
 from scheduling.decision import DECLINE, Gate
 from scheduling.embed_chooser import EmbedChooser, EmbedClient, FastEmbedder
 from scheduling.jev import JevClient, JevTypeDisambiguator
-from scheduling.openai_chooser import (OpenAIChoiceClient, SpendCapExceeded, distribution, option_keys,
-                                       request_body)
-from scheduling.resolver import NoDisambiguator
+from scheduling.model_client import SpendCapExceeded
+from scheduling.openai_chooser import OpenAIChoiceClient, distribution, option_keys, request_body
 
 
 @pytest.fixture(scope="module")
@@ -31,7 +30,6 @@ def test_key_spellings_add_up_and_mass_off_the_options_stays_uncertain():
            ["Hello", math.log(0.05)]]
     ans = distribution(top, keys)
     assert ans.probabilities == pytest.approx({"appt_a": 0.7, "appt_b": 0.1})
-    assert ans.other_mass == pytest.approx(0.2)
     # 0.7 alone would be "act" if the 0.2 were renormalized onto the options (0.875); it is not.
     assert Gate().decide(ans.probabilities).act is None
 
@@ -158,7 +156,29 @@ def test_embed_chooser_probabilities_are_a_softmax_over_cosines(sf):
     sx, sy = x @ q, y @ q
     assert probs["x"] == pytest.approx(math.exp(sx / 0.5) / (math.exp(sx / 0.5) + math.exp(sy / 0.5)), rel=1e-6)
     assert sum(probs.values()) == pytest.approx(1.0)
-    assert [(c.purpose, c.source, c.usd) for c in client.calls] == [("type", "live", 0.0)]
+    assert [(c.purpose, c.source, c.usd) for c in client.calls] == [("type", "local", 0.0)]
+
+
+def test_warmed_vectors_are_read_back_from_disk_after_a_restart(tmp_path, monkeypatch):
+    embedded = []
+
+    class Model:
+        def embed(self, texts):
+            embedded.extend(texts)
+            return TinyEmbedder().embed(list(texts)) * 3.0
+
+    texts = ["Hearing Test (ENT)", "Skin Check (Dermatology)"]
+    first = FastEmbedder(cache_dir=tmp_path)
+    monkeypatch.setattr(first, "_load", lambda: Model())
+    first.warm(texts)
+    first.warm(texts)
+    assert embedded == texts
+    restarted = FastEmbedder(cache_dir=tmp_path)
+    monkeypatch.setattr(restarted, "_load", lambda: Model())
+    restarted.warm(texts)
+    assert embedded == texts
+    assert np.array_equal(restarted.embed(texts), first.embed(texts))
+    assert np.allclose(np.linalg.norm(first.embed(texts), axis=1), 1.0)
 
 
 def test_a_broken_embedder_declines(sf):
@@ -197,11 +217,11 @@ def test_bad_chooser_and_timeout_are_path_errors():
 
 @pytest.mark.parametrize("chooser, env, provider, hook", [
     ("jev", {"CMD_API_KEY": "k"}, "jev", JevTypeDisambiguator),
-    ("jev", {}, "none", NoDisambiguator),
+    ("jev", {}, "none", None),
     ("openai", {"OPENAI_API_KEY": "k"}, "openai", JevTypeDisambiguator),
-    ("openai", {}, "none", NoDisambiguator),
+    ("openai", {}, "none", None),
     ("embed", {}, "embed", EmbedChooser),
-    ("none", {"CMD_API_KEY": "k", "OPENAI_API_KEY": "k"}, "none", NoDisambiguator),
+    ("none", {"CMD_API_KEY": "k", "OPENAI_API_KEY": "k"}, "none", None),
 ])
 def test_context_builds_the_chosen_model(monkeypatch, chooser, env, provider, hook):
     for key in ("CMD_API_KEY", "OPENAI_API_KEY"):
@@ -210,7 +230,7 @@ def test_context_builds_the_chosen_model(monkeypatch, chooser, env, provider, ho
         monkeypatch.setenv(key, value)
     ctx = make_context("data/catalog.json", speak_direct=True, chooser=chooser, timeout_ms=900)
     assert ctx.provider == provider and ctx.chooser == chooser
-    assert isinstance(ctx.disambiguator._types, hook)
+    assert (ctx.hooks is None) if hook is None else isinstance(ctx.hooks._types, hook)
     if provider == "openai":
         assert isinstance(ctx.model_client, OpenAIChoiceClient)
         assert (ctx.model_client.timeout_s, ctx.model_client.turn_budget_s) == (0.9, 0.9)

@@ -110,7 +110,7 @@ greeting | schedule | booked --transfer_to_staff--> handoff (end)
 - `Edge.precondition`: a state guard (`offer_confirmed`); the edge returns a tool error until it holds.
 - `Edge.action`: code run before the transition (`book_confirmed`, `new_request`); it may keep the call on the node.
 - `AgentConfig.catalog`: path to the catalog, picked in the UI from `GET /api/catalogs`.
-- `AgentConfig.resolver`: `{speak_direct, jev: {enabled, timeout_ms}}`. JEV gate thresholds are tuned offline (`eval/tune_jev_gate.py`).
+- `AgentConfig.resolver`: `{speak_direct, chooser, timeout_ms}`. JEV gate thresholds are tuned offline (`eval/tune_jev_gate.py`).
 
 Full contract: [AGENT_FORMAT.md](AGENT_FORMAT.md).
 

@@ -6,11 +6,14 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
 from itertools import takewhile
+from types import MappingProxyType
+from typing import Callable, Mapping
 
 import jellyfish
 
 from .catalog_index import CatalogIndex
 from .names import is_catalog_name
+from .per_index import per_index
 from .request import TIME_WORDS
 from .text import normalize, stem, tokens
 
@@ -73,11 +76,16 @@ class _Vocab:
     lay_term_words: int                           # words in the longest lay term
     lay_words: frozenset[str]                     # every word of a lay term
     place_words: frozenset[str]                   # every word of a clinic's or city's name
+    said_words: dict[str, frozenset[str]]         # type id -> every word of its name and its aliases
 
     @classmethod
     def build(cls, index: CatalogIndex) -> "_Vocab":
         name_words = {t.id: tuple(w for w in tokens(t.name) if w not in _GENERIC) for t in index.types.values()}
         alias_words = tuple(frozenset(a.phrase.split()) for a in index.aliases)
+        said_words: dict[str, set[str]] = {t.id: set(tokens(t.name)) for t in index.types.values()}
+        for a, ws in zip(index.aliases, alias_words):
+            for tid, _ in a.weights:
+                said_words[tid] |= ws
         name_parts = {t.id: tuple(p for p in (tuple(w for w in tokens(part) if w not in _NAME_STOP)
                                               for part in t.name.split("/")) if p)
                       for t in index.types.values()}
@@ -106,7 +114,8 @@ class _Vocab:
                    freeze(types_by_name_word), name_words, freeze(by_name), name_parts,
                    max((len(t.split()) for t in index.lay_terms), default=0),
                    frozenset(w for t in index.lay_terms for w in t.split()),
-                   frozenset(w for p in places for w in tokens(p)))
+                   frozenset(w for p in places for w in tokens(p)),
+                   {tid: frozenset(ws) for tid, ws in said_words.items()})
 
     def matched(self, heard: list[str]) -> set[str]:
         """Vocabulary words v with _token_match(h, v) for some heard word h."""
@@ -125,15 +134,14 @@ def _word_hits(vocab: _Vocab, h: str) -> frozenset[str]:
     return frozenset(out)
 
 
-# Keyed by id(index); the entry holds the index, so its id cannot be reused while cached.
-_VOCABS: dict[int, tuple[CatalogIndex, _Vocab]] = {}
+_vocab = per_index(_Vocab.build)
 
 
-def _vocab(index: CatalogIndex) -> _Vocab:
-    hit = _VOCABS.get(id(index))
-    if hit is None or hit[0] is not index:
-        hit = _VOCABS[id(index)] = (index, _Vocab.build(index))
-    return hit[1]
+@per_index
+def _scorer(index: CatalogIndex) -> Callable[[str | None, str | None], Mapping[str, TypeCandidate]]:
+    """_score_types for this catalog, remembered per phrase and hint: one model turn scores the same
+    phrase for the lexical match, the request's ranking, the check's rival and the shortlist."""
+    return lru_cache(maxsize=1024)(lambda phrase, hint: MappingProxyType(_score_types(index, phrase, hint)))
 
 
 def types_named(index: CatalogIndex, phrase: str) -> tuple[str, ...]:
@@ -144,7 +152,7 @@ def types_named(index: CatalogIndex, phrase: str) -> tuple[str, ...]:
 def match_types(index: CatalogIndex, phrase: str | None, specialty_hint: str | None = None) -> list[TypeCandidate]:
     """Score every appointment type against the phrase. Longest alias match wins over the
     shorter aliases it contains ("physical therapy" beats "physical")."""
-    return sorted((c for c in _score_types(index, phrase, specialty_hint).values() if c.score >= MIN_SCORE),
+    return sorted((c for c in _scorer(index)(phrase, specialty_hint).values() if c.score >= MIN_SCORE),
                   key=lambda c: (-c.score, c.type_id))
 
 
@@ -287,7 +295,7 @@ def _lay_specialties(index: CatalogIndex, words: list[str]) -> list[str]:
 
 def ranked_types(index: CatalogIndex, phrase: str | None, hint: str | None) -> list[str]:
     """Types any word of the phrase or the hint reaches, best lexical score first."""
-    scored = sorted(_score_types(index, phrase, hint).values(), key=lambda c: (-c.score, c.type_id))
+    scored = sorted(_scorer(index)(phrase, hint).values(), key=lambda c: (-c.score, c.type_id))
     return [c.type_id for c in scored]
 
 
@@ -340,9 +348,8 @@ def unexplained_words(index: CatalogIndex, phrase: str | None, type_ids: list[st
     "checkups while I'm expecting" leaves "expecting", which a model can weigh. Words another
     parser of the turn takes are accounted for: "a flu shot today" and "a flu shot with Dr.
     Chen" are as clear as "a flu shot"."""
-    ids = set(type_ids)
-    known = [w for t in type_ids for w in tokens(index.types[t].name)]
-    known += [w for a in index.aliases if ids & {tid for tid, _ in a.weights} for w in a.phrase.split()]
+    said = _vocab(index).said_words
+    known = set().union(*(said[t] for t in type_ids))
     words = tokens(phrase or "")
     elsewhere = _parsed_elsewhere(index, words)
     return tuple(w for i, w in enumerate(words)

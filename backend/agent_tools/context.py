@@ -2,20 +2,18 @@
 
 The catalog index is immutable and loaded once per process. Bookings (holds) are process-wide,
 so two concurrent calls cannot book the same slot; the request (flow_manager.state["req"]) is
-per call. The agent's resolver.chooser picks the model behind the resolver's hooks: JEV (needs
-CMD_API_KEY), OpenAI (OPENAI_API_KEY), local embeddings (fastembed installed) or none. A chooser
-whose key or package is missing falls back to none, the resolver's no-op disambiguator.
+per call. The agent's resolver.chooser picks the model behind the resolver's hooks
+(scheduling.choosers): JEV (needs CMD_API_KEY), OpenAI (OPENAI_API_KEY), local embeddings
+(fastembed installed) or none. A chooser whose key or package is missing runs as none.
 """
 
 from __future__ import annotations
 
 import asyncio
-import importlib.util
 import json
-import os
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
@@ -24,16 +22,11 @@ from loguru import logger
 
 from scheduling.availability import Availability, Hold, MockAvailability, Slot
 from scheduling.catalog_index import CatalogIndex
-from scheduling.decision import Verdict
-from scheduling.embed_chooser import EmbedChooser, EmbedClient, shared_embedder, warm_catalog
-from scheduling.jev import JevClient, JevProviderChooser, JevSiteChooser, JevTypeDisambiguator, type_criteria
-from scheduling.lexicon import SHORTLIST_SIZE, type_shortlist
-from scheduling.openai_chooser import OpenAIChoiceClient
+from scheduling.choosers import CHOOSERS, EMBEDDINGS_AVAILABLE
+from scheduling.decision import Gate, Verdict
+from scheduling.embed_chooser import shared_embedder, warm_catalog
+from scheduling.model_client import REQUEST_TIMEOUT_S, TURN_BUDGET_MS
 from scheduling.resolver import NoDisambiguator
-
-EMBEDDINGS_AVAILABLE = importlib.util.find_spec("fastembed") is not None
-# A type decision is a choice and then a check, each ~0.55 s (p95 ~0.9 s) live.
-REQUEST_TIMEOUT_S = 1.5
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -70,8 +63,8 @@ def resolve_catalog_path(catalog: str) -> Path:
 def preload_catalogs(agents_dir: Path, embeddings: bool = EMBEDDINGS_AVAILABLE) -> threading.Thread:
     """Build, in a background thread, the index of every catalog an agent in agents_dir names, so the
     first call on a large catalog does not wait for its build. With embeddings, also load the
-    embedding model and embed each catalog's types and sites: any agent can be switched to the
-    embeddings chooser right before a call."""
+    embedding model and each catalog's type and site vectors (from the disk cache after the first
+    boot): any agent can be switched to the embeddings chooser right before a call."""
     catalogs: set[str] = set()
     for path in sorted(Path(agents_dir).glob("*.json")):
         try:
@@ -97,7 +90,7 @@ def preload_catalogs(agents_dir: Path, embeddings: bool = EMBEDDINGS_AVAILABLE) 
                 except Exception as e:  # noqa: BLE001 - the chooser then fails per call and asks instead
                     logger.warning(f"Embedding preload failed: {e!r}")
                     return
-                logger.info(f"Embedded {len(index.types)} types and {len(index.locations)} sites in "
+                logger.info(f"Warmed {len(index.types)} type and {len(index.locations)} site vectors in "
                             f"{(time.perf_counter() - started) * 1000:.0f} ms")
 
     thread = threading.Thread(target=run, name="catalog-preload", daemon=True)
@@ -146,48 +139,39 @@ class CallAvailability:
                 self._shared.release(slot_id)
 
 
-class RecordingDisambiguator:
-    """Wraps the resolver's model hooks and keeps the verdicts of the current turn, so the
-    resolver_decision event can show whether the model was consulted and how sure it was."""
+class ModelHooks:
+    """The resolver's model hooks for one call, with a flag the event loop reads: a hook is running
+    right now, so a slow turn can say "One moment"."""
 
     def __init__(self, types: Any, providers: Any, sites: Any = None):
         self._types, self._providers = types, providers
         self._sites = sites or NoDisambiguator()
-        self.verdicts: list[Verdict] = []
-        self.consulting = False  # a model hook is running right now (read from the event loop)
+        self.consulting = False
 
     def pick_type(self, phrase: str, hint: str | None, candidate_ids: list[str]) -> Verdict:
-        return self._record(self._types.pick_type, phrase, hint, candidate_ids)
+        return self._run(self._types.pick_type, phrase, hint, candidate_ids)
 
     def check_type(self, phrase: str, hint: str | None, first: Verdict, rival: str) -> Verdict | None:
-        return self._record(self._types.check_type, phrase, hint, first, rival)
+        return self._run(self._types.check_type, phrase, hint, first, rival)
+
+    def prefetch_check(self, phrase: str, hint: str | None, pair: tuple[str, str]) -> None:
+        self._types.prefetch_check(phrase, hint, pair)
 
     def pick_provider(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
-        return self._record(self._providers.pick_provider, phrase, type_id, candidate_ids)
-
-    def pick_site(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
-        return self._record(self._sites.pick_site, phrase, type_id, candidate_ids)
+        return self._run(self._providers.pick_provider, phrase, type_id, candidate_ids)
 
     def provider_genders(self, candidate_ids: list[str]) -> dict[str, float] | None:
-        """Recorded as a model verdict only when a question was asked (None: the chooser has none)."""
-        self.consulting = True
-        try:
-            p_woman = self._providers.provider_genders(candidate_ids)
-        finally:
-            self.consulting = False
-        if p_woman is not None:
-            self.verdicts.append(Verdict(called=True, failed=not p_woman))
-        return p_woman
+        return self._run(self._providers.provider_genders, candidate_ids)
 
-    def _record(self, hook, *args) -> Verdict | None:
+    def pick_site(self, phrase: str, type_id: str | None, candidate_ids: list[str]) -> Verdict:
+        return self._run(self._sites.pick_site, phrase, type_id, candidate_ids)
+
+    def _run(self, hook, *args):
         self.consulting = True
         try:
-            verdict = hook(*args)
+            return hook(*args)
         finally:
             self.consulting = False
-        if verdict is not None:
-            self.verdicts.append(verdict)
-        return verdict
 
 
 @dataclass
@@ -195,9 +179,8 @@ class ToolContext:
     index: CatalogIndex
     availability: Availability
     speak_direct: bool = True
-    disambiguator: RecordingDisambiguator = field(
-        default_factory=lambda: RecordingDisambiguator(NoDisambiguator(), NoDisambiguator()))
-    # JevClient | OpenAIChoiceClient | EmbedClient: provider, calls, begin_turn(), close().
+    hooks: Optional[ModelHooks] = None  # None: the resolver runs without a model
+    # A ModelClient-like: provider, calls (scheduling.model_client.ModelCall), begin_turn(), warm_up(), close().
     model_client: Optional[Any] = None
     chooser: str = "none"  # what the agent asked for; model_client.provider is what runs
     on_event: Optional[EventCallback] = None
@@ -211,22 +194,17 @@ class ToolContext:
         return self.model_client.provider if self.model_client else "none"
 
 
-def make_context(catalog: str, *, speak_direct: bool, chooser: str = "none", timeout_ms: int = 2500,
+def make_context(catalog: str, *, speak_direct: bool, chooser: str = "none", timeout_ms: int = TURN_BUDGET_MS,
                  on_event: Optional[EventCallback] = None) -> ToolContext:
     catalog_path = resolve_catalog_path(catalog)
     index = load_index(catalog_path)
     client = make_model_client(chooser, timeout_ms / 1000)
-    if client is None:
-        dis = RecordingDisambiguator(NoDisambiguator(), NoDisambiguator())
-    elif client.provider == "embed":
-        hook = EmbedChooser(index, client)
-        dis = RecordingDisambiguator(hook, hook, hook)
-    else:
-        # The OpenAI client answers the same choice questions the JEV hooks ask.
-        dis = RecordingDisambiguator(JevTypeDisambiguator(index, client), JevProviderChooser(index, client),
-                                     JevSiteChooser(index, client))
+    hooks = None
+    if client is not None:
+        h = CHOOSERS[chooser].hooks_for(index, client, Gate())
+        hooks = ModelHooks(h["disambiguator"], h["chooser"], h["site_chooser"])
     return ToolContext(index=index, availability=CallAvailability(*shared_availability(catalog_path)),
-                       speak_direct=speak_direct, disambiguator=dis, model_client=client, chooser=chooser,
+                       speak_direct=speak_direct, hooks=hooks, model_client=client, chooser=chooser,
                        on_event=on_event)
 
 
@@ -234,24 +212,11 @@ def make_model_client(chooser: str, timeout_s: float) -> Any:
     """Per call, not shared: a networked client carries this call's per-turn budget (begin_turn).
     One request may use at most REQUEST_TIMEOUT_S of it, so a slow choice still leaves time for
     its check."""
-    request_s = min(REQUEST_TIMEOUT_S, timeout_s)
-    if chooser == "jev" and os.environ.get("CMD_API_KEY"):
-        return JevClient(os.environ["CMD_API_KEY"], mode="auto", timeout_s=request_s, retries=0,
-                         turn_budget_s=timeout_s)
-    if chooser == "openai" and os.environ.get("OPENAI_API_KEY"):
-        return OpenAIChoiceClient(os.environ["OPENAI_API_KEY"], mode="auto", timeout_s=request_s,
-                                  turn_budget_s=timeout_s)
-    if chooser == "embed" and EMBEDDINGS_AVAILABLE:
-        return EmbedClient(shared_embedder())
-    if chooser != "none":
+    spec = CHOOSERS.get(chooser)
+    if spec is None or not spec.available():
         logger.warning(f"Chooser {chooser!r} is not available (missing key or package); resolving without a model")
-    return None
-
-
-def warm_up_criteria(index: CatalogIndex) -> dict[str, str]:
-    """A shortlist-sized option set, like the requests a call makes (a national catalog offers more
-    types than one JEV choice question accepts)."""
-    return type_criteria(index, type_shortlist(index, "an appointment", None)[:SHORTLIST_SIZE])
+        return None
+    return spec.make_client(mode="auto", timeout_s=min(REQUEST_TIMEOUT_S, timeout_s), turn_budget_s=timeout_s)
 
 
 async def warm_up_model(ctx: ToolContext) -> None:
@@ -261,12 +226,7 @@ async def warm_up_model(ctx: ToolContext) -> None:
     if client is None:
         return
     started = time.perf_counter()
-    if client.provider == "jev":
-        call = await asyncio.to_thread(client.warm_up, warm_up_criteria(ctx.index))
-    elif client.provider == "embed":
-        call = await asyncio.to_thread(client.warm_up, ctx.index)
-    else:
-        call = await asyncio.to_thread(client.warm_up)
+    call = await asyncio.to_thread(client.warm_up, ctx.index)
     ms = (time.perf_counter() - started) * 1000
     if call is None:
         logger.warning(f"{client.provider} warm-up failed after {ms:.0f} ms")

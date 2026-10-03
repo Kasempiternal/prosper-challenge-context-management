@@ -22,13 +22,10 @@ export function modeLabel(mode: { requested: Chooser; active: Chooser }): string
     : `${active} (${chooserLabel(mode.requested)} unavailable)`
 }
 
-/** Mirrors ResolverConfig.from_dict: an absent chooser is JEV unless jev.enabled is false. */
-export function effectiveChooser(resolver: ResolverConfig | undefined): Chooser {
-  if (isChooser(resolver?.chooser)) return resolver.chooser
-  return resolver?.jev?.enabled === false ? 'none' : 'jev'
-}
+/** The per-turn budget of a networked chooser when resolver.timeout_ms is absent (backend TURN_BUDGET_MS). */
+export const DEFAULT_TIMEOUT_MS = 2500
 
-/** Mirrors ResolverConfig.from_dict: resolver.timeout_ms, else jev.timeout_ms, else 2500. */
-export function effectiveTimeoutMs(resolver: ResolverConfig | undefined): number {
-  return resolver?.timeout_ms ?? resolver?.jev?.timeout_ms ?? 2500
+/** Mirrors ResolverConfig.from_dict: an absent chooser is JEV. */
+export function effectiveChooser(resolver: ResolverConfig | undefined): Chooser {
+  return isChooser(resolver?.chooser) ? resolver.chooser : 'jev'
 }

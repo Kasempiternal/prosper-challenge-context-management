@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from fake_models import RandomHooks
 from scheduling.availability import MockAvailability, Slot as TimeSlot
 from scheduling.catalog_index import build_index
 from scheduling.decision import DECLINE, Verdict
@@ -472,35 +473,6 @@ def _oracle(raw, type_id, provider_id, location_id, patient) -> list[str]:
     return broken
 
 
-class _Adversary:
-    def __init__(self, rng, universe):
-        self.rng, self.universe = rng, universe
-
-    def _verdict(self, candidates, kind):
-        pool = list(candidates) if candidates and self.rng.random() < 0.6 else self.universe[kind]
-        roll = self.rng.random()
-        if roll < 0.3:
-            return DECLINE
-        if roll < 0.7:
-            return Verdict(act=self.rng.choice(pool), called=True)
-        return Verdict(ask=(self.rng.choice(pool), self.rng.choice(self.universe[kind])), called=True)
-
-    def pick_type(self, phrase, hint, candidate_ids):
-        return self._verdict(candidate_ids, "type")
-
-    def check_type(self, phrase, hint, first, rival):
-        return self._verdict([first.act or first.ask[0], rival], "type")
-
-    def pick_provider(self, phrase, type_id, candidate_ids):
-        return self._verdict(candidate_ids, "provider")
-
-    def provider_genders(self, candidate_ids):
-        return {p: self.rng.choice((0.02, 0.5, 0.98)) for p in candidate_ids if self.rng.random() < 0.7}
-
-    def pick_site(self, phrase, type_id, candidate_ids):
-        return self._verdict(candidate_ids, "site")
-
-
 _SERVICES = ["new patient visit", "follow up", "knee MRI", "cleaning", "my teeth", "I hurt my knee", "zorbly"]
 _DOCTORS = ["Dr. Maria Garcia", "Dr. Garcia", "Dr. Ken Ito", "Dr. Ito", "Dr. Ana Lee", "Dr. Sam Park", "Dr. Chen"]
 _PLACES = ["Austin", "Austen", "Portland", "Oregon", "Maine", "Dallas", "Downtown", "Downtown, Austin", "Hyde Park",
@@ -528,7 +500,7 @@ def test_geo_offers_pass_policy_and_stay_in_the_final_ring(nat, seed):
     commits = in_area = 0
     for _ in range(150):
         av = MockAvailability(nat)
-        hooks = _Adversary(rng, universe) if rng.random() < 0.6 else Recorder()
+        hooks = RandomHooks(rng, universe) if rng.random() < 0.6 else Recorder()
         req = Request()
         for _turn in range(rng.randint(1, 6)):
             a: dict = {}

@@ -300,8 +300,8 @@ def _resolve_head(ix: CatalogIndex, words: list[str], near: bool, within: frozen
 
     sites = _sites(ix, text, within)
     # A clinic's name, "Market Street" or "3330 Market" named the site outright.
-    strong = bool(sites) and sites[0].via in ("exact", "street", "address") and sites[0].score >= STRONG_SITE_SCORE
-    by_street = strong and sites[0].via != "exact"
+    strong = bool(sites) and sites[0].score >= STRONG_SITE_SCORE
+    by_street = strong and sites[0].by_street
     if not by_street and not any(set(words) <= _location_words(ix.locations[c.id]) for c in sites):
         # "Philedelphia", "San Antonyo": a misheard city name is the city, not the clinics whose
         # names merely share some of its words.
