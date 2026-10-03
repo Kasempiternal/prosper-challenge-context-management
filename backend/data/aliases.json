@@ -241,7 +241,11 @@
     "teeth cleaning": {"appt_074": 1.0},
     "cleaning": {"appt_074": 1.0},
     "dentist": {"appt_075": 1.0, "appt_076": 0.6},
-    "dental checkup": {"appt_075": 1.0, "appt_076": 0.6},
+    "dental checkup": {"appt_075": 1.0, "appt_074": 1.0, "appt_076": 0.6},
+    "dental check up": {"appt_075": 1.0, "appt_074": 1.0, "appt_076": 0.6},
+    "six month dental checkup": {"appt_074": 1.0, "appt_075": 1.0},
+    "six month dental check up": {"appt_074": 1.0, "appt_075": 1.0},
+    "6 month dental checkup": {"appt_074": 1.0, "appt_075": 1.0},
     "toothache": {"appt_075": 1.0},
     "new dentist": {"appt_076": 1.0},
 
