@@ -1,0 +1,73 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat5-dup-01: Existing patient who wants Travel Vaccination Consult with Dr. Scott Miller. They do not say where at first; asked which city, they answer Baltimore. Fields: service_phrase = the visit they want: Travel Vaccination Consult (said naturally); provider_phrase = the doctor's full name: Dr. Scott Miller; followup_location_phrase = their answer to 'which city?': Baltimore\n- id nat5-dup-02: Existing patient who wants Urinary Incontinence Evaluation with Dr. James Caskey. They do not say where at first; asked which city, they answer New York. Fields: service_phrase = the visit they want: Urinary Incontinence Evaluation (said naturally); provider_phrase = the doctor's full name: Dr. James Caskey; followup_location_phrase = their answer to 'which city?': New York\n- id nat5-dup-03: Existing patient who wants COVID-19 Vaccine with Dr. Michael Williams. They do not say where at first; asked which city, they answer Boston. Fields: service_phrase = the visit they want: COVID-19 Vaccine (said naturally); provider_phrase = the doctor's full name: Dr. Michael Williams; followup_location_phrase = their answer to 'which city?': Boston\n- id nat5-dup-04: Existing patient who wants EEG with Dr. Priya Shenoy, their doctor in Nashville. Fields: service_phrase = the visit they want: EEG (said naturally); provider_phrase = the doctor's full name: Dr. Priya Shenoy; location_phrase = the city: Nashville\n- id nat5-dup-05: Existing patient who wants Pacemaker Check with Dr. Craig Thomas, their doctor in Houston. Fields: service_phrase = the visit they want: Pacemaker Check (said naturally); provider_phrase = the doctor's full name: Dr. Craig Thomas; location_phrase = the city: Houston\n- id nat5-dup-06: Existing patient who wants Chronic Back Pain Evaluation with Dr. Michael Johnson, their doctor in Oakland. Fields: service_phrase = the visit they want: Chronic Back Pain Evaluation (said naturally); provider_phrase = the doctor's full name: Dr. Michael Johnson; location_phrase = the city: Oakland\n- id nat5-cap-01: Existing patient (with a referral) who needs Nerve Block. They are in St. Louis. Fields: service_phrase = the service: Nerve Block (said naturally); location_phrase = the city: St. Louis\n- id nat5-cap-02: Existing patient (with a referral) who needs Cystoscopy. They are in San Jose. Fields: service_phrase = the service: Cystoscopy (said naturally); location_phrase = the city: San Jose\n- id nat5-cap-03: Existing patient (with a referral) who needs Prenatal Ultrasound. They are in Sacramento. Fields: service_phrase = the service: Prenatal Ultrasound (said naturally); location_phrase = the city: Sacramento\n- id nat5-cap-04: Existing patient who needs a dry eye evaluation. They are in New York. Fields: service_phrase = how the caller asks for a dry eye evaluation; location_phrase = the city: New York\n- id nat5-cap-05: Existing patient (with a referral) who needs Nerve Block and insists on going to the clinic called Newton Specialty Center in Newton, which they always use. Fields: service_phrase = the service: Nerve Block (said naturally); location_phrase = that specific clinic by name: Newton Specialty Center (not 'near' it)\n- id nat5-new-01: A brand-new patient who has never been seen at these clinics needs Hearing Aid Evaluation. They are in Austin. Fields: service_phrase = the service: Hearing Aid Evaluation (said naturally); location_phrase = the city: Austin",
+ "response": "I'll draft the caller-wordings for each scenario, varying tone and keeping each field to the caller's own short phrasing.\n\n```json\n[\n  {\n    \"id\": \"nat5-dup-01\",\n    \"service_phrase\": \"a travel vaccination consult\",\n    \"provider_phrase\": \"Dr. Scott Miller\",\n    \"followup_location_phrase\": \"Baltimore\"\n  },\n  {\n    \"id\": \"nat5-dup-02\",\n    \"service_phrase\": \"urinary incontinence evaluation\",\n    \"provider_phrase\": \"Dr. James Caskey\",\n    \"followup_location_phrase\": \"New York\"\n  },\n  {\n    \"id\": \"nat5-dup-03\",\n    \"service_phrase\": \"the COVID vaccine\",\n    \"provider_phrase\": \"Dr. Michael Williams\",\n    \"followup_location_phrase\": \"Boston\"\n  },\n  {\n    \"id\": \"nat5-dup-04\",\n    \"service_phrase\": \"an EEG\",\n    \"provider_phrase\": \"Dr. Priya Shenoy\",\n    \"location_phrase\": \"Nashville\"\n  },\n  {\n    \"id\": \"nat5-dup-05\",\n    \"service_phrase\": \"pacemaker check\",\n    \"provider_phrase\": \"Dr. Craig Thomas\",\n    \"location_phrase\": \"Houston\"\n  },\n  {\n    \"id\": \"nat5-dup-06\",\n    \"service_phrase\": \"chronic back pain evaluation\",\n    \"provider_phrase\": \"Dr. Michael Johnson\",\n    \"location_phrase\": \"Oakland\"\n  },\n  {\n    \"id\": \"nat5-cap-01\",\n    \"service_phrase\": \"a nerve block\",\n    \"location_phrase\": \"I'm in St. Louis\"\n  },\n  {\n    \"id\": \"nat5-cap-02\",\n    \"service_phrase\": \"cystoscopy\",\n    \"location_phrase\": \"San Jose\"\n  },\n  {\n    \"id\": \"nat5-cap-03\",\n    \"service_phrase\": \"prenatal ultrasound\",\n    \"location_phrase\": \"over by Sacramento\"\n  },\n  {\n    \"id\": \"nat5-cap-04\",\n    \"service_phrase\": \"an appointment for dry eyes\",\n    \"location_phrase\": \"New York\"\n  },\n  {\n    \"id\": \"nat5-cap-05\",\n    \"service_phrase\": \"nerve block\",\n    \"location_phrase\": \"the Newton Specialty Center, that's the one I always use\"\n  },\n  {\n    \"id\": \"nat5-new-01\",\n    \"service_phrase\": \"hearing aid evaluation\",\n    \"location_phrase\": \"Austin\"\n  }\n]\n```\n",
+ "parsed": [
+  {
+   "id": "nat5-dup-01",
+   "service_phrase": "a travel vaccination consult",
+   "provider_phrase": "Dr. Scott Miller",
+   "followup_location_phrase": "Baltimore"
+  },
+  {
+   "id": "nat5-dup-02",
+   "service_phrase": "urinary incontinence evaluation",
+   "provider_phrase": "Dr. James Caskey",
+   "followup_location_phrase": "New York"
+  },
+  {
+   "id": "nat5-dup-03",
+   "service_phrase": "the COVID vaccine",
+   "provider_phrase": "Dr. Michael Williams",
+   "followup_location_phrase": "Boston"
+  },
+  {
+   "id": "nat5-dup-04",
+   "service_phrase": "an EEG",
+   "provider_phrase": "Dr. Priya Shenoy",
+   "location_phrase": "Nashville"
+  },
+  {
+   "id": "nat5-dup-05",
+   "service_phrase": "pacemaker check",
+   "provider_phrase": "Dr. Craig Thomas",
+   "location_phrase": "Houston"
+  },
+  {
+   "id": "nat5-dup-06",
+   "service_phrase": "chronic back pain evaluation",
+   "provider_phrase": "Dr. Michael Johnson",
+   "location_phrase": "Oakland"
+  },
+  {
+   "id": "nat5-cap-01",
+   "service_phrase": "a nerve block",
+   "location_phrase": "I'm in St. Louis"
+  },
+  {
+   "id": "nat5-cap-02",
+   "service_phrase": "cystoscopy",
+   "location_phrase": "San Jose"
+  },
+  {
+   "id": "nat5-cap-03",
+   "service_phrase": "prenatal ultrasound",
+   "location_phrase": "over by Sacramento"
+  },
+  {
+   "id": "nat5-cap-04",
+   "service_phrase": "an appointment for dry eyes",
+   "location_phrase": "New York"
+  },
+  {
+   "id": "nat5-cap-05",
+   "service_phrase": "nerve block",
+   "location_phrase": "the Newton Specialty Center, that's the one I always use"
+  },
+  {
+   "id": "nat5-new-01",
+   "service_phrase": "hearing aid evaluation",
+   "location_phrase": "Austin"
+  }
+ ]
+}

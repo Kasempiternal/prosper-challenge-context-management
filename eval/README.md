@@ -959,3 +959,51 @@ Misses that are not wrong commits but matter:
   within 50 miles because the specific "CT - chest" visit is not offered there, while a general
   CT scan that the label accepts is.
 - Gender policy (pre-registered): h4-p10 and h4-p11 confirm a doctor by name instead of booking.
+
+## Held-out round 5 (`heldout5`, `national5`)
+
+Frozen on 2026-10-03 and not yet scored. Both sets were authored blind. The author read no resolver code
+(`backend/scheduling/**`), no resolver results (`eval/results/**`), no `.kstack` files and no README
+section that reports scores, misses or failure classes. One exception, after authoring: when staging
+the commit, `git diff` context printed the last three lines of the round 4 scored section (a national
+CT-chest miss and a gender-policy note). Every case, label and note was final by then, and nothing
+changed after it. Neither the resolver nor `run_resolver_eval.py` was run on these cases. Both are
+registered as blind in `eval/sets.py`, so no test, tuning run or `--set all` reads them. Labels come
+from catalog queries. DeepSeek (`deepseek/deepseek-v4.1-flash` via `cmdc`) wrote only the caller's
+words. Regenerated phrasings and labels I was unsure of are listed in `eval/heldout5/label_notes.md`.
+
+| set | file | catalog | cases | turns | sha256 of the committed (LF) file |
+|---|---|---|---|---|---|
+| heldout5 | `cases_heldout5.jsonl` | SF | 56 | 64 | `d9cde3bd4548c40f93f7b1d88358a121ccd2cc1e34f55cc0bca43ffade514cd4` |
+| national5 | `cases_national5.jsonl` | national | 51 | 59 | `76b0b8ebb6aff1fce873d4d9734c536bbf56b8cb8d701185899996926616a233` |
+
+Categories:
+
+- **heldout5**: type 29 (lay test name 3, symptom 2, symptom whose body part points to another
+  specialty 4, acute symptom with its onset 4, everyday description 4, abbreviation 3, slang 3, genuine
+  two-way ask 4, not offered 2). Policy 5 (new-patient type 2, referral 1, new-patient provider 2).
+  Provider description 14 (specialty 3, title 2, language 3, full name 2, gender 2, site 2); in 4 of
+  these the description fits 2 doctors, so the case expects a provider question. Two-turn 8: the agent
+  asks and the caller picks a provider (4) or a service (4).
+- **national5**: geo 18 (city 2, "I'm in" 2, suburb 1, ZIP 2, ZIP3 1, neighborhood 2, "near"
+  neighborhood 2, state only 1, either/or town 2, far place 1, misspelled city 2), symptom 8,
+  duplicate names across metros 6 (3 with a city, 3 answered after a city question), capability by
+  metro 5, new-patient rules 5, no location 3, unoffered 2, ring expansion 1, general variant 3 (only
+  the general CT Scan or Ultrasound is bookable within 100 mi, not the specific test asked for). The
+  seed is 20261006. No scenario shares a type+metro or a provider+type pair with national, national2,
+  national3 or national4 (the `scenarios` step prints 0/51 for each). Every case pins the catalog's
+  sha256.
+
+Generator commands:
+
+```
+backend/.venv/Scripts/python eval/heldout3/build_cases.py --set heldout5 scenarios|phrase|merge
+backend/.venv/Scripts/python eval/heldout3/build_cases.py --set heldout5 repair h5-10,h5-20,h5-m02
+backend/.venv/Scripts/python eval/national/build_cases.py --set national5 scenarios|phrase|merge
+backend/.venv/Scripts/python eval/national/build_cases.py --set national5 repair nat5-geo-17,nat5-geo-18 twins
+backend/.venv/Scripts/python eval/validate_case_format.py heldout5 national5   # format only, 0 problems
+```
+
+DeepSeek calls: 12, none of them failed. heldout5 took 5 batches plus 1 repair call covering 3
+scenarios; national5 took 5 batches plus 1 call for the 2 either/or scenarios. The leak checks dropped
+no cases. The raw outputs are in `eval/heldout5/deepseek_raw/` and `eval/national5/deepseek_raw/`.

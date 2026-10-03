@@ -1,0 +1,67 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat5-geo-01: Existing patient who needs a diagnostic mammogram their doctor ordered. They are in Miami, Florida. Fields: service_phrase = how the caller asks for a diagnostic mammogram their doctor ordered; location_phrase = where they are: the caller names the city only (Miami)\n- id nat5-geo-02: Existing patient who needs a TB skin test they need for work. They are in Philadelphia, Pennsylvania. Fields: service_phrase = how the caller asks for a TB skin test they need for work; location_phrase = where they are: the caller names the city only (Philadelphia)\n- id nat5-geo-03: Existing patient who needs an MRI of their abdomen that their doctor ordered. They are in Las Vegas, Nevada. Fields: service_phrase = how the caller asks for an MRI of their abdomen that their doctor ordered; location_phrase = where they are: the caller says they are in / live in the city (Las Vegas)\n- id nat5-geo-04: Existing patient who needs a diagnostic mammogram their doctor ordered. They are in Fort Worth, Texas. Fields: service_phrase = how the caller asks for a diagnostic mammogram their doctor ordered; location_phrase = where they are: the caller says they are in / live in the city (Fort Worth)\n- id nat5-geo-05: Existing patient who needs a diagnostic mammogram their doctor ordered. They live in Chula Vista, California (a suburb; do not mention the bigger nearby city). Fields: service_phrase = how the caller asks for a diagnostic mammogram their doctor ordered; location_phrase = where they are: the town name Chula Vista\n- id nat5-geo-06: Existing patient who needs an MRI of their abdomen that their doctor ordered. Their ZIP code is 44114. Fields: service_phrase = how the caller asks for an MRI of their abdomen that their doctor ordered; location_phrase = where they are: the caller gives the ZIP code 44114\n- id nat5-geo-07: Existing patient who needs a diagnostic mammogram their doctor ordered. Their ZIP code is 10028. Fields: service_phrase = how the caller asks for a diagnostic mammogram their doctor ordered; location_phrase = where they are: the caller gives the ZIP code 10028\n- id nat5-geo-08: Existing patient who needs an MRI of their abdomen that their doctor ordered. Their ZIP code is 90401. Fields: service_phrase = how the caller asks for an MRI of their abdomen that their doctor ordered; location_phrase = where they are: the caller gives the ZIP code 90401\n- id nat5-geo-09: Existing patient who needs an emergency dental visit for a cracked tooth. They live in the Mueller neighborhood of Austin. Fields: service_phrase = how the caller asks for an emergency dental visit for a cracked tooth; location_phrase = where they are: the neighborhood they are in: Mueller (do not name the city)\n- id nat5-geo-10: Existing patient who needs a shingles shot. They live in the La Jolla neighborhood of San Diego. Fields: service_phrase = how the caller asks for a shingles shot; location_phrase = where they are: the neighborhood they are in: La Jolla (do not name the city)\n- id nat5-geo-11: Existing patient who needs an MRI of their abdomen that their doctor ordered. They are near the Financial District neighborhood of New York (any clinic close by is fine). Fields: service_phrase = how the caller asks for an MRI of their abdomen that their doctor ordered; location_phrase = where they are: that they are near / around Financial District (do not name the city)\n- id nat5-geo-12: Existing patient who needs an MRI of their abdomen that their doctor ordered. They are near the Adams Morgan neighborhood of Washington (any clinic close by is fine). Fields: service_phrase = how the caller asks for an MRI of their abdomen that their doctor ordered; location_phrase = where they are: that they are near / around Adams Morgan (do not name the city)",
+ "response": "```json\n[\n  {\"id\": \"nat5-geo-01\", \"service_phrase\": \"I need to get a diagnostic mammogram, my doctor ordered it\", \"location_phrase\": \"I'm in Miami\"},\n  {\"id\": \"nat5-geo-02\", \"service_phrase\": \"I need a TB skin test for work\", \"location_phrase\": \"Philadelphia\"},\n  {\"id\": \"nat5-geo-03\", \"service_phrase\": \"I'm supposed to get an MRI of my abdomen, doctor ordered it\", \"location_phrase\": \"I live in Las Vegas\"},\n  {\"id\": \"nat5-geo-04\", \"service_phrase\": \"I need diagnostic mammogram, doctor ordered for my breast\", \"location_phrase\": \"I am in Fort Worth\"},\n  {\"id\": \"nat5-geo-05\", \"service_phrase\": \"I need a diagnostic mammogram, my doctor said to get one, ordered it\", \"location_phrase\": \"I'm over in Chula Vista\"},\n  {\"id\": \"nat5-geo-06\", \"service_phrase\": \"I need an MRI of my abdomen, my doctor ordered it\", \"location_phrase\": \"44114\"},\n  {\"id\": \"nat5-geo-07\", \"service_phrase\": \"I need a diagnostic mammogram, doctor ordered it\", \"location_phrase\": \"my ZIP is 10028\"},\n  {\"id\": \"nat5-geo-08\", \"service_phrase\": \"I need an MRI of my abdomen that my doctor ordered\", \"location_phrase\": \"90401\"},\n  {\"id\": \"nat5-geo-09\", \"service_phrase\": \"I need an emergency dental visit, I cracked my tooth\", \"location_phrase\": \"I'm in Mueller\"},\n  {\"id\": \"nat5-geo-10\", \"service_phrase\": \"I need a shingles shot\", \"location_phrase\": \"I'm in La Jolla\"},\n  {\"id\": \"nat5-geo-11\", \"service_phrase\": \"I need an MRI of my abdomen, doctor ordered it\", \"location_phrase\": \"I'm near the Financial District\"},\n  {\"id\": \"nat5-geo-12\", \"service_phrase\": \"I need an MRI of my abdomen that my doctor ordered\", \"location_phrase\": \"I'm over by Adams Morgan\"}\n]\n```\n",
+ "parsed": [
+  {
+   "id": "nat5-geo-01",
+   "service_phrase": "I need to get a diagnostic mammogram, my doctor ordered it",
+   "location_phrase": "I'm in Miami"
+  },
+  {
+   "id": "nat5-geo-02",
+   "service_phrase": "I need a TB skin test for work",
+   "location_phrase": "Philadelphia"
+  },
+  {
+   "id": "nat5-geo-03",
+   "service_phrase": "I'm supposed to get an MRI of my abdomen, doctor ordered it",
+   "location_phrase": "I live in Las Vegas"
+  },
+  {
+   "id": "nat5-geo-04",
+   "service_phrase": "I need diagnostic mammogram, doctor ordered for my breast",
+   "location_phrase": "I am in Fort Worth"
+  },
+  {
+   "id": "nat5-geo-05",
+   "service_phrase": "I need a diagnostic mammogram, my doctor said to get one, ordered it",
+   "location_phrase": "I'm over in Chula Vista"
+  },
+  {
+   "id": "nat5-geo-06",
+   "service_phrase": "I need an MRI of my abdomen, my doctor ordered it",
+   "location_phrase": "44114"
+  },
+  {
+   "id": "nat5-geo-07",
+   "service_phrase": "I need a diagnostic mammogram, doctor ordered it",
+   "location_phrase": "my ZIP is 10028"
+  },
+  {
+   "id": "nat5-geo-08",
+   "service_phrase": "I need an MRI of my abdomen that my doctor ordered",
+   "location_phrase": "90401"
+  },
+  {
+   "id": "nat5-geo-09",
+   "service_phrase": "I need an emergency dental visit, I cracked my tooth",
+   "location_phrase": "I'm in Mueller"
+  },
+  {
+   "id": "nat5-geo-10",
+   "service_phrase": "I need a shingles shot",
+   "location_phrase": "I'm in La Jolla"
+  },
+  {
+   "id": "nat5-geo-11",
+   "service_phrase": "I need an MRI of my abdomen, doctor ordered it",
+   "location_phrase": "I'm near the Financial District"
+  },
+  {
+   "id": "nat5-geo-12",
+   "service_phrase": "I need an MRI of my abdomen that my doctor ordered",
+   "location_phrase": "I'm over by Adams Morgan"
+  }
+ ]
+}

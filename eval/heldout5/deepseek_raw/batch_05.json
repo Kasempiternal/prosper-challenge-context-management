@@ -1,0 +1,47 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h5-m01: Existing patient who wants a cardiology consultation with a specific doctor. Asked which Dr. Chen at Richmond they mean, Dr. David Chen or Dr. Emily Chen, they answer: the woman; they give no name. Fields: provider_phrase = how the caller names the doctor: Dr. Chen, the one at the Richmond clinic (no first name); followup_provider_phrase = their answer when asked which Dr. Chen at Richmond they mean, Dr. David Chen or Dr. Emily Chen: the woman; they give no name\n- id h5-m02: Existing patient who wants a flu shot with a specific doctor. Asked which Dr. Garcia they mean, Dr. Maria Garcia or Dr. Carlos Garcia, they answer: Carlos; they give only his first name. Fields: provider_phrase = how the caller names the doctor: Dr. Garcia, and that it is the family doctor (no first name); followup_provider_phrase = their answer when asked which Dr. Garcia they mean, Dr. Maria Garcia or Dr. Carlos Garcia: Carlos; they give only his first name\n- id h5-m03: Existing patient who wants a sick visit with a specific doctor. Asked which Dr. Chen they mean: Dr. Wei Chen, Dr. Michael Chen or Dr. Lucas Chen, they answer: the one who sees kids; they give no name. Fields: provider_phrase = how the caller names the doctor: Dr. Chen, and nothing else about the doctor (no first name); followup_provider_phrase = their answer when asked which Dr. Chen they mean: Dr. Wei Chen, Dr. Michael Chen or Dr. Lucas Chen: the one who sees kids; they give no name\n- id h5-m04: Existing patient who wants a annual physical with a specific doctor. Asked which Dr. Hernandez they mean, Dr. Tomas Hernandez or Dr. Patricia Hernandez, they answer: the nurse practitioner. Fields: provider_phrase = how the caller names the doctor: Dr. Hernandez, and nothing else about the doctor (no first name); followup_provider_phrase = their answer when asked which Dr. Hernandez they mean, Dr. Tomas Hernandez or Dr. Patricia Hernandez: the nurse practitioner\n- id h5-m05: Existing patient whose doctor ordered blood work. They do not say what it is for or whether they were told to fast. Asked whether it is a regular blood draw or a fasting blood test, they answer: the doctor told them not to eat anything after midnight before it; they do not say 'fasting'. Fields: service_phrase = what the caller says they need, in their own words; followup_service_phrase = their answer when asked whether it is a regular blood draw or a fasting blood test: the doctor told them not to eat anything after midnight before it; they do not say 'fasting'\n- id h5-m06: Existing dental patient who wants to book their regular visit with the dentist. They do not say whether it is a cleaning or an exam. Asked whether it is a cleaning or an exam, they answer: the cleaning. Fields: service_phrase = what the caller says they need, in their own words; followup_service_phrase = their answer when asked whether it is a cleaning or an exam: the cleaning\n- id h5-m07: Existing patient who sees a psychiatrist here regularly and wants to book their next usual appointment. They do not say what the appointment is for. Asked whether it is a therapy session or a medication check, they answer: the one where they go over their medication and get refills. Fields: service_phrase = what the caller says they need, in their own words; followup_service_phrase = their answer when asked whether it is a therapy session or a medication check: the one where they go over their medication and get refills\n- id h5-m08: Existing patient: a parent whose 10-year-old needs a physical and a form signed by the doctor. They do not say what the form is for. Asked whether the physical is for school or for sports, they answer: it is for the basketball team. Fields: service_phrase = what the caller says they need, in their own words; followup_service_phrase = their answer when asked whether the physical is for school or for sports: it is for the basketball team",
+ "response": "[\n  {\n    \"id\": \"h5-m01\",\n    \"provider_phrase\": \"Dr. Chen, the one at the Richmond clinic\",\n    \"followup_provider_phrase\": \"the woman\"\n  },\n  {\n    \"id\": \"h5-m02\",\n    \"provider_phrase\": \"Dr. Garcia, my family doctor\",\n    \"followup_provider_phrase\": \"Carlos\"\n  },\n  {\n    \"id\": \"h5-m03\",\n    \"provider_phrase\": \"Dr. Chen\",\n    \"followup_provider_phrase\": \"the one who sees kids\"\n  },\n  {\n    \"id\": \"h5-m04\",\n    \"provider_phrase\": \"Dr. Hernandez\",\n    \"followup_provider_phrase\": \"the nurse practitioner\"\n  },\n  {\n    \"id\": \"h5-m05\",\n    \"service_phrase\": \"my doctor ordered some blood work, I need to get that done\",\n    \"followup_service_phrase\": \"the doctor told me not to eat anything after midnight before it\"\n  },\n  {\n    \"id\": \"h5-m06\",\n    \"service_phrase\": \"just my regular visit with the dentist\",\n    \"followup_service_phrase\": \"the cleaning\"\n  },\n  {\n    \"id\": \"h5-m07\",\n    \"service_phrase\": \"my next usual appointment with my psychiatrist\",\n    \"followup_service_phrase\": \"the one where we go over my medication and get refills\"\n  },\n  {\n    \"id\": \"h5-m08\",\n    \"service_phrase\": \"my 10-year-old needs a physical and a form signed by the doctor\",\n    \"followup_service_phrase\": \"it's for the basketball team\"\n  }\n]\n",
+ "parsed": [
+  {
+   "id": "h5-m01",
+   "provider_phrase": "Dr. Chen, the one at the Richmond clinic",
+   "followup_provider_phrase": "the woman"
+  },
+  {
+   "id": "h5-m02",
+   "provider_phrase": "Dr. Garcia, my family doctor",
+   "followup_provider_phrase": "Carlos"
+  },
+  {
+   "id": "h5-m03",
+   "provider_phrase": "Dr. Chen",
+   "followup_provider_phrase": "the one who sees kids"
+  },
+  {
+   "id": "h5-m04",
+   "provider_phrase": "Dr. Hernandez",
+   "followup_provider_phrase": "the nurse practitioner"
+  },
+  {
+   "id": "h5-m05",
+   "service_phrase": "my doctor ordered some blood work, I need to get that done",
+   "followup_service_phrase": "the doctor told me not to eat anything after midnight before it"
+  },
+  {
+   "id": "h5-m06",
+   "service_phrase": "just my regular visit with the dentist",
+   "followup_service_phrase": "the cleaning"
+  },
+  {
+   "id": "h5-m07",
+   "service_phrase": "my next usual appointment with my psychiatrist",
+   "followup_service_phrase": "the one where we go over my medication and get refills"
+  },
+  {
+   "id": "h5-m08",
+   "service_phrase": "my 10-year-old needs a physical and a form signed by the doctor",
+   "followup_service_phrase": "it's for the basketball team"
+  }
+ ]
+}

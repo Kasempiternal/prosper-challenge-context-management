@@ -1,0 +1,20 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h5-10: Existing patient: a parent whose 6-year-old son has had a stomach ache and has thrown up twice since this morning, and they want a doctor to look at him. They say how old he is. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-20: Existing patient aged 70 who wants to book their 'AWV'. They say only 'AWV', do not spell it out and do not mention their insurance. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-m02: Existing patient who wants a flu shot with a specific doctor. Asked which Dr. Garcia they mean, Dr. Maria Garcia or Dr. Carlos Garcia, they answer: Carlos; they give only his first name. Fields: provider_phrase = how the caller names the doctor: Dr. Garcia, and that it is the family medicine doctor, said as a specialty, not 'my family doctor' (no first name); followup_provider_phrase = their answer when asked which Dr. Garcia they mean, Dr. Maria Garcia or Dr. Carlos Garcia: Carlos; they give only his first name",
+ "response": "```json\n[\n  {\n    \"id\": \"h5-10\",\n    \"service_phrase\": \"my son needs to be seen, he's 6, he's had a stomach ache and thrown up twice since this morning\"\n  },\n  {\n    \"id\": \"h5-20\",\n    \"service_phrase\": \"AWV\"\n  },\n  {\n    \"id\": \"h5-m02\",\n    \"provider_phrase\": \"Dr. Garcia, the family medicine doctor\",\n    \"followup_provider_phrase\": \"Carlos\"\n  }\n]\n```\n",
+ "parsed": [
+  {
+   "id": "h5-10",
+   "service_phrase": "my son needs to be seen, he's 6, he's had a stomach ache and thrown up twice since this morning"
+  },
+  {
+   "id": "h5-20",
+   "service_phrase": "AWV"
+  },
+  {
+   "id": "h5-m02",
+   "provider_phrase": "Dr. Garcia, the family medicine doctor",
+   "followup_provider_phrase": "Carlos"
+  }
+ ]
+}

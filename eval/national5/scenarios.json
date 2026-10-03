@@ -1,0 +1,2238 @@
+[
+ {
+  "id": "nat5-geo-01",
+  "category": "geo",
+  "kind": "city",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs a diagnostic mammogram their doctor ordered. They are in Miami, Florida.",
+  "fields": {
+   "service_phrase": "how the caller asks for a diagnostic mammogram their doctor ordered",
+   "location_phrase": "where they are: the caller names the city only (Miami)"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Miami"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_068",
+    "appt_216"
+   ],
+   "location_ids_subset": [
+    "loc_221",
+    "loc_223",
+    "loc_224",
+    "loc_226"
+   ]
+  },
+  "truth": {
+   "metro": "miami-fl"
+  }
+ },
+ {
+  "id": "nat5-geo-02",
+  "category": "geo",
+  "kind": "city",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs a TB skin test they need for work. They are in Philadelphia, Pennsylvania.",
+  "fields": {
+   "service_phrase": "how the caller asks for a TB skin test they need for work",
+   "location_phrase": "where they are: the caller names the city only (Philadelphia)"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Philadelphia"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_102"
+   ],
+   "location_ids_subset": [
+    "loc_257",
+    "loc_258",
+    "loc_259",
+    "loc_260",
+    "loc_261",
+    "loc_262",
+    "loc_263",
+    "loc_264"
+   ]
+  },
+  "truth": {
+   "metro": "philadelphia-pa"
+  }
+ },
+ {
+  "id": "nat5-geo-03",
+  "category": "geo",
+  "kind": "im_in",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs an MRI of their abdomen that their doctor ordered. They are in Las Vegas, Nevada.",
+  "fields": {
+   "service_phrase": "how the caller asks for an MRI of their abdomen that their doctor ordered",
+   "location_phrase": "where they are: the caller says they are in / live in the city (Las Vegas)"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Las Vegas"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_208"
+   ],
+   "location_ids_subset": [
+    "loc_076"
+   ]
+  },
+  "truth": {
+   "metro": "las-vegas-nv"
+  }
+ },
+ {
+  "id": "nat5-geo-04",
+  "category": "geo",
+  "kind": "im_in",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs a diagnostic mammogram their doctor ordered. They are in Fort Worth, Texas.",
+  "fields": {
+   "service_phrase": "how the caller asks for a diagnostic mammogram their doctor ordered",
+   "location_phrase": "where they are: the caller says they are in / live in the city (Fort Worth)"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Fort Worth"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_068",
+    "appt_216"
+   ],
+   "location_ids_subset": [
+    "loc_104"
+   ]
+  },
+  "truth": {
+   "metro": "fort-worth-tx"
+  }
+ },
+ {
+  "id": "nat5-geo-05",
+  "category": "geo",
+  "kind": "suburb_city",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs a diagnostic mammogram their doctor ordered. They live in Chula Vista, California (a suburb; do not mention the bigger nearby city).",
+  "fields": {
+   "service_phrase": "how the caller asks for a diagnostic mammogram their doctor ordered",
+   "location_phrase": "where they are: the town name Chula Vista"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Chula Vista"
+    ],
+    "must_not": [
+     "San Diego"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_068",
+    "appt_216"
+   ],
+   "location_ids_subset": [
+    "loc_038",
+    "loc_039"
+   ],
+   "max_miles": 25,
+   "anchor": [
+    32.6413,
+    -117.082
+   ]
+  },
+  "truth": {
+   "metro": "san-diego-ca"
+  }
+ },
+ {
+  "id": "nat5-geo-06",
+  "category": "geo",
+  "kind": "zip",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs an MRI of their abdomen that their doctor ordered. Their ZIP code is 44114.",
+  "fields": {
+   "service_phrase": "how the caller asks for an MRI of their abdomen that their doctor ordered",
+   "location_phrase": "where they are: the caller gives the ZIP code 44114"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "44114"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_208"
+   ],
+   "location_ids_subset": [
+    "loc_188",
+    "loc_190"
+   ],
+   "max_miles": 10,
+   "anchor": [
+    41.4834,
+    -81.7068
+   ]
+  },
+  "truth": {
+   "site": "loc_188"
+  }
+ },
+ {
+  "id": "nat5-geo-07",
+  "category": "geo",
+  "kind": "zip",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs a diagnostic mammogram their doctor ordered. Their ZIP code is 10028.",
+  "fields": {
+   "service_phrase": "how the caller asks for a diagnostic mammogram their doctor ordered",
+   "location_phrase": "where they are: the caller gives the ZIP code 10028"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "10028"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_068",
+    "appt_216"
+   ],
+   "location_ids_subset": [
+    "loc_265",
+    "loc_267",
+    "loc_270",
+    "loc_271",
+    "loc_272",
+    "loc_274",
+    "loc_275",
+    "loc_276",
+    "loc_278",
+    "loc_281",
+    "loc_282"
+   ],
+   "max_miles": 10,
+   "anchor": [
+    40.7453,
+    -73.979
+   ]
+  },
+  "truth": {
+   "site": "loc_265"
+  }
+ },
+ {
+  "id": "nat5-geo-08",
+  "category": "geo",
+  "kind": "zip3",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs an MRI of their abdomen that their doctor ordered. Their ZIP code is 90401.",
+  "fields": {
+   "service_phrase": "how the caller asks for an MRI of their abdomen that their doctor ordered",
+   "location_phrase": "where they are: the caller gives the ZIP code 90401"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "90401"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_208"
+   ],
+   "location_ids_subset": [
+    "loc_019",
+    "loc_023",
+    "loc_026",
+    "loc_028",
+    "loc_031",
+    "loc_032"
+   ]
+  },
+  "truth": {
+   "metro": "los-angeles-ca",
+   "zip3": "904"
+  }
+ },
+ {
+  "id": "nat5-geo-09",
+  "category": "geo",
+  "kind": "neighborhood",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs an emergency dental visit for a cracked tooth. They live in the Mueller neighborhood of Austin.",
+  "fields": {
+   "service_phrase": "how the caller asks for an emergency dental visit for a cracked tooth",
+   "location_phrase": "where they are: the neighborhood they are in: Mueller (do not name the city)"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Mueller"
+    ],
+    "must_not": [
+     "Austin",
+     "clinic",
+     "center"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_239"
+   ],
+   "location_ids_subset": [
+    "loc_122",
+    "loc_124"
+   ],
+   "max_miles": 10,
+   "anchor": [
+    30.2997,
+    -97.6966
+   ]
+  },
+  "truth": {
+   "site": "loc_124",
+   "site_valid": true
+  }
+ },
+ {
+  "id": "nat5-geo-10",
+  "category": "geo",
+  "kind": "neighborhood",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs a shingles shot. They live in the La Jolla neighborhood of San Diego.",
+  "fields": {
+   "service_phrase": "how the caller asks for a shingles shot",
+   "location_phrase": "where they are: the neighborhood they are in: La Jolla (do not name the city)"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "La Jolla"
+    ],
+    "must_not": [
+     "San Diego",
+     "clinic",
+     "center"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_010",
+    "appt_103"
+   ],
+   "location_ids_subset": [
+    "loc_036",
+    "loc_037",
+    "loc_039"
+   ],
+   "max_miles": 10,
+   "anchor": [
+    32.8316,
+    -117.2704
+   ]
+  },
+  "truth": {
+   "site": "loc_037",
+   "site_valid": true
+  }
+ },
+ {
+  "id": "nat5-geo-11",
+  "category": "geo",
+  "kind": "near_neighborhood",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs an MRI of their abdomen that their doctor ordered. They are near the Financial District neighborhood of New York (any clinic close by is fine).",
+  "fields": {
+   "service_phrase": "how the caller asks for an MRI of their abdomen that their doctor ordered",
+   "location_phrase": "where they are: that they are near / around Financial District (do not name the city)"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Financial District"
+    ],
+    "must_not": [
+     "New York",
+     "clinic",
+     "center"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_208"
+   ],
+   "location_ids_subset": [
+    "loc_265",
+    "loc_271",
+    "loc_275",
+    "loc_276"
+   ],
+   "max_miles": 10,
+   "anchor": [
+    40.7083,
+    -74.0143
+   ]
+  },
+  "truth": {
+   "site": "loc_272",
+   "site_valid": false
+  }
+ },
+ {
+  "id": "nat5-geo-12",
+  "category": "geo",
+  "kind": "near_neighborhood",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs an MRI of their abdomen that their doctor ordered. They are near the Adams Morgan neighborhood of Washington (any clinic close by is fine).",
+  "fields": {
+   "service_phrase": "how the caller asks for an MRI of their abdomen that their doctor ordered",
+   "location_phrase": "where they are: that they are near / around Adams Morgan (do not name the city)"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Adams Morgan"
+    ],
+    "must_not": [
+     "Washington",
+     "clinic",
+     "center"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_208"
+   ],
+   "location_ids_subset": [
+    "loc_246"
+   ],
+   "max_miles": 10,
+   "anchor": [
+    38.9187,
+    -77.037
+   ]
+  },
+  "truth": {
+   "site": "loc_248",
+   "site_valid": false
+  }
+ },
+ {
+  "id": "nat5-geo-13",
+  "category": "geo",
+  "kind": "state_only",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs a TB skin test they need for work. They only say which state they live in: Florida.",
+  "fields": {
+   "service_phrase": "how the caller asks for a TB skin test they need for work",
+   "location_phrase": "the state only: Florida (no city)"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Florida"
+    ],
+    "must_not": [
+     "Miami",
+     "Orlando",
+     "Tampa"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "ask",
+   "ask_field": "metro"
+  },
+  "truth": {
+   "state": "FL"
+  }
+ },
+ {
+  "id": "nat5-geo-14",
+  "category": "geo",
+  "kind": "far_place",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs an MRI of their abdomen that their doctor ordered. They live in Birmingham, Alabama.",
+  "fields": {
+   "service_phrase": "how the caller asks for an MRI of their abdomen that their doctor ordered",
+   "location_phrase": "where they are: Birmingham, Alabama (say both words)"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Birmingham",
+     "Alabama"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_reason": "none_nearby",
+   "location_ids_subset": [
+    "loc_197"
+   ]
+  },
+  "truth": {
+   "nearest_metro": "atlanta-ga",
+   "nearest_miles": 140
+  }
+ },
+ {
+  "id": "nat5-geo-15",
+  "category": "geo",
+  "kind": "misspelled_city",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs a diagnostic mammogram their doctor ordered. They are in Orlando.",
+  "fields": {
+   "service_phrase": "how the caller asks for a diagnostic mammogram their doctor ordered"
+  },
+  "fixed": {
+   "location_phrase": "Orlanda"
+  },
+  "checks": {},
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_068",
+    "appt_216"
+   ],
+   "location_ids_subset": [
+    "loc_237",
+    "loc_238",
+    "loc_240"
+   ]
+  },
+  "truth": {
+   "metro": "orlando-fl"
+  }
+ },
+ {
+  "id": "nat5-geo-16",
+  "category": "geo",
+  "kind": "misspelled_city",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs a diagnostic mammogram their doctor ordered. They are in Detroit.",
+  "fields": {
+   "service_phrase": "how the caller asks for a diagnostic mammogram their doctor ordered"
+  },
+  "fixed": {
+   "location_phrase": "Detroyt"
+  },
+  "checks": {},
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_068",
+    "appt_216"
+   ],
+   "location_ids_subset": [
+    "loc_164",
+    "loc_167",
+    "loc_168"
+   ]
+  },
+  "truth": {
+   "metro": "detroit-mi"
+  }
+ },
+ {
+  "id": "nat5-sym-01",
+  "category": "symptom",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (has any referral needed) who has had thick, red, scaly patches on both elbows and knees that flake and itch for months. They do not know which kind of doctor they need. They are in Los Angeles.",
+  "fields": {
+   "service_phrase": "the reason for the visit, described as the symptom in everyday words (no specialty or doctor type)",
+   "location_phrase": "the city: Los Angeles"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must_not": [
+     "dermatolog",
+     "psoriasis",
+     "eczema"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Los Angeles"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_026",
+    "appt_121"
+   ],
+   "location_ids_subset": [
+    "loc_020",
+    "loc_021",
+    "loc_024",
+    "loc_027",
+    "loc_030",
+    "loc_031",
+    "loc_032",
+    "loc_034"
+   ]
+  },
+  "truth": {
+   "metro": "los-angeles-ca"
+  }
+ },
+ {
+  "id": "nat5-sym-02",
+  "category": "symptom",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (has any referral needed) who has a lump at the front of the neck that moves up and down when swallowing. They do not know which kind of doctor they need. They are in Indianapolis.",
+  "fields": {
+   "service_phrase": "the reason for the visit, described as the symptom in everyday words (no specialty or doctor type)",
+   "location_phrase": "the city: Indianapolis"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must_not": [
+     "thyroid",
+     "endocrin",
+     "nodule"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Indianapolis"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_050",
+    "appt_056",
+    "appt_191",
+    "appt_304"
+   ],
+   "location_ids_subset": [
+    "loc_180"
+   ]
+  },
+  "truth": {
+   "metro": "indianapolis-in"
+  }
+ },
+ {
+  "id": "nat5-sym-03",
+  "category": "symptom",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (has any referral needed) who has had sharp, cramping pain in one side of the back that shoots toward the groin since last night. They do not know which kind of doctor they need. They are in Indianapolis.",
+  "fields": {
+   "service_phrase": "the reason for the visit, described as the symptom in everyday words (no specialty or doctor type)",
+   "location_phrase": "the city: Indianapolis"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must_not": [
+     "kidney stone",
+     "urolog"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Indianapolis"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_008",
+    "appt_077",
+    "appt_084",
+    "appt_244"
+   ],
+   "location_ids_subset": [
+    "loc_176",
+    "loc_177",
+    "loc_178",
+    "loc_179",
+    "loc_180"
+   ]
+  },
+  "truth": {
+   "metro": "indianapolis-in"
+  }
+ },
+ {
+  "id": "nat5-sym-04",
+  "category": "symptom",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (has any referral needed) who has felt exhausted and looked pale for weeks, gets winded on stairs, and a recent blood test showed a low blood count. They do not know which kind of doctor they need. They are in Chicago.",
+  "fields": {
+   "service_phrase": "the reason for the visit, described as the symptom in everyday words (no specialty or doctor type)",
+   "location_phrase": "the city: Chicago"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must_not": [
+     "anemi",
+     "hematolog",
+     "iron"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Chicago"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_273",
+    "appt_274"
+   ],
+   "location_ids_subset": [
+    "loc_150",
+    "loc_157",
+    "loc_159"
+   ]
+  },
+  "truth": {
+   "metro": "chicago-il"
+  }
+ },
+ {
+  "id": "nat5-sym-05",
+  "category": "symptom",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (has any referral needed) who has a 15-year-old daughter who barely eats, has lost a lot of weight and is obsessed with calories. They do not know which kind of doctor they need. They are in Philadelphia.",
+  "fields": {
+   "service_phrase": "the reason for the visit, described as the symptom in everyday words (no specialty or doctor type)",
+   "location_phrase": "the city: Philadelphia"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must_not": [
+     "eating disorder",
+     "anorexi",
+     "bulimi",
+     "psychiatr"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Philadelphia"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_203",
+    "appt_204"
+   ],
+   "location_ids_subset": [
+    "loc_256",
+    "loc_257",
+    "loc_258",
+    "loc_259",
+    "loc_261",
+    "loc_263"
+   ]
+  },
+  "truth": {
+   "metro": "philadelphia-pa"
+  }
+ },
+ {
+  "id": "nat5-sym-06",
+  "category": "symptom",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (has any referral needed) who has a newborn who has trouble latching during breastfeeding, and feeding hurts. They do not know which kind of doctor they need. They are in Tampa.",
+  "fields": {
+   "service_phrase": "the reason for the visit, described as the symptom in everyday words (no specialty or doctor type)",
+   "location_phrase": "the city: Tampa"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must_not": [
+     "lactation"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Tampa"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_110"
+   ],
+   "location_ids_subset": [
+    "loc_228",
+    "loc_229",
+    "loc_230",
+    "loc_231",
+    "loc_232",
+    "loc_233",
+    "loc_234"
+   ]
+  },
+  "truth": {
+   "metro": "tampa-fl"
+  }
+ },
+ {
+  "id": "nat5-sym-07",
+  "category": "symptom",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (has any referral needed) who leaks a little urine whenever they cough, sneeze or laugh. They do not know which kind of doctor they need. They are in Oakland.",
+  "fields": {
+   "service_phrase": "the reason for the visit, described as the symptom in everyday words (no specialty or doctor type)",
+   "location_phrase": "the city: Oakland"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must_not": [
+     "incontinence",
+     "urolog",
+     "pelvic floor"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Oakland"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_077",
+    "appt_226",
+    "appt_246"
+   ],
+   "location_ids_subset": [
+    "loc_008",
+    "loc_009",
+    "loc_010",
+    "loc_011",
+    "loc_012"
+   ]
+  },
+  "truth": {
+   "metro": "oakland-ca"
+  }
+ },
+ {
+  "id": "nat5-sym-08",
+  "category": "symptom",
+  "kind": "symptom",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (has any referral needed) who has a 15-year-old son who hit his head at football practice yesterday and has had a headache and felt foggy since. They do not know which kind of doctor they need. They are in Philadelphia.",
+  "fields": {
+   "service_phrase": "the reason for the visit, described as the symptom in everyday words (no specialty or doctor type)",
+   "location_phrase": "the city: Philadelphia"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must_not": [
+     "concussion"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Philadelphia"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_008",
+    "appt_017",
+    "appt_084",
+    "appt_143",
+    "appt_145"
+   ],
+   "location_ids_subset": [
+    "loc_256",
+    "loc_257",
+    "loc_258",
+    "loc_259",
+    "loc_260",
+    "loc_261",
+    "loc_262",
+    "loc_263",
+    "loc_264"
+   ]
+  },
+  "truth": {
+   "metro": "philadelphia-pa"
+  }
+ },
+ {
+  "id": "nat5-dup-01",
+  "category": "dup_name_metro",
+  "kind": "no_city",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants Travel Vaccination Consult with Dr. Scott Miller. They do not say where at first; asked which city, they answer Baltimore.",
+  "fields": {
+   "service_phrase": "the visit they want: Travel Vaccination Consult (said naturally)",
+   "provider_phrase": "the doctor's full name: Dr. Scott Miller",
+   "followup_location_phrase": "their answer to 'which city?': Baltimore"
+  },
+  "fixed": {},
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     "Scott",
+     "Miller"
+    ]
+   },
+   "followup_location_phrase": {
+    "must": [
+     "Baltimore"
+    ]
+   }
+  },
+  "expect_t1": {
+   "status": "ask",
+   "ask_field": "metro"
+  },
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_013"
+   ],
+   "location_ids_subset": [
+    "loc_295"
+   ],
+   "provider_ids": [
+    "prov_4953"
+   ]
+  },
+  "truth": {
+   "namesakes": {
+    "baltimore-md": [
+     "prov_4953"
+    ],
+    "washington-dc": [
+     "prov_4119"
+    ]
+   }
+  }
+ },
+ {
+  "id": "nat5-dup-02",
+  "category": "dup_name_metro",
+  "kind": "no_city",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants Urinary Incontinence Evaluation with Dr. James Caskey. They do not say where at first; asked which city, they answer New York.",
+  "fields": {
+   "service_phrase": "the visit they want: Urinary Incontinence Evaluation (said naturally)",
+   "provider_phrase": "the doctor's full name: Dr. James Caskey",
+   "followup_location_phrase": "their answer to 'which city?': New York"
+  },
+  "fixed": {},
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     "James",
+     "Caskey"
+    ]
+   },
+   "followup_location_phrase": {
+    "must": [
+     "New York"
+    ]
+   }
+  },
+  "expect_t1": {
+   "status": "ask",
+   "ask_field": "metro"
+  },
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_246"
+   ],
+   "location_ids_subset": [
+    "loc_266",
+    "loc_268",
+    "loc_269"
+   ],
+   "provider_ids": [
+    "prov_4455"
+   ]
+  },
+  "truth": {
+   "namesakes": {
+    "houston-tx": [
+     "prov_1925"
+    ],
+    "new-york-ny": [
+     "prov_4455"
+    ]
+   }
+  }
+ },
+ {
+  "id": "nat5-dup-03",
+  "category": "dup_name_metro",
+  "kind": "no_city",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants COVID-19 Vaccine with Dr. Michael Williams. They do not say where at first; asked which city, they answer Boston.",
+  "fields": {
+   "service_phrase": "the visit they want: COVID-19 Vaccine (said naturally)",
+   "provider_phrase": "the doctor's full name: Dr. Michael Williams",
+   "followup_location_phrase": "their answer to 'which city?': Boston"
+  },
+  "fixed": {},
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     "Michael",
+     "Williams"
+    ]
+   },
+   "followup_location_phrase": {
+    "must": [
+     "Boston"
+    ]
+   }
+  },
+  "expect_t1": {
+   "status": "ask",
+   "ask_field": "metro"
+  },
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_012"
+   ],
+   "location_ids_subset": [
+    "loc_283"
+   ],
+   "provider_ids": [
+    "prov_4748"
+   ]
+  },
+  "truth": {
+   "namesakes": {
+    "boston-ma": [
+     "prov_4748"
+    ],
+    "washington-dc": [
+     "prov_4249"
+    ]
+   }
+  }
+ },
+ {
+  "id": "nat5-dup-04",
+  "category": "dup_name_metro",
+  "kind": "with_city",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants EEG with Dr. Priya Shenoy, their doctor in Nashville.",
+  "fields": {
+   "service_phrase": "the visit they want: EEG (said naturally)",
+   "provider_phrase": "the doctor's full name: Dr. Priya Shenoy",
+   "location_phrase": "the city: Nashville"
+  },
+  "fixed": {},
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     "Priya",
+     "Shenoy"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Nashville"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_037"
+   ],
+   "location_ids_subset": [
+    "loc_193"
+   ],
+   "provider_ids": [
+    "prov_3266"
+   ]
+  },
+  "truth": {
+   "namesakes": {
+    "houston-tx": [
+     "prov_1865"
+    ],
+    "nashville-tn": [
+     "prov_3266"
+    ]
+   }
+  }
+ },
+ {
+  "id": "nat5-dup-05",
+  "category": "dup_name_metro",
+  "kind": "with_city",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants Pacemaker Check with Dr. Craig Thomas, their doctor in Houston.",
+  "fields": {
+   "service_phrase": "the visit they want: Pacemaker Check (said naturally)",
+   "provider_phrase": "the doctor's full name: Dr. Craig Thomas",
+   "location_phrase": "the city: Houston"
+  },
+  "fixed": {},
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     "Craig",
+     "Thomas"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Houston"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_025"
+   ],
+   "location_ids_subset": [
+    "loc_109"
+   ],
+   "provider_ids": [
+    "prov_1793"
+   ]
+  },
+  "truth": {
+   "namesakes": {
+    "houston-tx": [
+     "prov_1793"
+    ],
+    "st-paul-mn": [
+     "prov_2443"
+    ]
+   }
+  }
+ },
+ {
+  "id": "nat5-dup-06",
+  "category": "dup_name_metro",
+  "kind": "with_city",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants Chronic Back Pain Evaluation with Dr. Michael Johnson, their doctor in Oakland.",
+  "fields": {
+   "service_phrase": "the visit they want: Chronic Back Pain Evaluation (said naturally)",
+   "provider_phrase": "the doctor's full name: Dr. Michael Johnson",
+   "location_phrase": "the city: Oakland"
+  },
+  "fixed": {},
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     "Michael",
+     "Johnson"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Oakland"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_279"
+   ],
+   "location_ids_subset": [
+    "loc_009"
+   ],
+   "provider_ids": [
+    "prov_186"
+   ]
+  },
+  "truth": {
+   "namesakes": {
+    "oakland-ca": [
+     "prov_186"
+    ],
+    "portland-or": [
+     "prov_1029"
+    ]
+   }
+  }
+ },
+ {
+  "id": "nat5-cap-01",
+  "category": "capability_metro",
+  "kind": "gated_offer",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (with a referral) who needs Nerve Block. They are in St. Louis.",
+  "fields": {
+   "service_phrase": "the service: Nerve Block (said naturally)",
+   "location_phrase": "the city: St. Louis"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "St. Louis"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_281"
+   ],
+   "location_ids_subset": [
+    "loc_173"
+   ]
+  },
+  "truth": {
+   "metro": "st-louis-mo",
+   "capability": "imaging"
+  }
+ },
+ {
+  "id": "nat5-cap-02",
+  "category": "capability_metro",
+  "kind": "gated_offer",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (with a referral) who needs Cystoscopy. They are in San Jose.",
+  "fields": {
+   "service_phrase": "the service: Cystoscopy (said naturally)",
+   "location_phrase": "the city: San Jose"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "San Jose"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_247"
+   ],
+   "location_ids_subset": [
+    "loc_014"
+   ]
+  },
+  "truth": {
+   "metro": "san-jose-ca",
+   "capability": "surgery"
+  }
+ },
+ {
+  "id": "nat5-cap-03",
+  "category": "capability_metro",
+  "kind": "gated_offer",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (with a referral) who needs Prenatal Ultrasound. They are in Sacramento.",
+  "fields": {
+   "service_phrase": "the service: Prenatal Ultrasound (said naturally)",
+   "location_phrase": "the city: Sacramento"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Sacramento"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_156"
+   ],
+   "location_ids_subset": [
+    "loc_046"
+   ]
+  },
+  "truth": {
+   "metro": "sacramento-ca",
+   "capability": "imaging"
+  }
+ },
+ {
+  "id": "nat5-cap-04",
+  "category": "capability_metro",
+  "kind": "metro_only_service",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs a dry eye evaluation. They are in New York.",
+  "fields": {
+   "service_phrase": "how the caller asks for a dry eye evaluation",
+   "location_phrase": "the city: New York"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "New York"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_170"
+   ],
+   "location_ids_subset": [
+    "loc_271",
+    "loc_274",
+    "loc_279",
+    "loc_281"
+   ]
+  },
+  "truth": {
+   "metro": "new-york-ny",
+   "eye_metros": [
+    "boston-ma",
+    "houston-tx",
+    "new-york-ny"
+   ]
+  }
+ },
+ {
+  "id": "nat5-cap-05",
+  "category": "capability_metro",
+  "kind": "named_site_lacks_capability",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (with a referral) who needs Nerve Block and insists on going to the clinic called Newton Specialty Center in Newton, which they always use.",
+  "fields": {
+   "service_phrase": "the service: Nerve Block (said naturally)",
+   "location_phrase": "that specific clinic by name: Newton Specialty Center (not 'near' it)"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Newton"
+    ],
+    "must_not": [
+     "near",
+     "around",
+     "close to"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_reason": "location_type",
+   "location_ids_subset": [
+    "loc_284",
+    "loc_290"
+   ]
+  },
+  "truth": {
+   "site": "loc_292",
+   "capability": "imaging"
+  }
+ },
+ {
+  "id": "nat5-new-01",
+  "category": "new_patient",
+  "kind": "accepting_only",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A brand-new patient who has never been seen at these clinics needs Hearing Aid Evaluation. They are in Austin.",
+  "fields": {
+   "service_phrase": "the service: Hearing Aid Evaluation (said naturally)",
+   "location_phrase": "the city: Austin"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Austin"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_176"
+   ],
+   "location_ids_subset": [
+    "loc_119",
+    "loc_120",
+    "loc_125"
+   ],
+   "provider_ids": [
+    "prov_2100"
+   ]
+  },
+  "truth": {
+   "metro": "austin-tx"
+  }
+ },
+ {
+  "id": "nat5-new-02",
+  "category": "new_patient",
+  "kind": "accepting_only",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A brand-new patient who has never been seen at these clinics needs Pelvic Pain Evaluation. They are in Columbus.",
+  "fields": {
+   "service_phrase": "the service: Pelvic Pain Evaluation (said naturally)",
+   "location_phrase": "the city: Columbus"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Columbus"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_162"
+   ],
+   "location_ids_subset": [
+    "loc_181",
+    "loc_182",
+    "loc_184",
+    "loc_185"
+   ],
+   "provider_ids": [
+    "prov_3052",
+    "prov_3080",
+    "prov_3098"
+   ]
+  },
+  "truth": {
+   "metro": "columbus-oh"
+  }
+ },
+ {
+  "id": "nat5-new-03",
+  "category": "new_patient",
+  "kind": "provider_not_accepting",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A brand-new patient wants Annual Well-Woman Exam with Dr. Kristie Tull in Las Vegas (a friend recommended this doctor).",
+  "fields": {
+   "service_phrase": "the service: Annual Well-Woman Exam (said naturally)",
+   "provider_phrase": "the doctor's full name: Dr. Kristie Tull",
+   "location_phrase": "the city: Las Vegas"
+  },
+  "fixed": {},
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     "Kristie",
+     "Tull"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Las Vegas"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_reason": "new_patient_provider"
+  },
+  "truth": {
+   "provider": "prov_1228",
+   "type": "appt_041"
+  }
+ },
+ {
+  "id": "nat5-new-04",
+  "category": "new_patient",
+  "kind": "provider_not_accepting",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A brand-new patient wants Annual Physical with Dr. Marcel Seligman in Dallas (a friend recommended this doctor).",
+  "fields": {
+   "service_phrase": "the service: Annual Physical (said naturally)",
+   "provider_phrase": "the doctor's full name: Dr. Marcel Seligman",
+   "location_phrase": "the city: Dallas"
+  },
+  "fixed": {},
+  "checks": {
+   "provider_phrase": {
+    "must": [
+     "Marcel",
+     "Seligman"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Dallas"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_reason": "new_patient_provider"
+  },
+  "truth": {
+   "provider": "prov_1651",
+   "type": "appt_002"
+  }
+ },
+ {
+  "id": "nat5-new-05",
+  "category": "new_patient",
+  "kind": "type_not_for_new",
+  "patient": {
+   "is_new": true,
+   "has_referral": true
+  },
+  "situation": "A brand-new patient who has never been seen here wants Occupational Therapy Session. They are in Washington, DC.",
+  "fields": {
+   "service_phrase": "the service: Occupational Therapy Session (said naturally)",
+   "location_phrase": "the city: Washington, DC"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Washington"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_reason": "new_patient_type"
+  },
+  "truth": {
+   "type": "appt_224"
+  }
+ },
+ {
+  "id": "nat5-noloc-01",
+  "category": "no_location",
+  "kind": "no_location",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs a shingles shot. They do not say where they are at first; asked which city, they answer Indianapolis.",
+  "fields": {
+   "service_phrase": "how the caller asks for a shingles shot",
+   "followup_location_phrase": "their answer to 'which city?': Indianapolis"
+  },
+  "fixed": {},
+  "checks": {
+   "followup_location_phrase": {
+    "must": [
+     "Indianapolis"
+    ]
+   }
+  },
+  "expect_t1": {
+   "status": "ask",
+   "ask_field": "metro"
+  },
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_010",
+    "appt_103"
+   ],
+   "location_ids_subset": [
+    "loc_176",
+    "loc_177",
+    "loc_178",
+    "loc_179",
+    "loc_180"
+   ]
+  },
+  "truth": {
+   "metro": "indianapolis-in"
+  }
+ },
+ {
+  "id": "nat5-noloc-02",
+  "category": "no_location",
+  "kind": "no_location",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs ear wax removal. They do not say where they are at first; asked which city, they answer Houston.",
+  "fields": {
+   "service_phrase": "how the caller asks for ear wax removal",
+   "followup_location_phrase": "their answer to 'which city?': Houston"
+  },
+  "fixed": {},
+  "checks": {
+   "followup_location_phrase": {
+    "must": [
+     "Houston"
+    ]
+   }
+  },
+  "expect_t1": {
+   "status": "ask",
+   "ask_field": "metro"
+  },
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_101",
+    "appt_174"
+   ],
+   "location_ids_subset": [
+    "loc_107",
+    "loc_108",
+    "loc_109",
+    "loc_110",
+    "loc_111",
+    "loc_112",
+    "loc_113",
+    "loc_114",
+    "loc_115",
+    "loc_116",
+    "loc_117",
+    "loc_118"
+   ]
+  },
+  "truth": {
+   "metro": "houston-tx"
+  }
+ },
+ {
+  "id": "nat5-noloc-03",
+  "category": "no_location",
+  "kind": "no_location",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs a TB skin test they need for work. They do not say where they are at first; asked which city, they answer Tampa.",
+  "fields": {
+   "service_phrase": "how the caller asks for a TB skin test they need for work",
+   "followup_location_phrase": "their answer to 'which city?': Tampa"
+  },
+  "fixed": {},
+  "checks": {
+   "followup_location_phrase": {
+    "must": [
+     "Tampa"
+    ]
+   }
+  },
+  "expect_t1": {
+   "status": "ask",
+   "ask_field": "metro"
+  },
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_102"
+   ],
+   "location_ids_subset": [
+    "loc_228",
+    "loc_229",
+    "loc_230",
+    "loc_231",
+    "loc_232",
+    "loc_233",
+    "loc_234"
+   ]
+  },
+  "truth": {
+   "metro": "tampa-fl"
+  }
+ },
+ {
+  "id": "nat5-unoff-01",
+  "category": "unoffered",
+  "kind": "unoffered",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants overnight sleep study. They are in San Diego.",
+  "fields": {
+   "service_phrase": "the service: overnight sleep study (said naturally)",
+   "location_phrase": "the city: San Diego"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "San Diego"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_reason": "not_offered"
+  },
+  "truth": {
+   "type": "appt_254"
+  }
+ },
+ {
+  "id": "nat5-unoff-02",
+  "category": "unoffered",
+  "kind": "unoffered",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who wants hair transplant consultation. They are in Oakland.",
+  "fields": {
+   "service_phrase": "the service: hair transplant consultation (said naturally)",
+   "location_phrase": "the city: Oakland"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Oakland"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_reason": "not_offered"
+  },
+  "truth": {
+   "type": "appt_131"
+  }
+ },
+ {
+  "id": "nat5-ring-01",
+  "category": "ring",
+  "kind": "none_nearby",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs nerve block (has any referral needed). They are in St. Paul.",
+  "fields": {
+   "service_phrase": "the service: nerve block (said naturally)",
+   "location_phrase": "the city: St. Paul"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "St. Paul"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "refuse",
+   "refuse_reason": "none_nearby",
+   "location_ids_subset": [
+    "loc_173"
+   ]
+  },
+  "truth": {
+   "metro": "st-paul-mn",
+   "nearest_metro": "st-louis-mo",
+   "nearest_miles": 463
+  }
+ },
+ {
+  "id": "nat5-gen-01",
+  "category": "general_variant",
+  "kind": "general_variant",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (with a referral) who needs a CT scan of their head that their doctor ordered. They are in Raleigh.",
+  "fields": {
+   "service_phrase": "how the caller asks for a CT scan of their head that their doctor ordered",
+   "location_phrase": "the city: Raleigh"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     "head"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Raleigh"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_066"
+   ],
+   "location_ids_subset": [
+    "loc_213"
+   ]
+  },
+  "truth": {
+   "metro": "raleigh-nc",
+   "type": "appt_209",
+   "general": "appt_066",
+   "nearest_specific_miles": 122
+  }
+ },
+ {
+  "id": "nat5-gen-02",
+  "category": "general_variant",
+  "kind": "general_variant",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (with a referral) who needs a breast ultrasound that their doctor ordered. They are in Las Vegas.",
+  "fields": {
+   "service_phrase": "how the caller asks for a breast ultrasound that their doctor ordered",
+   "location_phrase": "the city: Las Vegas"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     "breast"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Las Vegas"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_067"
+   ],
+   "location_ids_subset": [
+    "loc_076"
+   ]
+  },
+  "truth": {
+   "metro": "las-vegas-nv",
+   "type": "appt_215",
+   "general": "appt_067",
+   "nearest_specific_miles": 225
+  }
+ },
+ {
+  "id": "nat5-gen-03",
+  "category": "general_variant",
+  "kind": "general_variant",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient (with a referral) who needs a CT scan of their chest that their doctor ordered. They are in Indianapolis.",
+  "fields": {
+   "service_phrase": "how the caller asks for a CT scan of their chest that their doctor ordered",
+   "location_phrase": "the city: Indianapolis"
+  },
+  "fixed": {},
+  "checks": {
+   "service_phrase": {
+    "must": [
+     "chest"
+    ]
+   },
+   "location_phrase": {
+    "must": [
+     "Indianapolis"
+    ]
+   }
+  },
+  "expect_t1": null,
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_066"
+   ],
+   "location_ids_subset": [
+    "loc_177",
+    "loc_180"
+   ]
+  },
+  "truth": {
+   "metro": "indianapolis-in",
+   "type": "appt_210",
+   "general": "appt_066",
+   "nearest_specific_miles": 168
+  }
+ },
+ {
+  "id": "nat5-geo-17",
+  "category": "geo",
+  "kind": "either_or",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs ear wax removal. They live in Glendale, Arizona. In the first sentence they only say the town name; when asked which one, they say the state.",
+  "fields": {
+   "service_phrase": "how the caller asks for ear wax removal",
+   "location_phrase": "the town name Glendale only (no state, no bigger city)",
+   "followup_location_phrase": "their answer to 'which Glendale?': the state Arizona"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Glendale"
+    ],
+    "must_not": [
+     "Arizona",
+     "California",
+     "Los Angeles",
+     "Phoenix"
+    ]
+   },
+   "followup_location_phrase": {
+    "must": [
+     "Arizona"
+    ]
+   }
+  },
+  "expect_t1": {
+   "status": "ask",
+   "ask_field": "metro"
+  },
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_101",
+    "appt_174"
+   ],
+   "location_ids_subset": [
+    "loc_062",
+    "loc_063",
+    "loc_064",
+    "loc_065",
+    "loc_066",
+    "loc_067",
+    "loc_068",
+    "loc_069",
+    "loc_070",
+    "loc_071"
+   ],
+   "max_miles": 25,
+   "anchor": [
+    33.5371,
+    -112.1814
+   ]
+  },
+  "truth": {
+   "metros": [
+    "los-angeles-ca",
+    "phoenix-az"
+   ],
+   "chosen": "phoenix-az"
+  }
+ },
+ {
+  "id": "nat5-geo-18",
+  "category": "geo",
+  "kind": "either_or",
+  "patient": {
+   "is_new": false,
+   "has_referral": true
+  },
+  "situation": "Existing patient who needs an emergency dental visit for a cracked tooth. They live in Pasadena, California. In the first sentence they only say the town name; when asked which one, they say the state.",
+  "fields": {
+   "service_phrase": "how the caller asks for an emergency dental visit for a cracked tooth",
+   "location_phrase": "the town name Pasadena only (no state, no bigger city)",
+   "followup_location_phrase": "their answer to 'which Pasadena?': the state California"
+  },
+  "fixed": {},
+  "checks": {
+   "location_phrase": {
+    "must": [
+     "Pasadena"
+    ],
+    "must_not": [
+     "California",
+     "Texas",
+     "Houston",
+     "Los Angeles"
+    ]
+   },
+   "followup_location_phrase": {
+    "must": [
+     "California"
+    ]
+   }
+  },
+  "expect_t1": {
+   "status": "ask",
+   "ask_field": "metro"
+  },
+  "expected": {
+   "status": "offer",
+   "types_any": [
+    "appt_239"
+   ],
+   "location_ids_subset": [
+    "loc_021",
+    "loc_023",
+    "loc_028",
+    "loc_034"
+   ],
+   "max_miles": 25,
+   "anchor": [
+    34.1431,
+    -118.1546
+   ]
+  },
+  "truth": {
+   "metros": [
+    "houston-tx",
+    "los-angeles-ca"
+   ],
+   "chosen": "los-angeles-ca"
+  }
+ }
+]

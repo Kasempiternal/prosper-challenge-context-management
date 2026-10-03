@@ -1,4 +1,4 @@
-"""Author the SF held-out sets (eval/cases_heldout3.jsonl, eval/cases_heldout4.jsonl) from the SF
+"""Author the SF held-out sets (eval/cases_heldout3.jsonl .. eval/cases_heldout5.jsonl) from the SF
 catalog, blind to the resolver and its results.
 
 The target comes first: each scenario names a catalog appointment type (or the types a scheduler would
@@ -6,7 +6,7 @@ have to ask between) and the patient. Expectations come only from catalog querie
 rules in backend/data/README.md). DeepSeek then writes the caller's words from plain-language facts;
 it never sees type names it should echo, aliases, resolver code or the expected answer.
 
-  python eval/heldout3/build_cases.py [--set heldout3|heldout4] scenarios          # -> eval/<set>/scenarios.json
+  python eval/heldout3/build_cases.py [--set heldout3|heldout4|heldout5] scenarios # -> eval/<set>/scenarios.json
   python eval/heldout3/build_cases.py [--set ...] phrase             # DeepSeek via cmdc -> eval/<set>/deepseek_raw/*.json
   python eval/heldout3/build_cases.py [--set ...] repair ID,ID [tag] # re-ask DeepSeek for drifted phrasings
   python eval/heldout3/build_cases.py [--set ...] merge              # scenarios + phrasings -> eval/cases_<set>.jsonl
@@ -504,6 +504,256 @@ PICKS4 = [
          "service_phrase", "appt_055", (("throat", "mouth"),), ("colon*", "below", "bottom")),
 ]
 
+# ---------------- heldout5: round 5, authored blind; adds symptoms whose body part points to the wrong
+# specialty (symptom_misdirect) and acute symptoms with their onset (acute) ----------------
+NP = ("nurse practitioner", "np", "n.p.")
+FEMALE = ("she", "her", "woman", "lady", "female")
+MALE = ("he", "him", "his", "man", "male", "guy", "gentleman")
+
+NEEDS5 = [
+    # ---- named tests, in lay words ----
+    Need("h5-01", "heldout5_type", "test", ("appt_021",), EXISTING,
+         f"Existing patient whose heart doctor ordered a moving picture of their heart made with sound waves, "
+         f"where gel goes on the chest and a wand is moved over it. {LAY}", must=(("heart",),),
+         must_not=("echo*", "cardiogram")),
+    Need("h5-02", "heldout5_type", "test", ("appt_023",), EXISTING,
+         f"Existing patient whose doctor wants the quick test where about a dozen sticky pads go on the chest, "
+         f"arms and legs and the heartbeat is printed out on paper; it takes a few minutes. {LAY}",
+         must_not=("ekg", "ecg", "electro*", "holter", "monitor")),
+    Need("h5-03", "heldout5_type", "test", ("appt_063",), EXISTING,
+         f"Existing patient whose doctor ordered pictures of their brain, taken while they lie still inside a "
+         f"long, loud tube for about forty minutes. {LAY}", must=(("brain", "head"),),
+         must_not=("mri", "magnet*", "ct", "cat")),
+    # ---- symptoms ----
+    Need("h5-04", "heldout5_type", "symptom", ("appt_039",), EXISTING,
+         f"Existing patient: an adult child calling for their 78-year-old mother, who keeps forgetting recent "
+         f"conversations and got lost driving home from the grocery store; her regular doctor wants a "
+         f"specialist to check her. {LAY}",
+         must_not=("memory", "dementia", "alzheimer*", "neuro*", "cognitive")),
+    Need("h5-05", "heldout5_type", "symptom", ("appt_026",), EXISTING,
+         f"Existing patient whose hair has been coming out in clumps in the shower for two months, leaving bald "
+         f"patches; their regular doctor wants them to see a specialist about it. {LAY}",
+         must_not=("derm*", "alopecia")),
+    # ---- the body part named points to a different specialty ----
+    Need("h5-06", "heldout5_type", "symptom_misdirect", ("appt_080",), EXISTING,
+         f"Existing patient whose eyes itch, burn and water every time the pollen count is high or they visit "
+         f"their sister's cat. Their regular doctor says the eyes themselves are healthy, that it is a reaction "
+         f"to the pollen and the cat, and wants them to see a specialist for that. {LAY}",
+         must=(("eye*",),), must_not=("allerg*", "immun*", "hay fever")),
+    Need("h5-07", "heldout5_type", "symptom_misdirect", ("appt_026",), EXISTING,
+         f"Existing patient who has had thick, red, scaly patches on both elbows and knees that flake and itch "
+         f"for months; their regular doctor wants them to see a specialist. {LAY}",
+         must=(("elbow*", "knee*"),),
+         must_not=("derm*", "psoriasis", "eczema", "skin doctor", "skin specialist")),
+    Need("h5-08", "heldout5_type", "symptom_misdirect", ("appt_053",), EXISTING,
+         f"Existing patient who has had a burning pain in the middle of the chest after big meals and when lying "
+         f"down at night for two months. Their regular doctor checked their heart, found it healthy, says the "
+         f"problem is in their digestion and wants a specialist to look into it. {LAY}",
+         must=(("chest",),),
+         must_not=("heartburn", "acid", "reflux", "gerd", "gastro*", "gi", "stomach doctor")),
+    Need("h5-09", "heldout5_type", "symptom_misdirect", ("appt_020",), EXISTING,
+         f"Existing patient whose ankles swell up every evening and who gets out of breath lying flat in bed; "
+         f"their regular doctor listened to their heart and wants a specialist to check it. {LAY}",
+         must=(("ankle*",), ("heart",)), must_not=("cardio*", "heart doctor", "heart specialist")),
+    # ---- acute symptoms, with their onset ----
+    Need("h5-10", "heldout5_type", "acute", ("appt_017",), EXISTING,
+         f"Existing patient: a parent whose 6-year-old son has had a stomach ache and has thrown up twice since "
+         f"this morning, and they want a doctor to look at him. They say how old he is. {LAY}",
+         must=(("morning",), ("stomach", "tummy", "belly"), ("6", "six")),
+         must_not=("pediatric*", "sick visit", "urgent*")),
+    Need("h5-11", "heldout5_type", "acute", ("appt_008",), EXISTING,
+         f"Existing patient who rolled their ankle stepping off a curb about an hour ago; it is swollen, they "
+         f"can barely put weight on it, and they want to be seen today. {LAY}",
+         must=(("ankle",), ("hour*", "today")), must_not=("urgent*", "sprain*", "x-ray*", "ortho*")),
+    Need("h5-12", "heldout5_type", "acute", ("appt_007",), EXISTING,
+         f"Existing patient who woke up this morning with one eye red, goopy and crusted shut, and wants to see "
+         f"their regular doctor in the next day or so. {LAY}",
+         must=(("eye",), ("morning", "today", "woke")),
+         must_not=("pink eye", "pinkeye", "conjunctivitis", "sick visit", "urgent*")),
+    Need("h5-13", "heldout5_type", "acute", ("appt_075",), EXISTING,
+         f"Existing dental patient who has had a throbbing toothache in a back tooth since Sunday, and the "
+         f"cheek on that side is getting puffy. {LAY}", must=(("tooth", "toothache", "teeth", "molar"),),
+         must_not=("dental", "exam", "cleaning", "emergency")),
+    # ---- everyday descriptions of a visit ----
+    Need("h5-14", "heldout5_type", "colloquial", ("appt_010",), EXISTING,
+         "Existing patient in their sixties who wants the shot that prevents shingles; they say 'shingles'.",
+         must=(("shingles",),), must_not=("vaccin*", "immuniz*")),
+    Need("h5-15", "heldout5_type", "colloquial", ("appt_035",), EXISTING,
+         "Existing patient who is having a hip replacement next month and needs the sit-down with the bone "
+         "surgeon here to go over the operation beforehand.", must=(("hip",),),
+         must_not=("pre-surg*", "presurg*", "pre-op*", "preop*", "consult*", "ortho*")),
+    Need("h5-16", "heldout5_type", "colloquial", ("appt_054",), EXISTING,
+         "Existing patient who just turned 45; their regular doctor said it is time for the colon cancer "
+         "screening where they look inside the bowel, and they need to set it up with the stomach doctor.",
+         must_not=("colonoscop*", "scope", "endoscop*")),
+    Need("h5-17", "heldout5_type", "colloquial", ("appt_078",), EXISTING,
+         "Existing patient whose chest X-ray showed a spot on their lung; their regular doctor wants them to see "
+         "the lung specialist about it.", must=(("lung*",),), must_not=("pulmon*",)),
+    # ---- abbreviations and slang ----
+    Need("h5-18", "heldout5_type", "abbreviation", ("appt_079",), EXISTING,
+         "Existing patient whose lung doctor ordered a 'PFT'; they say 'PFT'.", must=(("pft",),),
+         must_not=("spirometr*", "lung function", "pulmonary function", "breathing test")),
+    Need("h5-19", "heldout5_type", "abbreviation", ("appt_055",), EXISTING,
+         "Existing patient whose stomach doctor wants to do an 'EGD'; they say 'EGD'.", must=(("egd",),),
+         must_not=("endoscop*", "scope", "camera")),
+    Need("h5-20", "heldout5_type", "abbreviation", ("appt_003",), EXISTING,
+         "Existing patient aged 70 who wants to book their 'AWV'. They say only 'AWV', do not spell it out and do "
+         "not mention their insurance.",
+         must=(("awv",),), must_not=("wellness", "medicare", "annual")),
+    Need("h5-21", "heldout5_type", "slang", ("appt_058",), EXISTING,
+         "Existing patient who takes Synthroid and sees the specialist here to keep the dose right; they are "
+         "due for the regular check, call it 'my Synthroid check' and never name the gland.",
+         must=(("synthroid",),), must_not=("thyroid", "endocrin*", "hormone*")),
+    Need("h5-22", "heldout5_type", "slang", ("appt_059",), EXISTING,
+         "Existing patient who has never seen a psychiatrist and wants a first appointment with one to figure "
+         "out what is going on with their mood; they call a psychiatrist a 'shrink'.", must=(("shrink",),),
+         must_not=("psychiatr*", "evaluat*", "therap*", "counsel*")),
+    Need("h5-23", "heldout5_type", "slang", ("appt_012",), EXISTING,
+         "Existing patient who wants the latest Moderna booster; they say 'Moderna' and do not name the disease.",
+         must=(("moderna",),), must_not=("covid", "corona*", "vaccin*")),
+    # ---- two types genuinely fit: a scheduler asks ----
+    Need("h5-24", "heldout5_type", "ask_two", ("appt_010", "appt_012"), EXISTING,
+         "Existing patient who says they are due for 'a booster shot'. They do not say what it protects against.",
+         must=(("booster",),),
+         must_not=("covid", "corona*", "tetanus", "tdap", "flu", "shingles", "moderna", "pfizer", "whooping",
+                   "pneumo*")),
+    Need("h5-25", "heldout5_type", "ask_two", ("appt_057", "appt_058"), EXISTING,
+         "Existing patient who sees the hormone specialist here regularly and wants to book their usual "
+         "follow-up. They do not say what it is for.", must=(("hormone*", "endocrin*", "gland*"),),
+         must_not=("sugar", "diabet*", "thyroid", "insulin", "a1c", "synthroid", "first", "new", "consult*")),
+    Need("h5-26", "heldout5_type", "ask_two", ("appt_064", "appt_066"), EXISTING,
+         "Existing patient whose doctor ordered a scan of their lower back. They do not know what kind of scan it "
+         "is and do not name one.", must=(("back",),),
+         must_not=("mri", "ct", "cat", "magnet*", "x-ray*", "xray*")),
+    Need("h5-27", "heldout5_type", "ask_two", ("appt_067", "appt_068"), EXISTING,
+         "Existing patient who found a lump in her breast; her doctor ordered imaging of the breast, but she "
+         "does not know which kind and does not name one.", must=(("breast",),),
+         must_not=("mammo*", "ultrasound", "sonogram", "mri", "x-ray*")),
+    # ---- nobody here offers it ----
+    Need("h5-28", "heldout5_type", "not_offered", ("appt_047",), EXISTING,
+         "Existing patient whose mother went blind from high pressure inside her eyes; their regular doctor "
+         "wants them to have their eye pressure checked by an eye specialist.", must_not=("glaucoma",)),
+    Need("h5-29", "heldout5_type", "not_offered", ("appt_071",), EXISTING,
+         "Existing patient who has been doing weekly exercise sessions for their back with a physical therapist "
+         "at another place and wants to continue those weekly sessions here; they call it 'rehab'.",
+         must=(("rehab*",),), must_not=("physical therapy", "pt", "therapist")),
+    # ---- booking rules ----
+    Need("h5-x01", "heldout5_policy", "new_patient_type", ("appt_025",), NEW,
+         "A brand-new patient who has never been seen here has a pacemaker and needs it checked; an outside "
+         "doctor referred them."),
+    Need("h5-x02", "heldout5_policy", "new_patient_type", ("appt_081",), NEW,
+         "A brand-new patient who has never been seen here wants the skin tests that show exactly what they are "
+         "allergic to; an outside doctor referred them."),
+    Need("h5-x03", "heldout5_policy", "referral", ("appt_032",), NO_REFERRAL,
+         "Existing patient with no referral whose shoulder has hurt for months and who wants to see an "
+         "orthopedist; they say 'orthopedist'.", must=(("orthop*",),)),
+    Need("h5-x04", "heldout5_policy", "new_patient_provider", ("appt_042",), NEW,
+         "A brand-new patient who just moved here, is about twelve weeks pregnant and needs a doctor here to "
+         "look after the pregnancy.", must_not=("prenatal",)),
+    Need("h5-x05", "heldout5_policy", "new_patient_provider", ("appt_056",), NEW,
+         "A brand-new patient whose outside doctor found an overactive thyroid and referred them to a specialist "
+         "for it; they mention the thyroid.", must=(("thyroid",),), must_not=("endocrin*",)),
+]
+
+DOCTORS5 = [
+    Doctor("h5-p01", "specialty", "appt_007", "sick visit", EXISTING, "Nguyen",
+           "Dr. Nguyen, and that it is the internal medicine doctor (no first name)",
+           lambda p: p["specialty"] == "Internal Medicine", (("nguyen",), ("internal",))),
+    Doctor("h5-p02", "specialty", "appt_003", "annual wellness visit", EXISTING, "Sato",
+           "Dr. Sato, and that it is the internal medicine doctor (no first name)",
+           lambda p: p["specialty"] == "Internal Medicine", (("sato",), ("internal",))),
+    Doctor("h5-p03", "specialty", "appt_003", "annual wellness visit", NEW, "Sato",
+           "Dr. Sato, and that it is the internal medicine doctor (no first name)",
+           lambda p: p["specialty"] == "Internal Medicine", (("sato",), ("internal",))),
+    Doctor("h5-p04", "title", "appt_011", "flu shot", EXISTING, "Nguyen",
+           "Dr. Nguyen, and that it is the physician assistant (no first name)",
+           lambda p: p["title"] == "PA", (("nguyen",), PA)),
+    Doctor("h5-p05", "title", "appt_002", "annual physical", EXISTING, "Ramirez",
+           "Dr. Ramirez, and that it is the nurse practitioner (no first name)",
+           lambda p: p["title"] == "NP", (("ramirez",), NP)),
+    Doctor("h5-p06", "language", "appt_061", "medication management", EXISTING, "Smith",
+           "Dr. Smith, the one who speaks Portuguese (no first name)",
+           lambda p: "Portuguese" in p["languages"], (("smith",), ("portuguese",))),
+    Doctor("h5-p07", "language", "appt_078", "pulmonology consultation", EXISTING, "Nguyen",
+           "Dr. Nguyen, the one who speaks Spanish (no first name)",
+           lambda p: "Spanish" in p["languages"], (("nguyen",), ("spanish",))),
+    Doctor("h5-p08", "language", "appt_029", "mole removal", EXISTING, "Chen",
+           "Dr. Chen, the one who speaks Arabic (no first name)",
+           lambda p: "Arabic" in p["languages"], (("chen",), ("arabic",))),
+    Doctor("h5-p09", "full_name", "appt_059", "psychiatric evaluation", NEW, "Sato",
+           "the doctor's full name, Dr. Olivia Sato, and nothing else about her",
+           lambda p: first(p) == "Olivia", (("olivia",), ("sato",))),
+    Doctor("h5-p10", "full_name", "appt_013", "travel vaccination consult", EXISTING, "Patel",
+           "the doctor's full name, Dr. Kenji Patel, and nothing else about him",
+           lambda p: first(p) == "Kenji", (("kenji",), ("patel",))),
+    Doctor("h5-p11", "gender", "appt_011", "flu shot", EXISTING, "Patel",
+           "Dr. Patel, making clear the doctor is a man, e.g. 'he' or 'the male one' (no first name)",
+           lambda p: first(p) in {"Andre", "Kenji"}, (("patel",), MALE)),
+    Doctor("h5-p12", "gender", "appt_007", "sick visit", EXISTING, "Hernandez",
+           "Dr. Hernandez, making clear the doctor is a man, e.g. 'he' or 'the male one' (no first name)",
+           lambda p: first(p) in {"Tomas"}, (("hernandez",), MALE)),
+    Doctor("h5-p13", "site", "appt_059", "psychiatric evaluation", EXISTING, "Smith",
+           "Dr. Smith, the one at the Mission District clinic (no first name)",
+           lambda p: "loc_001" in p["location_ids"], (("smith",), ("mission district",)), site="loc_001"),
+    Doctor("h5-p14", "site", "appt_023", "EKG", EXISTING, "Ramirez",
+           "Dr. Ramirez, the one at the Midtown clinic (no first name)",
+           lambda p: "loc_005" in p["location_ids"], (("ramirez",), ("midtown",)), site="loc_005"),
+]
+
+PICKS5 = [
+    Pick("h5-m01", Doctor("h5-m01", "site", "appt_020", "cardiology consultation", EXISTING, "Chen",
+                          "Dr. Chen, the one at the Richmond clinic (no first name)",
+                          lambda p: "loc_007" in p["location_ids"], (("chen",), ("richmond",)), site="loc_007"),
+         "which Dr. Chen at Richmond they mean, Dr. David Chen or Dr. Emily Chen",
+         "the woman; they give no name", "provider_phrase", "prov_046", (FEMALE,), ("david", "emily")),
+    Pick("h5-m02", Doctor("h5-m02", "specialty", "appt_011", "flu shot", EXISTING, "Garcia",
+                          "Dr. Garcia, and that it is the family medicine doctor, said as a specialty, not 'my "
+                          "family doctor' (no first name)",
+                          lambda p: p["specialty"] == "Family Medicine", (("garcia",), ("family medicine",))),
+         "which Dr. Garcia they mean, Dr. Maria Garcia or Dr. Carlos Garcia",
+         "Carlos; they give only his first name", "provider_phrase", "prov_008", (("carlos",),), ("maria",)),
+    Pick("h5-m03", Doctor("h5-m03", "surname", "appt_007", "sick visit", EXISTING, "Chen",
+                          "Dr. Chen, and nothing else about the doctor (no first name)",
+                          lambda p: True, (("chen",),)),
+         "which Dr. Chen they mean: Dr. Wei Chen, Dr. Michael Chen or Dr. Lucas Chen",
+         "the one who sees kids; they give no name", "provider_phrase", "prov_012",
+         (("kid*", "child*", "children", "pediatric*"),), ("wei", "michael", "lucas")),
+    Pick("h5-m04", Doctor("h5-m04", "surname", "appt_002", "annual physical", EXISTING, "Hernandez",
+                          "Dr. Hernandez, and nothing else about the doctor (no first name)",
+                          lambda p: True, (("hernandez",),)),
+         "which Dr. Hernandez they mean, Dr. Tomas Hernandez or Dr. Patricia Hernandez",
+         "the nurse practitioner", "provider_phrase", "prov_025", (NP,), ("tomas", "patricia")),
+    Pick("h5-m05", Need("h5-m05", "heldout5_multiturn", "service_pick", ("appt_072", "appt_073"), EXISTING,
+                        "Existing patient whose doctor ordered blood work. They do not say what it is for or "
+                        "whether they were told to fast.", must=(("blood",),),
+                        must_not=("fast*", "eat*", "empty stomach", "cbc", "a1c", "cholesterol", "sugar",
+                                  "glucose", "morning", "food")),
+         "whether it is a regular blood draw or a fasting blood test",
+         "the doctor told them not to eat anything after midnight before it; they do not say 'fasting'",
+         "service_phrase", "appt_073", (("eat*", "food", "midnight", "empty stomach"),), ("fast*",)),
+    Pick("h5-m06", Need("h5-m06", "heldout5_multiturn", "service_pick", ("appt_074", "appt_075"), EXISTING,
+                        "Existing dental patient who wants to book their regular visit with the dentist. They do not "
+                        "say whether it is a cleaning or an exam.", must=(("dentist", "dental", "teeth", "tooth"),),
+                        must_not=("clean*", "exam*", "check*", "x-ray*")),
+         "whether it is a cleaning or an exam", "the cleaning", "service_phrase", "appt_074",
+         (("clean*",),), ("exam*",)),
+    Pick("h5-m07", Need("h5-m07", "heldout5_multiturn", "service_pick", ("appt_060", "appt_061"), EXISTING,
+                        "Existing patient who sees a psychiatrist here regularly and wants to book their next usual "
+                        "appointment. They do not say what the appointment is for.", must=(("psychiatr*",),),
+                        must_not=("therap*", "medic*", "meds", "pill*", "prescri*", "evaluat*", "counsel*", "talk*",
+                                  "dose", "refill*")),
+         "whether it is a therapy session or a medication check",
+         "the one where they go over their medication and get refills", "service_phrase", "appt_061",
+         (("med*", "prescri*", "refill*", "pill*"),), ("therap*", "talk*", "counsel*")),
+    Pick("h5-m08", Need("h5-m08", "heldout5_multiturn", "service_pick", ("appt_018", "appt_019"), EXISTING,
+                        "Existing patient: a parent whose 10-year-old needs a physical and a form signed by the "
+                        "doctor. They do not say what the form is for.", must=(("form",),),
+                        must_not=("school", "sport*", "team", "soccer", "basketball", "football", "camp", "class",
+                                  "play*")),
+         "whether the physical is for school or for sports", "it is for the basketball team", "service_phrase",
+         "appt_019", (("basketball", "team", "sport*"),), ("school",)),
+]
+
 
 @dataclass(frozen=True)
 class Profile:
@@ -529,7 +779,8 @@ class Profile:
         return ROOT / "eval" / f"cases_{self.name}.jsonl"
 
 
-PROFILES = {p.name: p for p in (Profile("heldout3", NEEDS3, DOCTORS3), Profile("heldout4", NEEDS4, DOCTORS4, PICKS4))}
+PROFILES = {p.name: p for p in (Profile("heldout3", NEEDS3, DOCTORS3), Profile("heldout4", NEEDS4, DOCTORS4, PICKS4),
+                                Profile("heldout5", NEEDS5, DOCTORS5, PICKS5))}
 
 
 class Catalog:
@@ -698,7 +949,7 @@ def merge(scen: list[dict], prof: Profile) -> None:
         lines.append({"id": s["id"], "category": s["category"], "kind": s["kind"], "patient": s["patient"],
                       "turns": turns, "expected": s["expected"], "phrasing_source": got["_file"]})
     out = prof.out
-    out.write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in lines), encoding="utf-8")
+    out.write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in lines), encoding="utf-8", newline="\n")
     print(f"wrote {out.relative_to(ROOT)}: {len(lines)} cases; dropped {len(drops)}")
     for sid, errs, got in drops:
         print(f"  DROP {sid}: {'; '.join(errs)}  got={got}")
@@ -719,7 +970,7 @@ def main() -> None:
     if step == "scenarios":
         scen = build(prof)
         prof.dir.mkdir(parents=True, exist_ok=True)
-        prof.scenarios.write_text(json.dumps(scen, indent=1, ensure_ascii=False), encoding="utf-8")
+        prof.scenarios.write_text(json.dumps(scen, indent=1, ensure_ascii=False), encoding="utf-8", newline="\n")
         print(f"wrote {prof.scenarios.relative_to(ROOT)}: {len(scen)} scenarios")
         print("per category:", dict(Counter(s["category"] for s in scen)))
         for s in scen:

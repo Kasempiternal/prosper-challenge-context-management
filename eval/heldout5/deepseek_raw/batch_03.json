@@ -1,0 +1,55 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h5-25: Existing patient who sees the hormone specialist here regularly and wants to book their usual follow-up. They do not say what it is for. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-26: Existing patient whose doctor ordered a scan of their lower back. They do not know what kind of scan it is and do not name one. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-27: Existing patient who found a lump in her breast; her doctor ordered imaging of the breast, but she does not know which kind and does not name one. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-28: Existing patient whose mother went blind from high pressure inside her eyes; their regular doctor wants them to have their eye pressure checked by an eye specialist. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-29: Existing patient who has been doing weekly exercise sessions for their back with a physical therapist at another place and wants to continue those weekly sessions here; they call it 'rehab'. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-x01: A brand-new patient who has never been seen here has a pacemaker and needs it checked; an outside doctor referred them. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-x02: A brand-new patient who has never been seen here wants the skin tests that show exactly what they are allergic to; an outside doctor referred them. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-x03: Existing patient with no referral whose shoulder has hurt for months and who wants to see an orthopedist; they say 'orthopedist'. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-x04: A brand-new patient who just moved here, is about twelve weeks pregnant and needs a doctor here to look after the pregnancy. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-x05: A brand-new patient whose outside doctor found an overactive thyroid and referred them to a specialist for it; they mention the thyroid. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-p01: Existing patient who wants a sick visit with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Nguyen, and that it is the internal medicine doctor (no first name)\n- id h5-p02: Existing patient who wants a annual wellness visit with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Sato, and that it is the internal medicine doctor (no first name)",
+ "response": "[\n  {\"id\": \"h5-25\", \"service_phrase\": \"my usual follow-up with the hormone doctor here\"},\n  {\"id\": \"h5-26\", \"service_phrase\": \"doctor ordered a scan of my lower back, not sure what kind\"},\n  {\"id\": \"h5-27\", \"service_phrase\": \"I found a lump in my breast and my doctor wants imaging of it, I don't know which kind\"},\n  {\"id\": \"h5-28\", \"service_phrase\": \"my mother, she go blind from the pressure inside her eyes, my doctor wants my eye pressure checked\"},\n  {\"id\": \"h5-29\", \"service_phrase\": \"want to keep up my rehab, the weekly sessions for my back\"},\n  {\"id\": \"h5-x01\", \"service_phrase\": \"I have a pacemaker and I need it checked, my doctor sent me\"},\n  {\"id\": \"h5-x02\", \"service_phrase\": \"the skin tests that show exactly what I'm allergic to\"},\n  {\"id\": \"h5-x03\", \"service_phrase\": \"my shoulder has hurt for months, I want to see an orthopedist\"},\n  {\"id\": \"h5-x04\", \"service_phrase\": \"just moved here, about twelve weeks pregnant, need a doctor to look after the pregnancy\"},\n  {\"id\": \"h5-x05\", \"service_phrase\": \"my doctor found an overactive thyroid and sent me to a specialist for it\"},\n  {\"id\": \"h5-p01\", \"provider_phrase\": \"Dr. Nguyen, the internal medicine doctor\"},\n  {\"id\": \"h5-p02\", \"provider_phrase\": \"Dr. Sato, the internal medicine doctor\"}\n]\n",
+ "parsed": [
+  {
+   "id": "h5-25",
+   "service_phrase": "my usual follow-up with the hormone doctor here"
+  },
+  {
+   "id": "h5-26",
+   "service_phrase": "doctor ordered a scan of my lower back, not sure what kind"
+  },
+  {
+   "id": "h5-27",
+   "service_phrase": "I found a lump in my breast and my doctor wants imaging of it, I don't know which kind"
+  },
+  {
+   "id": "h5-28",
+   "service_phrase": "my mother, she go blind from the pressure inside her eyes, my doctor wants my eye pressure checked"
+  },
+  {
+   "id": "h5-29",
+   "service_phrase": "want to keep up my rehab, the weekly sessions for my back"
+  },
+  {
+   "id": "h5-x01",
+   "service_phrase": "I have a pacemaker and I need it checked, my doctor sent me"
+  },
+  {
+   "id": "h5-x02",
+   "service_phrase": "the skin tests that show exactly what I'm allergic to"
+  },
+  {
+   "id": "h5-x03",
+   "service_phrase": "my shoulder has hurt for months, I want to see an orthopedist"
+  },
+  {
+   "id": "h5-x04",
+   "service_phrase": "just moved here, about twelve weeks pregnant, need a doctor to look after the pregnancy"
+  },
+  {
+   "id": "h5-x05",
+   "service_phrase": "my doctor found an overactive thyroid and sent me to a specialist for it"
+  },
+  {
+   "id": "h5-p01",
+   "provider_phrase": "Dr. Nguyen, the internal medicine doctor"
+  },
+  {
+   "id": "h5-p02",
+   "provider_phrase": "Dr. Sato, the internal medicine doctor"
+  }
+ ]
+}

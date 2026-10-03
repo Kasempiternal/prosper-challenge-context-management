@@ -1,0 +1,55 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h5-01: Existing patient whose heart doctor ordered a moving picture of their heart made with sound waves, where gel goes on the chest and a wand is moved over it. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-02: Existing patient whose doctor wants the quick test where about a dozen sticky pads go on the chest, arms and legs and the heartbeat is printed out on paper; it takes a few minutes. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-03: Existing patient whose doctor ordered pictures of their brain, taken while they lie still inside a long, loud tube for about forty minutes. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-04: Existing patient: an adult child calling for their 78-year-old mother, who keeps forgetting recent conversations and got lost driving home from the grocery store; her regular doctor wants a specialist to check her. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-05: Existing patient whose hair has been coming out in clumps in the shower for two months, leaving bald patches; their regular doctor wants them to see a specialist about it. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-06: Existing patient whose eyes itch, burn and water every time the pollen count is high or they visit their sister's cat. Their regular doctor says the eyes themselves are healthy, that it is a reaction to the pollen and the cat, and wants them to see a specialist for that. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-07: Existing patient who has had thick, red, scaly patches on both elbows and knees that flake and itch for months; their regular doctor wants them to see a specialist. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-08: Existing patient who has had a burning pain in the middle of the chest after big meals and when lying down at night for two months. Their regular doctor checked their heart, found it healthy, says the problem is in their digestion and wants a specialist to look into it. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-09: Existing patient whose ankles swell up every evening and who gets out of breath lying flat in bed; their regular doctor listened to their heart and wants a specialist to check it. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-10: Existing patient: a parent whose 6-year-old son has had a stomach ache and has thrown up twice since this morning, and they want a doctor to look at him. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-11: Existing patient who rolled their ankle stepping off a curb about an hour ago; it is swollen, they can barely put weight on it, and they want to be seen today. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-12: Existing patient who woke up this morning with one eye red, goopy and crusted shut, and wants to see their regular doctor in the next day or so. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words",
+ "response": "[\n  {\n    \"id\": \"h5-01\",\n    \"service_phrase\": \"my heart doctor wants the moving picture of my heart done, the one with the gel and the wand they move around\"\n  },\n  {\n    \"id\": \"h5-02\",\n    \"service_phrase\": \"the fast one with the sticky pads on my chest and arms and legs that prints my heartbeat out on paper\"\n  },\n  {\n    \"id\": \"h5-03\",\n    \"service_phrase\": \"they want pictures of my brain, you lie still in that long loud tube for like forty minutes\"\n  },\n  {\n    \"id\": \"h5-04\",\n    \"service_phrase\": \"my mom's doctor wants a specialist to check her, she keeps forgetting things and got lost driving home from the store\"\n  },\n  {\n    \"id\": \"h5-05\",\n    \"service_phrase\": \"my hair's been falling out in clumps in the shower and leaving bare spots, my doctor wants me to see a specialist\"\n  },\n  {\n    \"id\": \"h5-06\",\n    \"service_phrase\": \"my eyes itch and burn and water up around pollen or at my sister's cat, doctor says my eyes are fine and it's a reaction, wants me to see a specialist for that\"\n  },\n  {\n    \"id\": \"h5-07\",\n    \"service_phrase\": \"I've got these thick red scaly flaky patches on my elbows and knees that itch, my doctor wants me to see a specialist\"\n  },\n  {\n    \"id\": \"h5-08\",\n    \"service_phrase\": \"I get this burning in the middle of my chest after big meals and when I lie down at night, doctor checked my heart and says it's my digestion, wants a specialist to look into it\"\n  },\n  {\n    \"id\": \"h5-09\",\n    \"service_phrase\": \"my ankles swell up every night and I get out of breath lying flat, my doctor listened to my heart and wants a specialist to check it\"\n  },\n  {\n    \"id\": \"h5-10\",\n    \"service_phrase\": \"my boy's got a stomach ache and threw up twice since this morning, I want a doctor to look at him\"\n  },\n  {\n    \"id\": \"h5-11\",\n    \"service_phrase\": \"I rolled my ankle off a curb an hour ago, it's all swollen and I can hardly walk on it, I want to be seen today\"\n  },\n  {\n    \"id\": \"h5-12\",\n    \"service_phrase\": \"I woke up with one eye all red and goopy, it was crusted shut this morning, I want to get in in the next day or two\"\n  }\n]\n",
+ "parsed": [
+  {
+   "id": "h5-01",
+   "service_phrase": "my heart doctor wants the moving picture of my heart done, the one with the gel and the wand they move around"
+  },
+  {
+   "id": "h5-02",
+   "service_phrase": "the fast one with the sticky pads on my chest and arms and legs that prints my heartbeat out on paper"
+  },
+  {
+   "id": "h5-03",
+   "service_phrase": "they want pictures of my brain, you lie still in that long loud tube for like forty minutes"
+  },
+  {
+   "id": "h5-04",
+   "service_phrase": "my mom's doctor wants a specialist to check her, she keeps forgetting things and got lost driving home from the store"
+  },
+  {
+   "id": "h5-05",
+   "service_phrase": "my hair's been falling out in clumps in the shower and leaving bare spots, my doctor wants me to see a specialist"
+  },
+  {
+   "id": "h5-06",
+   "service_phrase": "my eyes itch and burn and water up around pollen or at my sister's cat, doctor says my eyes are fine and it's a reaction, wants me to see a specialist for that"
+  },
+  {
+   "id": "h5-07",
+   "service_phrase": "I've got these thick red scaly flaky patches on my elbows and knees that itch, my doctor wants me to see a specialist"
+  },
+  {
+   "id": "h5-08",
+   "service_phrase": "I get this burning in the middle of my chest after big meals and when I lie down at night, doctor checked my heart and says it's my digestion, wants a specialist to look into it"
+  },
+  {
+   "id": "h5-09",
+   "service_phrase": "my ankles swell up every night and I get out of breath lying flat, my doctor listened to my heart and wants a specialist to check it"
+  },
+  {
+   "id": "h5-10",
+   "service_phrase": "my boy's got a stomach ache and threw up twice since this morning, I want a doctor to look at him"
+  },
+  {
+   "id": "h5-11",
+   "service_phrase": "I rolled my ankle off a curb an hour ago, it's all swollen and I can hardly walk on it, I want to be seen today"
+  },
+  {
+   "id": "h5-12",
+   "service_phrase": "I woke up with one eye all red and goopy, it was crusted shut this morning, I want to get in in the next day or two"
+  }
+ ]
+}

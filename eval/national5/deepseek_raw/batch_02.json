@@ -1,0 +1,65 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat5-geo-13: Existing patient who needs a TB skin test they need for work. They only say which state they live in: Florida. Fields: service_phrase = how the caller asks for a TB skin test they need for work; location_phrase = the state only: Florida (no city)\n- id nat5-geo-14: Existing patient who needs an MRI of their abdomen that their doctor ordered. They live in Birmingham, Alabama. Fields: service_phrase = how the caller asks for an MRI of their abdomen that their doctor ordered; location_phrase = where they are: Birmingham, Alabama (say both words)\n- id nat5-geo-15: Existing patient who needs a diagnostic mammogram their doctor ordered. They are in Orlando. Fields: service_phrase = how the caller asks for a diagnostic mammogram their doctor ordered\n- id nat5-geo-16: Existing patient who needs a diagnostic mammogram their doctor ordered. They are in Detroit. Fields: service_phrase = how the caller asks for a diagnostic mammogram their doctor ordered\n- id nat5-sym-01: Existing patient (has any referral needed) who has had thick, red, scaly patches on both elbows and knees that flake and itch for months. They do not know which kind of doctor they need. They are in Los Angeles. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Los Angeles\n- id nat5-sym-02: Existing patient (has any referral needed) who has a lump at the front of the neck that moves up and down when swallowing. They do not know which kind of doctor they need. They are in Indianapolis. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Indianapolis\n- id nat5-sym-03: Existing patient (has any referral needed) who has had sharp, cramping pain in one side of the back that shoots toward the groin since last night. They do not know which kind of doctor they need. They are in Indianapolis. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Indianapolis\n- id nat5-sym-04: Existing patient (has any referral needed) who has felt exhausted and looked pale for weeks, gets winded on stairs, and a recent blood test showed a low blood count. They do not know which kind of doctor they need. They are in Chicago. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Chicago\n- id nat5-sym-05: Existing patient (has any referral needed) who has a 15-year-old daughter who barely eats, has lost a lot of weight and is obsessed with calories. They do not know which kind of doctor they need. They are in Philadelphia. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Philadelphia\n- id nat5-sym-06: Existing patient (has any referral needed) who has a newborn who has trouble latching during breastfeeding, and feeding hurts. They do not know which kind of doctor they need. They are in Tampa. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Tampa\n- id nat5-sym-07: Existing patient (has any referral needed) who leaks a little urine whenever they cough, sneeze or laugh. They do not know which kind of doctor they need. They are in Oakland. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Oakland\n- id nat5-sym-08: Existing patient (has any referral needed) who has a 15-year-old son who hit his head at football practice yesterday and has had a headache and felt foggy since. They do not know which kind of doctor they need. They are in Philadelphia. Fields: service_phrase = the reason for the visit, described as the symptom in everyday words (no specialty or doctor type); location_phrase = the city: Philadelphia",
+ "response": "[\n  {\n    \"id\": \"nat5-geo-13\",\n    \"service_phrase\": \"I need a TB skin test for work\",\n    \"location_phrase\": \"I'm in Florida\"\n  },\n  {\n    \"id\": \"nat5-geo-14\",\n    \"service_phrase\": \"my doctor ordered an MRI of my abdomen\",\n    \"location_phrase\": \"I'm in Birmingham, Alabama\"\n  },\n  {\n    \"id\": \"nat5-geo-15\",\n    \"service_phrase\": \"my doctor ordered a diagnostic mammogram\"\n  },\n  {\n    \"id\": \"nat5-geo-16\",\n    \"service_phrase\": \"doctor ordered me a mammogram, the diagnostic kind\"\n  },\n  {\n    \"id\": \"nat5-sym-01\",\n    \"service_phrase\": \"I've got these thick red scaly patches on both my elbows and knees, they flake and itch, been months now\",\n    \"location_phrase\": \"Los Angeles\"\n  },\n  {\n    \"id\": \"nat5-sym-02\",\n    \"service_phrase\": \"there's a lump at the front of my neck, it moves up and down when I swallow\",\n    \"location_phrase\": \"Indianapolis\"\n  },\n  {\n    \"id\": \"nat5-sym-03\",\n    \"service_phrase\": \"sharp cramping pain in one side of my back, shoots toward the groin, started last night\",\n    \"location_phrase\": \"Indianapolis\"\n  },\n  {\n    \"id\": \"nat5-sym-04\",\n    \"service_phrase\": \"I've been exhausted and look pale for weeks, get winded on the stairs, blood test showed a low count\",\n    \"location_phrase\": \"Chicago\"\n  },\n  {\n    \"id\": \"nat5-sym-05\",\n    \"service_phrase\": \"it's my 15-year-old daughter, she barely eats, lost a lot of weight, obsessed with calories\",\n    \"location_phrase\": \"Philadelphia\"\n  },\n  {\n    \"id\": \"nat5-sym-06\",\n    \"service_phrase\": \"my newborn has trouble latching when breastfeeding and feeding hurts\",\n    \"location_phrase\": \"Tampa\"\n  },\n  {\n    \"id\": \"nat5-sym-07\",\n    \"service_phrase\": \"I leak a little urine whenever I cough, sneeze or laugh\",\n    \"location_phrase\": \"Oakland\"\n  },\n  {\n    \"id\": \"nat5-sym-08\",\n    \"service_phrase\": \"my 15-year-old son hit his head at football practice yesterday, headache and foggy since\",\n    \"location_phrase\": \"Philadelphia\"\n  }\n]\n",
+ "parsed": [
+  {
+   "id": "nat5-geo-13",
+   "service_phrase": "I need a TB skin test for work",
+   "location_phrase": "I'm in Florida"
+  },
+  {
+   "id": "nat5-geo-14",
+   "service_phrase": "my doctor ordered an MRI of my abdomen",
+   "location_phrase": "I'm in Birmingham, Alabama"
+  },
+  {
+   "id": "nat5-geo-15",
+   "service_phrase": "my doctor ordered a diagnostic mammogram"
+  },
+  {
+   "id": "nat5-geo-16",
+   "service_phrase": "doctor ordered me a mammogram, the diagnostic kind"
+  },
+  {
+   "id": "nat5-sym-01",
+   "service_phrase": "I've got these thick red scaly patches on both my elbows and knees, they flake and itch, been months now",
+   "location_phrase": "Los Angeles"
+  },
+  {
+   "id": "nat5-sym-02",
+   "service_phrase": "there's a lump at the front of my neck, it moves up and down when I swallow",
+   "location_phrase": "Indianapolis"
+  },
+  {
+   "id": "nat5-sym-03",
+   "service_phrase": "sharp cramping pain in one side of my back, shoots toward the groin, started last night",
+   "location_phrase": "Indianapolis"
+  },
+  {
+   "id": "nat5-sym-04",
+   "service_phrase": "I've been exhausted and look pale for weeks, get winded on the stairs, blood test showed a low count",
+   "location_phrase": "Chicago"
+  },
+  {
+   "id": "nat5-sym-05",
+   "service_phrase": "it's my 15-year-old daughter, she barely eats, lost a lot of weight, obsessed with calories",
+   "location_phrase": "Philadelphia"
+  },
+  {
+   "id": "nat5-sym-06",
+   "service_phrase": "my newborn has trouble latching when breastfeeding and feeding hurts",
+   "location_phrase": "Tampa"
+  },
+  {
+   "id": "nat5-sym-07",
+   "service_phrase": "I leak a little urine whenever I cough, sneeze or laugh",
+   "location_phrase": "Oakland"
+  },
+  {
+   "id": "nat5-sym-08",
+   "service_phrase": "my 15-year-old son hit his head at football practice yesterday, headache and foggy since",
+   "location_phrase": "Philadelphia"
+  }
+ ]
+}

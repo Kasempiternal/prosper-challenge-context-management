@@ -1,0 +1,69 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence; keep natural fillers like \"I'm in\", \"near\", \"over by\" when they fit). Vary the style across\nscenarios: casual, terse, older caller, non-native speaker, rambling. Do not add facts that are not in\nthe scenario, and do not add any other place, doctor or service.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id nat5-new-02: A brand-new patient who has never been seen at these clinics needs Pelvic Pain Evaluation. They are in Columbus. Fields: service_phrase = the service: Pelvic Pain Evaluation (said naturally); location_phrase = the city: Columbus\n- id nat5-new-03: A brand-new patient wants Annual Well-Woman Exam with Dr. Kristie Tull in Las Vegas (a friend recommended this doctor). Fields: service_phrase = the service: Annual Well-Woman Exam (said naturally); provider_phrase = the doctor's full name: Dr. Kristie Tull; location_phrase = the city: Las Vegas\n- id nat5-new-04: A brand-new patient wants Annual Physical with Dr. Marcel Seligman in Dallas (a friend recommended this doctor). Fields: service_phrase = the service: Annual Physical (said naturally); provider_phrase = the doctor's full name: Dr. Marcel Seligman; location_phrase = the city: Dallas\n- id nat5-new-05: A brand-new patient who has never been seen here wants Occupational Therapy Session. They are in Washington, DC. Fields: service_phrase = the service: Occupational Therapy Session (said naturally); location_phrase = the city: Washington, DC\n- id nat5-noloc-01: Existing patient who needs a shingles shot. They do not say where they are at first; asked which city, they answer Indianapolis. Fields: service_phrase = how the caller asks for a shingles shot; followup_location_phrase = their answer to 'which city?': Indianapolis\n- id nat5-noloc-02: Existing patient who needs ear wax removal. They do not say where they are at first; asked which city, they answer Houston. Fields: service_phrase = how the caller asks for ear wax removal; followup_location_phrase = their answer to 'which city?': Houston\n- id nat5-noloc-03: Existing patient who needs a TB skin test they need for work. They do not say where they are at first; asked which city, they answer Tampa. Fields: service_phrase = how the caller asks for a TB skin test they need for work; followup_location_phrase = their answer to 'which city?': Tampa\n- id nat5-unoff-01: Existing patient who wants overnight sleep study. They are in San Diego. Fields: service_phrase = the service: overnight sleep study (said naturally); location_phrase = the city: San Diego\n- id nat5-unoff-02: Existing patient who wants hair transplant consultation. They are in Oakland. Fields: service_phrase = the service: hair transplant consultation (said naturally); location_phrase = the city: Oakland\n- id nat5-ring-01: Existing patient who needs nerve block (has any referral needed). They are in St. Paul. Fields: service_phrase = the service: nerve block (said naturally); location_phrase = the city: St. Paul\n- id nat5-gen-01: Existing patient (with a referral) who needs a CT scan of their head that their doctor ordered. They are in Raleigh. Fields: service_phrase = how the caller asks for a CT scan of their head that their doctor ordered; location_phrase = the city: Raleigh\n- id nat5-gen-02: Existing patient (with a referral) who needs a breast ultrasound that their doctor ordered. They are in Las Vegas. Fields: service_phrase = how the caller asks for a breast ultrasound that their doctor ordered; location_phrase = the city: Las Vegas",
+ "response": "```json\n[\n  {\n    \"id\": \"nat5-new-02\",\n    \"service_phrase\": \"I need a pelvic pain evaluation\",\n    \"location_phrase\": \"I'm in Columbus\"\n  },\n  {\n    \"id\": \"nat5-new-03\",\n    \"service_phrase\": \"I want an annual well-woman exam\",\n    \"provider_phrase\": \"Dr. Kristie Tull\",\n    \"location_phrase\": \"over in Las Vegas\"\n  },\n  {\n    \"id\": \"nat5-new-04\",\n    \"service_phrase\": \"I'd like to book an annual physical\",\n    \"provider_phrase\": \"Dr. Marcel Seligman\",\n    \"location_phrase\": \"near Dallas\"\n  },\n  {\n    \"id\": \"nat5-new-05\",\n    \"service_phrase\": \"I want to make appointment for occupational therapy session\",\n    \"location_phrase\": \"I am in Washington, DC\"\n  },\n  {\n    \"id\": \"nat5-noloc-01\",\n    \"service_phrase\": \"I need to get the shingles shot\",\n    \"followup_location_phrase\": \"Indianapolis\"\n  },\n  {\n    \"id\": \"nat5-noloc-02\",\n    \"service_phrase\": \"ear wax removal\",\n    \"followup_location_phrase\": \"Houston\"\n  },\n  {\n    \"id\": \"nat5-noloc-03\",\n    \"service_phrase\": \"I need a TB skin test, I need it for work\",\n    \"followup_location_phrase\": \"Tampa\"\n  },\n  {\n    \"id\": \"nat5-unoff-01\",\n    \"service_phrase\": \"I want to set up an overnight sleep study\",\n    \"location_phrase\": \"I'm in San Diego\"\n  },\n  {\n    \"id\": \"nat5-unoff-02\",\n    \"service_phrase\": \"I'd like a hair transplant consultation\",\n    \"location_phrase\": \"Oakland\"\n  },\n  {\n    \"id\": \"nat5-ring-01\",\n    \"service_phrase\": \"nerve block\",\n    \"location_phrase\": \"St. Paul\"\n  },\n  {\n    \"id\": \"nat5-gen-01\",\n    \"service_phrase\": \"my doctor ordered a CT scan of my head\",\n    \"location_phrase\": \"Raleigh\"\n  },\n  {\n    \"id\": \"nat5-gen-02\",\n    \"service_phrase\": \"my doctor order a breast ultrasound\",\n    \"location_phrase\": \"Las Vegas\"\n  }\n]\n```\n",
+ "parsed": [
+  {
+   "id": "nat5-new-02",
+   "service_phrase": "I need a pelvic pain evaluation",
+   "location_phrase": "I'm in Columbus"
+  },
+  {
+   "id": "nat5-new-03",
+   "service_phrase": "I want an annual well-woman exam",
+   "provider_phrase": "Dr. Kristie Tull",
+   "location_phrase": "over in Las Vegas"
+  },
+  {
+   "id": "nat5-new-04",
+   "service_phrase": "I'd like to book an annual physical",
+   "provider_phrase": "Dr. Marcel Seligman",
+   "location_phrase": "near Dallas"
+  },
+  {
+   "id": "nat5-new-05",
+   "service_phrase": "I want to make appointment for occupational therapy session",
+   "location_phrase": "I am in Washington, DC"
+  },
+  {
+   "id": "nat5-noloc-01",
+   "service_phrase": "I need to get the shingles shot",
+   "followup_location_phrase": "Indianapolis"
+  },
+  {
+   "id": "nat5-noloc-02",
+   "service_phrase": "ear wax removal",
+   "followup_location_phrase": "Houston"
+  },
+  {
+   "id": "nat5-noloc-03",
+   "service_phrase": "I need a TB skin test, I need it for work",
+   "followup_location_phrase": "Tampa"
+  },
+  {
+   "id": "nat5-unoff-01",
+   "service_phrase": "I want to set up an overnight sleep study",
+   "location_phrase": "I'm in San Diego"
+  },
+  {
+   "id": "nat5-unoff-02",
+   "service_phrase": "I'd like a hair transplant consultation",
+   "location_phrase": "Oakland"
+  },
+  {
+   "id": "nat5-ring-01",
+   "service_phrase": "nerve block",
+   "location_phrase": "St. Paul"
+  },
+  {
+   "id": "nat5-gen-01",
+   "service_phrase": "my doctor ordered a CT scan of my head",
+   "location_phrase": "Raleigh"
+  },
+  {
+   "id": "nat5-gen-02",
+   "service_phrase": "my doctor order a breast ultrasound",
+   "location_phrase": "Las Vegas"
+  }
+ ]
+}

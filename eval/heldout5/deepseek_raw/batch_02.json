@@ -1,0 +1,55 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h5-13: Existing dental patient who has had a throbbing toothache in a back tooth since Sunday, and the cheek on that side is getting puffy. They do not know the medical name for it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-14: Existing patient in their sixties who wants the shot that prevents shingles; they say 'shingles'. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-15: Existing patient who is having a hip replacement next month and needs the sit-down with the bone surgeon here to go over the operation beforehand. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-16: Existing patient who just turned 45; their regular doctor said it is time for the colon cancer screening where they look inside the bowel, and they need to set it up with the stomach doctor. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-17: Existing patient whose chest X-ray showed a spot on their lung; their regular doctor wants them to see the lung specialist about it. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-18: Existing patient whose lung doctor ordered a 'PFT'; they say 'PFT'. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-19: Existing patient whose stomach doctor wants to do an 'EGD'; they say 'EGD'. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-20: Existing patient on Medicare who wants to book their 'AWV'; they say 'AWV' and do not spell it out. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-21: Existing patient who takes Synthroid and sees the specialist here to keep the dose right; they are due for the regular check, call it 'my Synthroid check' and never name the gland. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-22: Existing patient who has never seen a psychiatrist and wants a first appointment with one to figure out what is going on with their mood; they call a psychiatrist a 'shrink'. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-23: Existing patient who wants the latest Moderna booster; they say 'Moderna' and do not name the disease. Fields: service_phrase = what the caller says they need, in their own words\n- id h5-24: Existing patient who says they are due for 'a booster shot'. They do not say what it protects against. Fields: service_phrase = what the caller says they need, in their own words",
+ "response": "[\n  {\"id\": \"h5-13\", \"service_phrase\": \"so this one back tooth's been throbbing at me since Sunday and now my cheek on that side is going all puffy\"},\n  {\"id\": \"h5-14\", \"service_phrase\": \"I need that shot for the shingles\"},\n  {\"id\": \"h5-15\", \"service_phrase\": \"got a hip replacement coming up next month, need to sit down with the bone doctor here and go over it first\"},\n  {\"id\": \"h5-16\", \"service_phrase\": \"my doctor says it's time for that colon cancer screening, the one where they look inside your bowel, and I'm to set it up with the stomach doctor\"},\n  {\"id\": \"h5-17\", \"service_phrase\": \"chest x-ray showed a spot on my lung, my doctor wants me to see the lung specialist\"},\n  {\"id\": \"h5-18\", \"service_phrase\": \"need my PFT done\"},\n  {\"id\": \"h5-19\", \"service_phrase\": \"my stomach doctor, he wants to do an EGD, I need to book it\"},\n  {\"id\": \"h5-20\", \"service_phrase\": \"I'm on Medicare and I want to book my AWV\"},\n  {\"id\": \"h5-21\", \"service_phrase\": \"I'm due for my Synthroid check\"},\n  {\"id\": \"h5-22\", \"service_phrase\": \"never been to a shrink before, but I want a first appointment to figure out what's going on with my mood\"},\n  {\"id\": \"h5-23\", \"service_phrase\": \"I want the latest Moderna booster\"},\n  {\"id\": \"h5-24\", \"service_phrase\": \"I'm due for a booster shot\"}\n]\n",
+ "parsed": [
+  {
+   "id": "h5-13",
+   "service_phrase": "so this one back tooth's been throbbing at me since Sunday and now my cheek on that side is going all puffy"
+  },
+  {
+   "id": "h5-14",
+   "service_phrase": "I need that shot for the shingles"
+  },
+  {
+   "id": "h5-15",
+   "service_phrase": "got a hip replacement coming up next month, need to sit down with the bone doctor here and go over it first"
+  },
+  {
+   "id": "h5-16",
+   "service_phrase": "my doctor says it's time for that colon cancer screening, the one where they look inside your bowel, and I'm to set it up with the stomach doctor"
+  },
+  {
+   "id": "h5-17",
+   "service_phrase": "chest x-ray showed a spot on my lung, my doctor wants me to see the lung specialist"
+  },
+  {
+   "id": "h5-18",
+   "service_phrase": "need my PFT done"
+  },
+  {
+   "id": "h5-19",
+   "service_phrase": "my stomach doctor, he wants to do an EGD, I need to book it"
+  },
+  {
+   "id": "h5-20",
+   "service_phrase": "I'm on Medicare and I want to book my AWV"
+  },
+  {
+   "id": "h5-21",
+   "service_phrase": "I'm due for my Synthroid check"
+  },
+  {
+   "id": "h5-22",
+   "service_phrase": "never been to a shrink before, but I want a first appointment to figure out what's going on with my mood"
+  },
+  {
+   "id": "h5-23",
+   "service_phrase": "I want the latest Moderna booster"
+  },
+  {
+   "id": "h5-24",
+   "service_phrase": "I'm due for a booster shot"
+  }
+ ]
+}

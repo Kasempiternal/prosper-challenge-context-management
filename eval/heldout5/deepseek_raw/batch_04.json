@@ -1,0 +1,55 @@
+{
+ "model": "deepseek/deepseek-v4.1-flash",
+ "prompt": "You write realistic phone-call wording for a clinic scheduling test set.\nFor each scenario below, write what the caller would actually say for each listed field, the way a\nnote-taking assistant would record the caller's own words for that field (a short phrase, not a full\nsentence). Vary the style across scenarios: casual, terse, older caller, non-native speaker, rambling.\nUse only the facts in the scenario; do not add any other doctor, clinic or service. When the scenario\nsays the caller does not know the medical name, describe the need the way a layperson would, without\nnaming a medical specialty or a type of appointment. Do not use tools or open files; answer directly.\n\nReturn ONLY a JSON array, one object per scenario: {\"id\": ..., \"<field>\": \"...\", ...} with exactly the\nfields listed for that scenario.\n\nScenarios:\n- id h5-p03: A brand-new patient who wants a annual wellness visit with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Sato, and that it is the internal medicine doctor (no first name)\n- id h5-p04: Existing patient who wants a flu shot with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Nguyen, and that it is the physician assistant (no first name)\n- id h5-p05: Existing patient who wants a annual physical with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Ramirez, and that it is the nurse practitioner (no first name)\n- id h5-p06: Existing patient who wants a medication management with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Smith, the one who speaks Portuguese (no first name)\n- id h5-p07: Existing patient who wants a pulmonology consultation with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Nguyen, the one who speaks Spanish (no first name)\n- id h5-p08: Existing patient who wants a mole removal with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Chen, the one who speaks Arabic (no first name)\n- id h5-p09: A brand-new patient who wants a psychiatric evaluation with a specific doctor. Fields: provider_phrase = how the caller names the doctor: the doctor's full name, Dr. Olivia Sato, and nothing else about her\n- id h5-p10: Existing patient who wants a travel vaccination consult with a specific doctor. Fields: provider_phrase = how the caller names the doctor: the doctor's full name, Dr. Kenji Patel, and nothing else about him\n- id h5-p11: Existing patient who wants a flu shot with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Patel, making clear the doctor is a man, e.g. 'he' or 'the male one' (no first name)\n- id h5-p12: Existing patient who wants a sick visit with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Hernandez, making clear the doctor is a man, e.g. 'he' or 'the male one' (no first name)\n- id h5-p13: Existing patient who wants a psychiatric evaluation with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Smith, the one at the Mission District clinic (no first name)\n- id h5-p14: Existing patient who wants a EKG with a specific doctor. Fields: provider_phrase = how the caller names the doctor: Dr. Ramirez, the one at the Midtown clinic (no first name)",
+ "response": "```json\n[\n  {\"id\": \"h5-p03\", \"provider_phrase\": \"Dr. Sato, the internal medicine doctor\"},\n  {\"id\": \"h5-p04\", \"provider_phrase\": \"Dr. Nguyen — the physician assistant\"},\n  {\"id\": \"h5-p05\", \"provider_phrase\": \"Dr. Ramirez, she's the nurse practitioner\"},\n  {\"id\": \"h5-p06\", \"provider_phrase\": \"Dr. Smith, the Portuguese-speaking one\"},\n  {\"id\": \"h5-p07\", \"provider_phrase\": \"Dr. Nguyen, the one who speaks Spanish\"},\n  {\"id\": \"h5-p08\", \"provider_phrase\": \"Dr. Chen, the Arabic-speaking one\"},\n  {\"id\": \"h5-p09\", \"provider_phrase\": \"Dr. Olivia Sato\"},\n  {\"id\": \"h5-p10\", \"provider_phrase\": \"Dr. Kenji Patel\"},\n  {\"id\": \"h5-p11\", \"provider_phrase\": \"Dr. Patel, the male one\"},\n  {\"id\": \"h5-p12\", \"provider_phrase\": \"Dr. Hernandez, he's a man\"},\n  {\"id\": \"h5-p13\", \"provider_phrase\": \"Dr. Smith at the Mission District clinic\"},\n  {\"id\": \"h5-p14\", \"provider_phrase\": \"Dr. Ramirez, the one at Midtown clinic\"}\n]\n```\n",
+ "parsed": [
+  {
+   "id": "h5-p03",
+   "provider_phrase": "Dr. Sato, the internal medicine doctor"
+  },
+  {
+   "id": "h5-p04",
+   "provider_phrase": "Dr. Nguyen — the physician assistant"
+  },
+  {
+   "id": "h5-p05",
+   "provider_phrase": "Dr. Ramirez, she's the nurse practitioner"
+  },
+  {
+   "id": "h5-p06",
+   "provider_phrase": "Dr. Smith, the Portuguese-speaking one"
+  },
+  {
+   "id": "h5-p07",
+   "provider_phrase": "Dr. Nguyen, the one who speaks Spanish"
+  },
+  {
+   "id": "h5-p08",
+   "provider_phrase": "Dr. Chen, the Arabic-speaking one"
+  },
+  {
+   "id": "h5-p09",
+   "provider_phrase": "Dr. Olivia Sato"
+  },
+  {
+   "id": "h5-p10",
+   "provider_phrase": "Dr. Kenji Patel"
+  },
+  {
+   "id": "h5-p11",
+   "provider_phrase": "Dr. Patel, the male one"
+  },
+  {
+   "id": "h5-p12",
+   "provider_phrase": "Dr. Hernandez, he's a man"
+  },
+  {
+   "id": "h5-p13",
+   "provider_phrase": "Dr. Smith at the Mission District clinic"
+  },
+  {
+   "id": "h5-p14",
+   "provider_phrase": "Dr. Ramirez, the one at Midtown clinic"
+  }
+ ]
+}

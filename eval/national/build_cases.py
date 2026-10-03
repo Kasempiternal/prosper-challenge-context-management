@@ -3,7 +3,7 @@
 Ground truth comes only from catalog queries here (the 6 policies + haversine distance). Caller
 wording comes from DeepSeek, which sees scenario facts in plain language and nothing else.
 
-  python eval/national/build_cases.py [--set national|national2|national3|national4] scenarios  # seeded sampler -> <dir>/scenarios.json
+  python eval/national/build_cases.py [--set national|national2|...|national5] scenarios  # seeded sampler -> <dir>/scenarios.json
   python eval/national/build_cases.py [--set ...] phrase      # DeepSeek via cmdc -> <dir>/deepseek_raw/*.json
   python eval/national/build_cases.py [--set ...] merge       # scenarios + phrasings -> eval/cases_<set>.jsonl
 
@@ -194,6 +194,50 @@ MISSPELLED4 = {"indianapolis-in": "Indianapolus", "albuquerque-nm": "Albakerky",
                "seattle-wa": "Seeattle", "new-orleans-la": "New Orlins", "raleigh-nc": "Rawley",
                "kansas-city-mo": "Kanses City", "denver-co": "Denvor"}
 
+# national5: a fifth held-out draw, authored blind to resolver code and results. New services, symptoms and
+# types, plus a kind where only the general variant of a requested test is bookable near the caller.
+GEO_SERVICES5 = [
+    ("a shingles shot", ["appt_103", "appt_010"]),
+    ("a TB skin test they need for work", ["appt_102"]),
+    ("ear wax removal", ["appt_101", "appt_174"]),
+    ("an emergency dental visit for a cracked tooth", ["appt_239"]),
+    ("an MRI of their abdomen that their doctor ordered", ["appt_208"]),
+    ("a diagnostic mammogram their doctor ordered", ["appt_216", "appt_068"]),
+]
+SYMPTOMS5 = [
+    ("has had thick, red, scaly patches on both elbows and knees that flake and itch for months",
+     ["appt_026", "appt_121"], ["dermatolog", "psoriasis", "eczema"]),
+    ("has a lump at the front of the neck that moves up and down when swallowing",
+     ["appt_191", "appt_056", "appt_304", "appt_050"], ["thyroid", "endocrin", "nodule"]),
+    ("has had sharp, cramping pain in one side of the back that shoots toward the groin since last night",
+     ["appt_244", "appt_077", "appt_008", "appt_084"], ["kidney stone", "urolog"]),
+    ("has felt exhausted and looked pale for weeks, gets winded on stairs, and a recent blood test showed a low "
+     "blood count", ["appt_274", "appt_273"], ["anemi", "hematolog", "iron"]),
+    ("has a 15-year-old daughter who barely eats, has lost a lot of weight and is obsessed with calories",
+     ["appt_204", "appt_203"], ["eating disorder", "anorexi", "bulimi", "psychiatr"]),
+    ("has a newborn who has trouble latching during breastfeeding, and feeding hurts",
+     ["appt_110"], ["lactation"]),
+    ("leaks a little urine whenever they cough, sneeze or laugh", ["appt_246", "appt_226", "appt_077"],
+     ["incontinence", "urolog", "pelvic floor"]),
+    ("has a 15-year-old son who hit his head at football practice yesterday and has had a headache and felt "
+     "foggy since", ["appt_145", "appt_143", "appt_008", "appt_084", "appt_017"], ["concussion"]),
+]
+NEW_OK_TYPES5 = ["appt_093", "appt_097", "appt_176", "appt_196", "appt_105", "appt_162"]
+NO_NEW_TYPES5 = ["appt_275", "appt_309", "appt_224"]
+UNOFFERED5 = ["appt_131", "appt_166", "appt_254", "appt_284"]
+CAPABILITY_TYPES5 = ["appt_157", "appt_247", "appt_281", "appt_222", "appt_100", "appt_156"]
+MISSPELLED5 = {"san-jose-ca": "San Hosay", "st-louis-mo": "Saint Lewis", "detroit-mi": "Detroyt",
+               "las-vegas-nv": "Las Vagas", "austin-tx": "Austen", "columbus-oh": "Columbis",
+               "orlando-fl": "Orlanda", "san-diego-ca": "San Deigo", "atlanta-ga": "Atlanna",
+               "fort-worth-tx": "Fort Wurth"}
+# (what the caller asks for, the specific type, its general variant, a word the phrase must keep)
+GENERAL_VARIANTS5 = [
+    ("a CT scan of their head that their doctor ordered", "appt_209", "appt_066", "head"),
+    ("a breast ultrasound that their doctor ordered", "appt_215", "appt_067", "breast"),
+    ("a CT scan of their chest that their doctor ordered", "appt_210", "appt_066", "chest"),
+    ("a kidney ultrasound that their doctor ordered", "appt_268", "appt_067", "kidney"),
+]
+
 
 @dataclass(frozen=True)
 class FarPlace:
@@ -227,6 +271,12 @@ class Profile:
     # 16 of the 18 cross-metro name groups are used by the first three sets. A fourth set also takes used
     # groups for the with-city kind, with a type whose provider+type and type+metro no earlier set used.
     reuse_names: bool = False
+    # (desc, specific type, general type, word): cases where the specific test has no valid site within 100 mi
+    # of the metro but its general variant is bookable in the metro.
+    general: list = field(default_factory=list)
+    # Every (twin town, metro) choice is used by the first four sets. A fifth set reuses one for either/or,
+    # with a service whose type+metro is new.
+    reuse_twins: bool = False
 
     @property
     def scenarios(self) -> Path:
@@ -258,6 +308,11 @@ PROFILES = {p.name: p for p in (
             FarPlace("far_place", "Boise", "Idaho", (43.6150, -116.2023), (44.2405, -114.4788)),
             excludes=("national", "national2", "national3"), misspelled=MISSPELLED4, reuse_pools=True,
             reuse_names=True),
+    Profile("national5", 20261006, "nat5", ROOT / "eval" / "national5", GEO_SERVICES5, SYMPTOMS5, NEW_OK_TYPES5,
+            NO_NEW_TYPES5, UNOFFERED5, CAPABILITY_TYPES5, ("a dry eye evaluation", ["appt_170"]),
+            FarPlace("far_place", "Birmingham", "Alabama", (33.5186, -86.8104), (32.3182, -86.9023)),
+            excludes=("national", "national2", "national3", "national4"), misspelled=MISSPELLED5, reuse_pools=True,
+            reuse_names=True, general=GENERAL_VARIANTS5, reuse_twins=True),
 )}
 
 
@@ -580,23 +635,23 @@ def build(cat: Catalog, prof: Profile, avoid: Avoid) -> list[dict]:
                         truth={"state": st}))
 
     # either/or: a town name that exists in two metros
-    twins = sorted((c, sorted(ms)) for c, ms in
-                   ((c, {mm for cc, mm in {(x["city"], x["metro_id"]) for x in cat.locs.values()} if cc == c})
-                    for c in {x["city"] for x in cat.locs.values()})
-                   if len(ms) == 2 and (c not in avoid.places
-                                        or prof.reuse_pools and any((c, m) not in avoid.twin_choices for m in ms)))
+    all_twins = sorted((c, sorted(ms)) for c, ms in
+                       ((c, {mm for cc, mm in {(x["city"], x["metro_id"]) for x in cat.locs.values()} if cc == c})
+                        for c in {x["city"] for x in cat.locs.values()})
+                       if len(ms) == 2)
+    twins = [(c, ms) for c, ms in all_twins
+             if c not in avoid.places or prof.reuse_pools and any((c, m) not in avoid.twin_choices for m in ms)]
     rng.shuffle(twins)
-    for city, ms in twins[:2]:
-        chosen = rng.choice([m for m in ms if (city, m) not in avoid.twin_choices])
+
+    def twin_anchor(city, m):
+        pts = [cat.xy(lid) for lid, x in cat.locs.items() if x["city"] == city and x["metro_id"] == m]
+        return sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)
+
+    def twin_other_pt(city, m):
+        return cat.xy(next(lid for lid, x in cat.locs.items() if x["city"] == city and x["metro_id"] != m))
+
+    def add_either_or(city, ms, chosen, desc, types, valid, anchor):
         st_names = [STATE_NAMES[cat.locs[lid]["state"]] for lid in cat.locs if cat.locs[lid]["city"] == city]
-        pts = [cat.xy(lid) for lid, x in cat.locs.items() if x["city"] == city and x["metro_id"] == chosen]
-        anchor = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
-        for desc, types in svc_order():
-            valid = cat.within(cat.valid_locs(types, EXISTING), anchor, 25)
-            other = [lid for lid, x in cat.locs.items() if x["city"] == city and x["metro_id"] != chosen]
-            other_pt = cat.xy(other[0])
-            if valid and cat.within(cat.valid_locs(types, EXISTING), other_pt, 25):
-                break
         chosen_state = STATE_NAMES[cat.locs[next(lid for lid in cat.locs if cat.locs[lid]["city"] == city
                                                  and cat.locs[lid]["metro_id"] == chosen)]["state"]]
         out.append(scenario(gid(), "geo", "either_or", EXISTING,
@@ -611,6 +666,15 @@ def build(cat: Catalog, prof: Profile, avoid: Avoid) -> list[dict]:
                                 cat.metros[m]["name"] for m in ms]},
                                     "followup_location_phrase": {"must": [chosen_state]}},
                             truth={"metros": ms, "chosen": chosen}))
+
+    for city, ms in twins[:2]:
+        chosen = rng.choice([m for m in ms if (city, m) not in avoid.twin_choices])
+        anchor, other_pt = twin_anchor(city, chosen), twin_other_pt(city, chosen)
+        for desc, types in svc_order():
+            valid = cat.within(cat.valid_locs(types, EXISTING), anchor, 25)
+            if valid and cat.within(cat.valid_locs(types, EXISTING), other_pt, 25):
+                break
+        add_either_or(city, ms, chosen, desc, types, valid, anchor)
 
     # far place (Portland, Maine for `national`): no clinic in its state; the nearest metro must win from
     # both the town and the state centroid
@@ -928,6 +992,51 @@ def build(cat: Catalog, prof: Profile, avoid: Avoid) -> list[dict]:
                          "location_ids_subset": cat.in_metro(cat.valid_locs(types, EXISTING), m1)},
                         checks={"location_phrase": {"must": [cat.metros[m]["name"]]}},
                         truth={"metro": m, "nearest_metro": m1, "nearest_miles": round(d1)}))
+
+    # ---------------- only the general variant is bookable nearby ----------------
+    gen_metros: list[str] = []
+    for desc, specific, general, word in prof.general:
+        if len(gen_metros) == 3:
+            break
+
+        def only_general(m):
+            return (m not in gen_metros and avoid.fresh([specific, general], m)
+                    and bool(cat.in_metro(cat.valid_locs([general], EXISTING), m))
+                    and not cat.within(cat.valid_locs([specific], EXISTING), cat.metro_xy(m), 100))
+        m = pick_metro(only_general, types=[specific, general])
+        if m is None:
+            continue
+        gen_metros.append(m)
+        made_gen = len(gen_metros)
+        d = min(miles(cat.metro_xy(m), cat.xy(lid)) for lid in cat.valid_locs([specific], EXISTING))
+        out.append(scenario(f"{pre}-gen-{made_gen:02d}", "general_variant", "general_variant", EXISTING,
+                            f"Existing patient (with a referral) who needs {desc}. They are in {label(m)}.",
+                            {**svc_field(desc), **loc_field(f"the city: {label(m)}")},
+                            offer([general], cat.in_metro(cat.valid_locs([general], EXISTING), m)),
+                            checks={"service_phrase": {"must": [word]},
+                                    "location_phrase": {"must": [cat.metros[m]["name"]]}},
+                            truth={"metro": m, "type": specific, "general": general,
+                                   "nearest_specific_miles": round(d)}))
+
+    # either/or again when too few unused (town, metro) choices are left: reuse a choice, with a service whose
+    # type+metro is new for every metro it touches
+    if prof.reuse_twins:
+        reused = [t for t in all_twins if t not in twins[:2]]
+        rng.shuffle(reused)
+        need = 2 - len(twins[:2])
+        for city, ms in reused:
+            if need == 0:
+                break
+            chosen = rng.choice(ms)
+            anchor, other_pt = twin_anchor(city, chosen), twin_other_pt(city, chosen)
+            hit = next(((desc, types, valid) for desc, types in svc_order()
+                        for valid in [cat.within(cat.valid_locs(types, EXISTING), anchor, 25)]
+                        if valid and cat.within(cat.valid_locs(types, EXISTING), other_pt, 25)
+                        and all(avoid.fresh(types, mm) for mm in {chosen} | {cat.metro_of(lid) for lid in valid})),
+                       None)
+            if hit:
+                add_either_or(city, ms, chosen, *hit, anchor)
+                need -= 1
     return out
 
 
@@ -981,7 +1090,7 @@ def phrase(scen: list[dict], raw_dir: Path, only: list[str] | None = None, tag: 
         batch = todo[i:i + BATCH]
         prompt, text = ask_deepseek(batch, preamble)
         path.write_text(json.dumps({"model": MODEL, "prompt": prompt, "response": text,
-                                    "parsed": parse_array(text)}, indent=1, ensure_ascii=False), encoding="utf-8")
+                                    "parsed": parse_array(text)}, indent=1, ensure_ascii=False), encoding="utf-8", newline="\n")
         print(f"wrote {path.name}: {len(batch)} scenarios")
 
 
@@ -1048,7 +1157,7 @@ def merge_cases(scen: list[dict], prof: Profile) -> None:
                       "patient": s["patient"], "turns": turns, "expected": s["expected"],
                       "phrasing_source": got.get("_file", "hand")})
     out = prof.out
-    out.write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in lines), encoding="utf-8")
+    out.write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in lines), encoding="utf-8", newline="\n")
     print(f"wrote {out.relative_to(ROOT)}: {len(lines)} cases; dropped {len(drops)}")
     for sid, errs, got in drops:
         print(f"  DROP {sid}: {'; '.join(errs)}  got={got}")
@@ -1092,7 +1201,7 @@ def main() -> None:
         other = [s for ex in prof.excludes for s in load_scenarios(PROFILES[ex])]
         scen = build(cat, prof, Avoid.of(cat, other))
         prof.dir.mkdir(parents=True, exist_ok=True)
-        prof.scenarios.write_text(json.dumps(scen, indent=1, ensure_ascii=False), encoding="utf-8")
+        prof.scenarios.write_text(json.dumps(scen, indent=1, ensure_ascii=False), encoding="utf-8", newline="\n")
         print(f"wrote {prof.scenarios.relative_to(ROOT)}: {len(scen)} scenarios")
         print("per category:", dict(Counter(s["category"] for s in scen)))
         print("per kind:", dict(Counter(s["kind"] for s in scen)))
