@@ -90,14 +90,14 @@ In both scheduler agents: `start` (greeting to schedule) and `book_another` (boo
 | Tool | Arguments | Result |
 |---|---|---|
 | `update_request` | `service_phrase`, `specialty_hint` (enum of the catalog's specialties), `provider_phrase`, `location_phrase` (clinic, neighborhood, city, state or ZIP in the caller's words), `is_new`, `has_referral`, `time_pref` (`soonest`, `day`, `days`, `part_of_day`, `not_before`), `pick_offer` (1-3), `clear` | `{status, spoken or say, offers?, ask?, reason?, ...}` for `offer`, `ask`, `refuse` or `confirm` |
-| `lookup` | `kind` (`location_info`, `provider_info`, `do_you_offer`), `phrase` | At most 5 facts: hours, addresses, languages, "do you offer X" |
+| `lookup` | `kind` (`location_info`, `provider_info`, `do_you_offer`), `phrase` | At most 5 facts: hours, addresses, languages, "do you offer X". For information questions only; a booking request asked as a question goes to `update_request`. The LLM words the answer from the facts (no speak-direct): the caller asked for one fact, and a fact can list hundreds of sites. |
 
 ### Edge actions
 
 | Action | Behavior |
 |---|---|
 | `book_confirmed` | Books exactly the offer `update_request` read back, whatever the LLM passed. Re-checks policy and holds the slot. On success it speaks "You're all booked. Your confirmation is ..." with the reference spelled one character at a time, appends to `bookings`, and moves to the target. If policy fails or the slot was taken, it says so, offers fresh times and stays on the node. Holding a slot this call already holds returns the same reference, so a retry converges on one booking. |
-| `new_request` | Starts a fresh request from the caller's latest words (`request`). Only the patient flags carry over. The words become `summary`, so they survive the context reset. |
+| `new_request` | Starts a fresh request from the caller's latest words (`request`). Only the patient flags carry over. The words become `summary`, so they survive the context reset. The target node's first LLM request is sent with `tool_choice` forcing `update_request`, so the words reach the resolver before the LLM can speak; the next request is unforced. A target node without `update_request` gets no forcing. |
 
 Flow state written by the scheduling tools and actions: `req` (the request), `status` (last resolver status `offer | ask | refuse | confirm`, or `booked`), `summary`, `bookings` (a list of `{ref, visit, provider, location, when}`), `today` (the date phrase the prompts use).
 

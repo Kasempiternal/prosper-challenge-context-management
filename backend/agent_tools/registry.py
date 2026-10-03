@@ -25,7 +25,7 @@ EDGE_GUARDS: dict[str, EdgeGuard] = {
 
 EDGE_ACTIONS: dict[str, EdgeAction] = {
     "book_confirmed": EdgeAction(book_confirmed),
-    "new_request": EdgeAction(new_request, params=("request",)),
+    "new_request": EdgeAction(new_request, params=("request",), first_tool="update_request"),
 }
 
 TOOL_NAMES = frozenset(TOOLS)

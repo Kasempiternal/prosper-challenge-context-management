@@ -82,12 +82,26 @@ transport_params = {
 class SerialToolCallsLLMService(OpenAILLMService):
     """One tool call per LLM turn: a speak-direct handler returns NO_RESPONSE, which only
     holds if no sibling call asks the LLM to run again. OpenAI rejects parallel_tool_calls
-    on a request without tools (end nodes), so it is set per request."""
+    on a request without tools (end nodes), so it is set per request.
+
+    force_tool_once(name): the next request must call that tool (tool_choice). Only that one
+    request: the flag is spent on it whether or not it offers the tool, and OpenAI rejects a
+    tool_choice naming a tool the request does not offer, so then it is not sent."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._forced_tool: str | None = None
+
+    def force_tool_once(self, name: str) -> None:
+        self._forced_tool = name
 
     def build_chat_completion_params(self, params_from_context) -> dict:
         params = super().build_chat_completion_params(params_from_context)
+        forced, self._forced_tool = self._forced_tool, None
         if params.get("tools"):
             params["parallel_tool_calls"] = False
+            if forced in {t["function"]["name"] for t in params["tools"]}:
+                params["tool_choice"] = {"type": "function", "function": {"name": forced}}
         return params
 
 
@@ -108,8 +122,16 @@ def user_aggregator_params() -> LLMUserAggregatorParams:
     )
 
 
-def make_services(config: AgentConfig, api_keys: Mapping[str, str], keyterms: list[str] | None):
-    """The call's STT, TTS and LLM, each with this call's key over .env (call_key)."""
+def make_llm(config: AgentConfig, api_keys: Mapping[str, str]) -> SerialToolCallsLLMService:
+    """The call's LLM, with this call's key over .env (call_key)."""
+    return SerialToolCallsLLMService(
+        api_key=call_key(OPENAI_ENV, api_keys),
+        settings=SerialToolCallsLLMService.Settings(model=config.model),
+    )
+
+
+def make_voice(config: AgentConfig, api_keys: Mapping[str, str], keyterms: list[str] | None):
+    """The call's STT and TTS, with this call's key over .env (call_key)."""
     elevenlabs_key = call_key(ELEVENLABS_ENV, api_keys)
     stt = ElevenLabsRealtimeSTTService(
         api_key=elevenlabs_key,
@@ -119,11 +141,7 @@ def make_services(config: AgentConfig, api_keys: Mapping[str, str], keyterms: li
         api_key=elevenlabs_key,
         settings=ElevenLabsTTSService.Settings(voice=config.voice_id),
     )
-    llm = SerialToolCallsLLMService(
-        api_key=call_key(OPENAI_ENV, api_keys),
-        settings=SerialToolCallsLLMService.Settings(model=config.model),
-    )
-    return stt, tts, llm
+    return stt, tts
 
 
 def load_agent_data(body: dict | None) -> dict:
@@ -148,10 +166,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
     async def send_event(event: dict) -> None:
         await worker.queue_frame(RTVIServerMessageFrame(data=event))
 
-    builder = AgentBuilder(config, on_event=send_event, api_keys=api_keys)
+    llm = make_llm(config, api_keys)
+    builder = AgentBuilder(config, on_event=send_event, api_keys=api_keys, force_tool=llm.force_tool_once)
     keyterms = stt_keyterms(builder.tool_context.index) if builder.tool_context else None
-
-    stt, tts, llm = make_services(config, api_keys, keyterms)
+    stt, tts = make_voice(config, api_keys, keyterms)
 
     context = LLMContext()
     context_aggregator = LLMContextAggregatorPair(

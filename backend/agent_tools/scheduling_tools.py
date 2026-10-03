@@ -63,10 +63,13 @@ class EdgeOutcome:
 @dataclass(frozen=True)
 class EdgeAction:
     """Code an edge runs before its transition. params: edge properties it reads, which the edge
-    must declare as required."""
+    must declare as required. first_tool: when the action moves on, the target node's first LLM
+    request must call this tool: the action left the caller's words where only that tool reads
+    them, and a reset context gives the LLM nothing else to answer."""
 
     run: Callable[[ToolContext, dict, FlowManager], Awaitable[EdgeOutcome]]
     params: tuple[str, ...] = ()
+    first_tool: str | None = None
 
 
 def today_phrase(now: datetime) -> str:
@@ -280,7 +283,10 @@ def lookup_tool(ctx: ToolContext) -> FlowsFunctionSchema:
         description=(
             "Answer a caller's question from the clinic catalog: a location's address, hours or phone "
             "(location_info), a doctor's specialty, sites, languages or whether they take new patients "
-            "(provider_info), or whether we offer a kind of visit (do_you_offer). Answer only from the facts returned."
+            "(provider_info), or whether we offer a kind of visit (do_you_offer). Only for a question that asks for "
+            "information: a request to book something, even asked as \"do you have X in Y?\", is not a question for "
+            "lookup. Say only what the facts state; never say whether something is or is not available in a place "
+            "they do not name."
         ),
         properties={
             "kind": {"type": "string", "enum": list(KINDS)},

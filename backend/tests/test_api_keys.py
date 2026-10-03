@@ -1,13 +1,11 @@
 import argparse
 import asyncio
-import importlib
 import json
 import sys
 import threading
 from pathlib import Path
 from types import SimpleNamespace
 
-import dotenv
 import httpx
 import pytest
 from fastapi import FastAPI
@@ -49,21 +47,6 @@ def logs(caplog):
     sink = logger.add(caplog.handler, format="{message}", level="DEBUG")
     yield caplog
     logger.remove(sink)
-    logger.configure(patcher=None)
-
-
-@pytest.fixture
-def runner(monkeypatch):
-    """pipecat.runner.run and bot.py load a .env when first imported (the runner's search finds
-    backend/.env from the venv); in tests that would put real keys in this process."""
-    monkeypatch.setattr(dotenv, "load_dotenv", lambda *args, **kwargs: False)
-    return importlib.import_module("pipecat.runner.run")
-
-
-@pytest.fixture
-def bot(runner):
-    module = importlib.import_module("bot")
-    yield module
     logger.configure(patcher=None)
 
 
@@ -135,9 +118,9 @@ def test_call_services_get_the_call_keys(bot, monkeypatch, no_server_keys, env, 
     for name, key in env.items():
         monkeypatch.setenv(name, key)
     config = AgentConfig.from_dict(json.loads(CLINIC.read_text(encoding="utf-8")))
-    stt, tts, llm = bot.make_services(config, keys, None)
+    stt, tts = bot.make_voice(config, keys, None)
     assert stt._api_key == tts._api_key == sent["ELEVENLABS_API_KEY"]
-    assert llm._client.api_key == sent["OPENAI_API_KEY"]
+    assert bot.make_llm(config, keys)._client.api_key == sent["OPENAI_API_KEY"]
 
 
 @pytest.mark.parametrize("keys, missing", [

@@ -34,16 +34,19 @@ from .schema import AgentConfig, Edge, Node
 from .validation import AgentValidationError, validate_agent
 
 EventCallback = Callable[[dict], Awaitable[None]]
+ForceTool = Callable[[str], None]  # the LLM's next request must call this tool
 
 
 class AgentBuilder:
     """Builds a runnable Pipecat Flows graph from a declarative AgentConfig."""
 
     def __init__(self, config: AgentConfig, on_event: Optional[EventCallback] = None,
-                 api_keys: Mapping[str, str] = NO_KEYS):
-        """api_keys: this call's API keys by env var name, over the environment (scheduling.choosers)."""
+                 api_keys: Mapping[str, str] = NO_KEYS, force_tool: Optional[ForceTool] = None):
+        """api_keys: this call's API keys by env var name, over the environment (scheduling.choosers).
+        force_tool: how an edge action's first_tool reaches the LLM (bot.SerialToolCallsLLMService)."""
         self.config = config
         self._on_event = on_event
+        self._force_tool = force_tool
         self._nodes_by_name = {n.name: n for n in config.nodes}
         self._validate()
         self.tool_context: Optional[ToolContext] = None
@@ -151,6 +154,8 @@ class AgentBuilder:
                     return outcome.result, None if outcome.respond else NO_RESPONSE
                 result = outcome.result
                 next_node["respond_immediately"] = outcome.respond
+                if action.first_tool and self._force_tool:
+                    self._force_tool(action.first_tool)
             else:
                 # Persist what the caller gave us so later nodes can use it.
                 flow_manager.state.update(args)

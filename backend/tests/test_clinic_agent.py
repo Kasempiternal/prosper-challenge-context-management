@@ -29,6 +29,27 @@ def test_national_agent_is_valid():
     assert validate_agent(json.loads(NATIONAL.read_text(encoding="utf-8"))) == []
 
 
+@pytest.mark.parametrize("path", sorted(CLINIC.parent.glob("*.json")), ids=lambda p: p.stem)
+def test_every_saved_agent_is_valid(path):
+    assert validate_agent(json.loads(path.read_text(encoding="utf-8"))) == []
+
+
+@pytest.mark.parametrize("path", [CLINIC, NATIONAL], ids=lambda p: p.stem)
+def test_a_booking_asked_as_a_question_goes_to_book_another_in_the_callers_words(path):
+    """Live call: after a booking, "Can I have a flu shot in Trenton?" went to lookup, the LLM said "We
+    do not offer flu shots in Trenton, but there are many other locations", then called book_another
+    with "flu shot in the closest city to Trenton"."""
+    agent = json.loads(path.read_text(encoding="utf-8"))
+    nodes = {n["name"]: n for n in agent["nodes"]}
+    booked = nodes["booked"]["task_messages"][0]["content"]
+    assert "even when they ask it as a question" in booked and "never call lookup first" in booked
+    assert "never add a claim of your own" in agent["persona"]
+    for node in ("greeting", "booked"):
+        [request] = [e["properties"]["request"] for e in nodes[node]["edges"] if e.get("action") == "new_request"]
+        assert "Never paraphrase, summarize or add words of your own" in request["description"]
+    assert "never answer in your own words except a lookup answer" in nodes["schedule"]["task_messages"][0]["content"]
+
+
 def test_unknown_tool_is_a_path_error(clinic):
     clinic["nodes"][1]["tools"] = ["update_request", "teleport"]
     assert validate_agent(clinic) == [{
