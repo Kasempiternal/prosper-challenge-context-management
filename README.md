@@ -310,7 +310,7 @@ Open the agent in Agent Studio, start a test call, and keep the Decisions tab op
 2. **Established patient, same request.** Both Chens are valid now, so the agent asks "Do you mean Dr. David Chen or Dr. Emily Chen?"
 3. **Street level** (National Scheduler). "I need a sick visit at the clinic on Market Street in San Jose." Agent: "Is that Downtown at 1812 Market or Willow Glen at 3330 Market?" Say "thirty-three thirty." The agent offers times at Willow Glen. Then "a sick visit at the one on Lincoln Avenue in Salt Lake" gets times at Sugar House (4821 Lincoln Ave). "Avenue" is not taken as The Avenues Family Clinic.
 4. **A place heard by sound.** "I need a flu shot, I'm in Trenton." Agent: "Did you mean Renton, Washington?" Say "No, Trenton, New Jersey." Agent: "Our nearest clinic in New Jersey for a flu shot is Cherry Hill, near Philadelphia. Want me to look there?"
-5. **The switch** (Clinic Scheduler). With JEV, "something for my back pain" gets orthopedic consultation times. Flip the Disambiguator to **Off** and call again: the same words get "What's the visit for?". That is the rules path, with no model.
+5. **The switch** (Clinic Scheduler, new call). With JEV, "something for my back pain" is read as an orthopedic consultation, and the agent asks "Do you have a referral for an orthopedic consultation?". Flip the Disambiguator to **Off** and call again: the same words get "What's the visit for?". That is the rules path, with no model.
 6. **Consent guard.** After an offer, say "Sure, book it" without picking a time. `confirm_booking` is refused, and the agent asks which time first.
 7. **Nothing nearby** (National Scheduler). "I need a dental cleaning, I live in Maine." The agent offers the nearest Boston site.
 
