@@ -632,3 +632,36 @@ def test_the_decision_event_shows_the_words_kept_over_the_models(make_ctx, event
     call(ctx, fm, "update_request", {"provider_phrase": "Dr. Emily Chen"})
     last = [e for e in events if e["type"] == "resolver_decision"][-1]
     assert last["kept_words"] == {"model": ["Dr. Emily Chen"], "caller": "The lady one."}
+
+
+def test_a_yes_sent_as_a_pick_with_nothing_offered_answers_the_open_question():
+    """Live call: "Yes." to "Do you mean Dr. Emily Chen?" arrived as pick_offer 1, twice."""
+    from scheduling.request import PendingAsk, Request
+    req = Request(pending_ask=PendingAsk("provider", ("prov_046",)))
+    out, replaced = grounded({"pick_offer": 1}, req, "Yes.")
+    assert out == {"provider_phrase": "Yes."} and replaced == ["pick_offer 1"]
+
+
+def test_a_pick_with_offers_on_the_table_is_left_alone():
+    from scheduling.request import OfferRef, PendingAsk, Request
+    req = Request(offered=(OfferRef(1, "t", "p", "l", "2026-10-08T08:00:00", 30),),
+                  pending_ask=PendingAsk("provider", ("prov_046",)))
+    out, _ = grounded({"pick_offer": 1}, req, "The first one.")
+    assert out == {"pick_offer": 1}
+
+
+def test_a_run_on_request_adds_no_doctor_description():
+    from agent_tools.scheduling_tools import with_dropped_description
+    said = "health doctor again lady one dog Chin Chen morning bus"
+    assert with_dropped_description("Dr. Chen", said) == "Dr. Chen"
+
+
+def test_booking_for_someone_else_asks_their_details_again(make_ctx):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    fm.state["req"] = {"patient": {"is_new": False, "has_referral": True}}
+    asyncio.run(new_request(ctx, {"request": "my husband Frank, a flu shot", "for_someone_else": True}, fm))
+    assert fm.state["req"]["patient"] == {"is_new": None, "has_referral": None}
+    fm2 = FakeFlowManager()
+    fm2.state["req"] = {"patient": {"is_new": False, "has_referral": True}}
+    asyncio.run(new_request(ctx, {"request": "a flu shot for me too"}, fm2))
+    assert fm2.state["req"]["patient"] == {"is_new": False, "has_referral": True}

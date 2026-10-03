@@ -41,7 +41,7 @@
         },
         {
           "function": "transfer_to_staff",
-          "description": "The caller wants to reschedule, cancel, or speak to a person.",
+          "description": "The caller wants to reschedule, cancel, or speak to a person. Never for a question, even one lookup cannot answer.",
           "target": "handoff",
           "properties": {},
           "required": []
@@ -77,7 +77,7 @@
         },
         {
           "function": "transfer_to_staff",
-          "description": "The caller wants a person, a reschedule or a cancellation, or update_request returned reason handoff.",
+          "description": "The caller wants a person, a reschedule or a cancellation, or update_request returned reason handoff. Never for a question, even one lookup cannot answer.",
           "target": "handoff",
           "properties": {},
           "required": []
@@ -96,7 +96,7 @@
       "task_messages": [
         {
           "role": "developer",
-          "content": "This appointment is booked and the caller has been told its confirmation number: {{ summary }}\n\nIf the caller wants to book anything else, including one they mentioned while saying yes, and even when they ask it as a question such as \"can I get a flu shot in Trenton?\", call book_another right away with their exact words; never call lookup first and never answer it yourself. Call lookup only for a question that asks for information about a location, a doctor, or whether we offer a kind of visit, and answer in one sentence that says only what its facts state, nothing about places or availability they do not name. If they want to change or cancel the appointment just booked, or want a person, call transfer_to_staff. When the caller needs nothing else, call finish."
+          "content": "This appointment is booked and the caller has been told its confirmation number: {{ summary }}\n\nIf the caller wants to book anything else, for themselves or for someone else such as a family member, including one they mentioned while saying yes, and even when they ask it as a question such as \"can I get a flu shot in Trenton?\", call book_another right away with their exact words; never call lookup first and never answer it yourself. Call lookup only for a question that asks for information about a location, a doctor, or whether we offer a kind of visit, and answer in one sentence that says only what its facts state, nothing about places or availability they do not name. If they want to change or cancel the appointment just booked, or want a person, call transfer_to_staff. When the caller needs nothing else, call finish."
         }
       ],
       "edges": [
@@ -109,12 +109,16 @@
         },
         {
           "function": "book_another",
-          "description": "The caller wants to book another appointment.",
+          "description": "The caller wants to book another appointment, for themselves or for someone else such as a family member.",
           "target": "schedule",
           "properties": {
             "request": {
               "type": "string",
               "description": "The caller's own words about what they want booked now, exactly as they said them, unclear or garbled parts included: need or symptom, visit, doctor, place, day or time, new or returning patient, referral. If they said it over several turns, join their words in order. Never paraphrase, summarize or add words of your own, such as \"closest city\" or a place they did not say. Nothing from an earlier appointment."
+            },
+            "for_someone_else": {
+              "type": "boolean",
+              "description": "True when the appointment is for someone else than the caller, such as a husband, wife, child or grandchild: their patient details are asked again."
             }
           },
           "required": [
@@ -124,7 +128,7 @@
         },
         {
           "function": "transfer_to_staff",
-          "description": "The caller wants a person, or to change or cancel the appointment just booked.",
+          "description": "The caller wants a person, or to change or cancel the appointment just booked. Never for a question, even one lookup cannot answer.",
           "target": "handoff",
           "properties": {},
           "required": []

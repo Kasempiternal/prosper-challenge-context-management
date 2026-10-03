@@ -580,6 +580,8 @@ class _Resolution:
             return None
         if slot_name == "provider" and len(s.within) == 1:
             answer = read_confirmation(s.heard)
+            if answer is None:
+                answer = self._gender_answer(s)
             if answer is not None:
                 return self._confirmed_provider(s, answer)
         matcher = match_providers if slot_name == "provider" else match_locations
@@ -594,6 +596,21 @@ class _Resolution:
         if cands:
             self.slots[slot_name] = replace(s, asks=0, candidates=tuple((c.id, c.score) for c in cands))
         return [c.id for c in cands]
+
+    def _gender_answer(self, s: Slot) -> bool | None:
+        """"The lady one" answering "Do you mean Dr. Emily Chen?": a gender and nothing that names,
+        places or rules out a doctor. Yes when the model reads that gender off the asked doctor's
+        name for sure, no when it reads the other; None when it cannot tell or no model runs, and
+        the question is asked again."""
+        pid = s.within[0]
+        clues = read_provider_clues(self.ix, s.heard, [pid])
+        if not clues.gender or clues.facts or clues.rest or clues.negated:
+            return None
+        asked = self.chooser.provider_genders([pid])
+        gender = gender_of((asked or {}).get(pid))
+        self._consulted("provider gender", DECLINE if asked is None else Verdict(called=True, failed=not asked),
+                        f"confirmation answered by gender {clues.gender}: {pid} reads {gender}")
+        return None if gender is None else gender == clues.gender
 
     def _confirmed_provider(self, s: Slot, yes: bool) -> list[str]:
         """The caller answered "Do you mean Dr. Emily Chen?" without a name. Yes pins the slot to
@@ -1181,6 +1198,11 @@ class _Resolution:
                 # the model preferred is a prior ("my doctor ordered an MRI" -> brain), so the
                 # caller is asked among all of them, as without a model.
                 return DECLINE
+        if shortlisted and first.act and not first.failed:
+            # The check can also settle on a specialty's default after a first answer that asked
+            # ("my 2-year-old only says a few words" -> New Patient Visit at 0.79, then confirmed):
+            # a default names the specialty, not the visit, on this path as on the one above.
+            first, pool = self._within_specialty(first, pool)
         ids = [first.act] if first.act else list(first.ask or ())
         if not set(ids) <= set(pool):
             # The check gate only settles on the two it weighed; anything else is no usable answer.
@@ -1471,6 +1493,10 @@ class _Resolution:
         self.slots[slot_name] = replace(s, asks=asks, candidates=())
         if asks >= HANDOFF_AFTER_MISSES:
             return self._refuse("handoff")
+        if slot_name == "provider" and len(s.within) == 1:
+            # "Do you mean Dr. Emily Chen?" answered with no yes, no, name or fitting description:
+            # the same yes-or-no question again, never "which doctor was that?" or a spelling.
+            return self._ask("provider_confirm_again", options=s.within)
         field = {"service": "service_open",
                  "provider": "provider_retry" if asks == 1 else "provider_spelling",
                  "location": "location_retry" if asks == 1 else "location_zip"}[slot_name]
@@ -1490,6 +1516,7 @@ class _Resolution:
                 refusal: Refusal | None = None, confirm: Offer | None = None, keep_pick: bool = False) -> Plan:
         pending_field = {"provider_retry": "provider", "provider_spelling": "provider",
                          "provider_first_name": "provider", "location_retry": "location", "location_zip": "location",
+                         "provider_confirm_again": "provider",
                          "location_open": "location", "service_open": "service", "metro_again": "metro"}
         new_req = replace(
             self.req,

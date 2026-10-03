@@ -672,6 +672,36 @@ def test_the_answer_to_a_confirmation_books_the_doctor_it_names(index, availabil
     assert second.status == "offer" and _provs(second) == {provider}
 
 
+@pytest.mark.parametrize("answer", ["Uh, the lady one.", "the woman", "yeah, the lady one"])
+def test_restating_the_gender_confirms_the_doctor_it_fits(index, availability, answer):
+    """Live call: "Do you mean Dr. Emily Chen?" -> "Uh, the lady one." got "which doctor was that?"
+    and then a spelling request."""
+    first, second = _talk(index, availability, Server(nouls=SURE_GENDERS),
+                          {**EXISTING_REF, "service_phrase": "cardiology consultation",
+                           "provider_phrase": "Dr. Chen, the woman"},
+                          {"provider_phrase": answer})
+    assert first.ask.options == ("prov_046",)
+    assert second.status == "offer" and _provs(second) == {"prov_046"}
+
+
+def test_the_other_gender_to_a_confirmation_is_a_no(index, availability):
+    first, second = _talk(index, availability, Server(nouls=SURE_GENDERS),
+                          {**EXISTING_REF, "service_phrase": "cardiology consultation",
+                           "provider_phrase": "Dr. Chen, the woman"},
+                          {"provider_phrase": "the man"})
+    assert (second.status, second.say) == ("ask", "Do you mean Dr. David Chen?")
+
+
+def test_an_unclear_answer_to_a_confirmation_asks_it_again_never_a_spelling(index, availability):
+    first, second, third = _talk(index, availability, Server(nouls=SURE_GENDERS),
+                                 {**EXISTING_REF, "service_phrase": "cardiology consultation",
+                                  "provider_phrase": "Dr. Chen, the woman"},
+                                 {"provider_phrase": "what was that"}, {"provider_phrase": "yes"})
+    assert (second.status, second.ask.options, second.say) == (
+        "ask", ("prov_046",), "Sorry, I didn't catch that. Do you mean Dr. Emily Chen? Yes or no?")
+    assert third.status == "offer" and _provs(third) == {"prov_046"}
+
+
 @pytest.mark.parametrize("answer", ["no", "nope, not her", "the other one", "no, Lucas Chen"])
 def test_a_no_to_a_confirmation_asks_about_the_others(index, availability, answer):
     first, second, third = _talk(index, availability, Server(nouls=SURE_GENDERS),

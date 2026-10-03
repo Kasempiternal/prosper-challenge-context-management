@@ -33,7 +33,7 @@ def _location_facts(index: CatalogIndex, phrase: str) -> list[str]:
         return [f"Several locations match: {join_and([index.locations[c.id].name for c in cands])}."]
     loc = index.locations[cands[0].id]
     caps = join_and(sorted(c.replace("_", " ") for c in loc.capabilities)) or "general visits only"
-    return [loc.name, f"Address: {loc.address}, {loc.city}", f"Hours: {loc.hours}", f"Phone: {loc.phone}",
+    return [loc.name, f"Address: {loc.address}, {loc.city}", f"Hours: {loc.hours}", f"Phone: {loc.phone} (for anything not listed here)",
             f"On-site services: {caps}"][:MAX_FACTS]
 
 

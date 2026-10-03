@@ -272,7 +272,7 @@ The first three voice calls, driven by a person. Each found something the offlin
 
 A prompt instruction did not stop the model from claiming a booking in call 2. Moving the booking into an edge action did.
 
-Later rounds of live calls on 2026-10-03 (about 35 calls) found one recurring fault: the conversation model rewrote the caller before the resolver saw them.
+Later rounds of live calls on 2026-10-03 (about 40 calls) found one recurring fault: the conversation model rewrote the caller before the resolver saw them.
 
 | What the caller said | What the model sent | What changed |
 |---|---|---|
@@ -282,6 +282,7 @@ Later rounds of live calls on 2026-10-03 (about 35 calls) found one recurring fa
 | "My 10-year-old needs a physical…" | `physical and form signed` (a child was offered a pre-employment physical) | Same restore |
 | "Day of checkup." | `time_pref.day = wednesday` | A day the caller did not say is dropped |
 | "What are the hours at the Mission Bay clinic?" as the first words | `transfer_to_staff`: the greeting node had no `lookup` tool, so a question could only start a booking or end in a handoff | The greeting node has `lookup` and answers questions from its facts. Replayed through gpt-4o: 9/9 questions went to `lookup`, 6/6 booking requests to `start` |
+| Unscripted elderly-caller roleplays: "Uh, the lady one." answering "Do you mean Dr. Emily Chen?"; "Yes." sent as a time pick; "Does the clinic have parking?" at "Shall I book it?"; "Can you do my husband too?" | A spelling request, a repeated question, an invented "Yes" plus a transfer that lost the booking, and a transfer instead of a second booking | A gender-only answer confirms by the model's reading of the name; unclear answers repeat the yes-or-no question; a pick with nothing offered answers the open question; `lookup` says what it does not know and never transfers; `book_another` covers family members and clears their patient details |
 
 Replaying those turns through the same prompt with gpt-4.1 gave the same rewrites, and it answered "dental exam" for a caller who had not chosen. A stronger model was not the fix; a check in code was. The same calls led to a scope shortlist fix ("GI doc wants a scope" now asks), visit names matching without a bracketed abbreviation ("Upper Endoscopy (EGD)"), a second unknown place asking for a nearby city or ZIP instead of repeating itself, and the agent's name in the call panel header. The scripted retests are in [docs/live-call-tests.html](docs/live-call-tests.html); every fault and fix is in [eval/README.md](eval/README.md).
 
@@ -296,7 +297,7 @@ Remaining failure classes from blind round 4 (JEV mode):
 
 Other limits:
 
-- The offline eval feeds tool-call arguments, not audio. LLM extraction accuracy is measured only by live calls, about 35 so far.
+- The offline eval feeds tool-call arguments, not audio. LLM extraction accuracy is measured only by live calls, about 40 so far.
 - Availability is a seeded mock with a fixed `DEMO_NOW` (Wednesday 2026-10-07, 09:00). Bookings and holds live in memory and are lost on restart.
 - JEV probabilities move by 0.02-0.08 between identical requests, so a case near a threshold can flip between runs.
 - Reschedule, cancel and anything outside booking go to a handoff node with no real transfer behind it.
@@ -377,7 +378,7 @@ cd frontend && pnpm test                                   # vitest
 cd frontend && pnpm typecheck && pnpm lint && pnpm build
 ```
 
-Last run: **1,314 backend tests passed, 1 live JEV smoke test skipped** (2026-10-03, after the live-call fixes). **125 frontend tests passed**, and the frontend production build passed.
+Last run: **1,324 backend tests passed, 1 live JEV smoke test skipped** (2026-10-03, after the live-call fixes). **125 frontend tests passed**, and the frontend production build passed.
 
 ## Final verification (2026-10-03, resolver frozen at `222eb22`)
 

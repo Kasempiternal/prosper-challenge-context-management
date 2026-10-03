@@ -1308,3 +1308,17 @@ Fixed: h5-26 ("a scan of my lower back, not sure what kind" now asks), nat5-sym-
 | | no aliases, no lay terms | 2/28, 42 | 1/31, 47 |
 
 With JEV, losing all hand-written vocabulary costs 3-4 correct turns per set and adds at most one wrong commit. Without a model it costs up to 15 correct turns on SF. The vocabulary mainly serves the rules-only path; the disambiguator is what makes a new catalog usable on day one. `specialty_default` (one default visit per specialty) was kept in every run.
+
+## Real-caller round (2026-10-04)
+
+Six unscripted calls, the tester playing elderly callers from character cards (`docs/live-call-tests.html`). Three passed (a reschedule handed to staff; a knee visit in Overland Park with a mid-booking question; a well-woman exam in Philadelphia that switched to afternoons and asked for the street). Three found faults, each reproduced and fixed with a general rule:
+
+| What happened | Fix |
+|---|---|
+| "Do you mean Dr. Emily Chen?" -> "Uh, the lady one." got "Sorry, which doctor was that?", then "Could you spell the doctor's last name?" | A gender-only answer confirms the asked doctor when the model reads that gender off the name for sure, and is a no for the other gender. Any other unclear answer repeats the yes-or-no question, never a spelling request. |
+| "Yes." to the same question arrived as `pick_offer: 1` with nothing offered, twice | A pick while nothing is offered and a question is open goes to that question in the caller's words. |
+| At "Shall I book it?", "Does the clinic have parking?" got "Yes, the Downtown Health Center is at...", and "No, I mean parking" a transfer: the booking was lost | `lookup` says what it does not know: no yes or no beyond its facts, the phone number, and the call carries on. A question is never a reason to transfer. Replayed 3/3: "I don't have parking information, you can call (415) 555-6146." |
+| After booking her flu shot, "Can you do Frank, my husband, too?" was transferred to staff | `book_another` covers someone else, with a `for_someone_else` flag that clears the caller's patient details so Frank's are asked. Replayed 3/3 to `book_another`. |
+| A grandson's rash with the age lost to speech recognition went to dermatology, refused for lack of a referral, with nothing else offered | Not changed. Alternatives stay within the specialty (round 5 review), and dermatology has none without a referral. Listed as a known limit. |
+
+The dev re-run after these fixes surfaced one more case through JEV variance: nat4-sym-06 ("my 2-year-old only says a few words") got a first answer of 0.79, just under the 0.8 act threshold, so the check settled on New Patient Visit and an adult visit was offered for a toddler. The round 3 rule that re-chooses within a specialty when a choice lands on its default ran only on the act path; it now also runs after the check. Dev and stress sets after all of it, JEV: 0 wrong commits on every dev set, both stress gates PASS.

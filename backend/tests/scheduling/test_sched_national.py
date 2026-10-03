@@ -479,6 +479,33 @@ def test_a_specialty_default_chosen_from_a_shortlist_is_chosen_again_within_its_
     assert (plan.status, plan.ask and plan.ask.field, {o.type_id for o in plan.offers}) == expected
 
 
+class SpecialtyDefaultAfterAsk(SpecialtyFirst):
+    """The first answer asks between Spec3's default and another visit; the check settles on the
+    default."""
+
+    def pick_type(self, phrase, hint, candidate_ids):
+        self.calls.append(("type", phrase, list(candidate_ids)))
+        return self.within if "appt_000" not in candidate_ids else Verdict(ask=("appt_103", "appt_000"), called=True)
+
+    def check_type(self, phrase, hint, first, rival):
+        self.calls.append(("check", first.act, rival))
+        return Verdict(act="appt_103", called=True)
+
+
+def test_a_specialty_default_the_check_settles_on_is_chosen_again_within_its_specialty():
+    """National4 nat4-sym-06 on a live re-run: the first answer asked at 0.79 (the act threshold
+    is 0.8), the check settled on New Patient Visit, and a 2-year-old's speech delay was booked
+    into an adult visit. The act path already re-chose within the specialty; this path did not."""
+    ix = build_index(_many_types_raw(), {**ALIASES, "specialty_default": {**ALIASES["specialty_default"],
+                                                                         "Spec3": "appt_103"}})
+    hooks = SpecialtyDefaultAfterAsk(Verdict(act="appt_112", called=True))
+    req = merge(Request(), Update.from_args({"service_phrase": "my zorbly thing", "is_new": False,
+                                             "location_phrase": "Austin"}))
+    plan = resolve(ix, req, MockAvailability(ix), hooks, hooks, hooks)
+    assert any(c[0] == "check" for c in hooks.calls)
+    assert (plan.status, {o.type_id for o in plan.offers}) == ("offer", {"appt_112"})
+
+
 def _with(locations=(), metros=(), providers=()):
     raw = national_raw()
     raw["metros"] = METROS + list(metros)

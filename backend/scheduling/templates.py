@@ -230,6 +230,8 @@ def say_ask(index: CatalogIndex, field: str, options: list[str], context: str | 
         return f"Do you mean {join_or(_distinct_provider_labels(index, options))}?"
     if field == "provider_first_name":
         return f"Which {context or 'doctor'} is it? Do you know the first name?"
+    if field == "provider_confirm_again":
+        return f"Sorry, I didn't catch that. Do you mean {join_or(_distinct_provider_labels(index, options))}? Yes or no?"
     if field == "provider_retry":
         return "Sorry, which doctor was that?"
     if field == "provider_spelling":
