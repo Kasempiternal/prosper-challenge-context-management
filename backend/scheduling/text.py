@@ -20,6 +20,22 @@ _SPOKEN_RESPELL = (
 )
 
 
+# English function words (pronouns, determiners, auxiliaries, conjunctions, prepositions of place
+# and time, contraction pieces): words that say nothing about what a phrase is about. Directions
+# ("up", "down", "below") and negations ("not", "no") are left out: they can tell things apart.
+FUNCTION_WORDS = frozenset({
+    "i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself", "he", "him",
+    "his", "himself", "she", "her", "hers", "herself", "it", "its", "itself", "they", "them", "their", "theirs",
+    "themselves", "what", "which", "who", "whom", "whose", "this", "that", "these", "those", "am", "is", "are", "was",
+    "were", "be", "been", "being", "have", "has", "had", "having", "do", "does", "did", "doing", "will", "would",
+    "shall", "should", "can", "could", "may", "might", "must", "a", "an", "the", "and", "but", "if", "or", "because",
+    "as", "until", "while", "of", "at", "by", "for", "with", "about", "between", "to", "from", "in", "on", "again",
+    "then", "once", "here", "there", "when", "where", "why", "how", "all", "any", "both", "each", "some", "such",
+    "so", "than", "too", "very", "just", "also", "really", "now", "s", "t", "d", "ll", "m", "re", "ve", "don",
+    "um", "uh", "oh", "like", "okay", "ok", "please", "yeah", "yes", "one", "ones",
+})
+
+
 def normalize(text: str) -> str:
     return _NON_ALNUM.sub(" ", text.lower()).strip()
 

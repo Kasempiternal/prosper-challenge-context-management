@@ -8,6 +8,7 @@ from datetime import datetime
 
 from .catalog_index import AppointmentType, CatalogIndex
 from .geo import US_STATES
+from .lexicon import fasting_pair
 from .names import street_of
 from .text import normalize
 
@@ -147,12 +148,6 @@ def ring_preface(index: CatalogIndex, location_id: str, distance_mi: float, near
     return f"There's nothing closer to {near}; the nearest is {miles(distance_mi)} away, in {where}. "
 
 
-def kin_preface(index: CatalogIndex, type_id: str) -> str:
-    """Said before offers of a related visit the caller's words also name, when none near has the
-    one they meant: "We don't offer a CT - chest nearby. For a CT scan, ..."."""
-    return f"We don't offer {with_article(type_label(index.types[type_id]))} nearby. "
-
-
 def _clock(dt: datetime) -> str:
     hour = dt.hour % 12 or 12
     return f"{hour}" if dt.minute == 0 else f"{hour}:{dt.minute:02d}"
@@ -214,6 +209,9 @@ def say_confirm(index: CatalogIndex, type_id: str, provider_id: str, location_id
 
 
 def say_ask(index: CatalogIndex, field: str, options: list[str], context: str | None = None) -> str:
+    if field == "service" and fasting_pair(index, options):
+        # A caller can say whether they were told to fast; "a blood draw or a fasting blood test?" they often can't.
+        return "Did your doctor say to fast for it?"
     if field == "service":
         return f"Is that {join_or([with_article(type_label(index.types[o])) for o in options])}?"
     if field == "service_open":
@@ -263,10 +261,12 @@ def say_refuse(index: CatalogIndex, code: str, *, type_id: str | None = None, wh
                location_id: str | None = None, specialty: str | None = None,
                alternatives: tuple[tuple[str, str, str], ...] = (), alt_type_id: str | None = None,
                needs_referral: bool = False, near: str | None = None, near_kind: str | None = None,
-               radius_mi: float | None = None, nearest_mi: float | None = None, inside: bool = False) -> str:
+               radius_mi: float | None = None, nearest_mi: float | None = None, inside: bool = False,
+               related: tuple[str, str, float] | None = None) -> str:
     """`at`: the clinics the caller named (location_type, provider_location, and none_nearby when
     nothing near a named clinic has the visit); `location_id`: the nearest clinic that has it
-    (none_nearby), `inside` the state the caller named."""
+    (none_nearby), `inside` the state the caller named; `related`: a more general visit near the
+    caller (type, clinic, miles), asked about beside the far one (none_nearby)."""
     what = with_article(type_label(index.types[type_id])) if type_id else "that"
     What = what[0].upper() + what[1:]
     loc = named_sites(index, at, on_street)
@@ -299,6 +299,15 @@ def say_refuse(index: CatalogIndex, code: str, *, type_id: str | None = None, wh
         return f"We can't do {what}{_at(loc)}.{alt}"
     if code == "no_availability":
         return f"I don't see any openings for {what} in the next three weeks with those preferences. Want me to try other days?"
+    if code == "none_nearby" and related:
+        kin_type, kin_loc, kin_mi = related
+        kin = f"{with_article(type_label(index.types[kin_type]))} is {miles(kin_mi)} away, at {site_label(index, kin_loc)}"
+        if location_id:
+            city = city_of(index, location_id) or site_label(index, location_id)
+            far = f"about {miles(nearest_mi)} away, in {city}" if nearest_mi is not None else f"in {city}"
+            return (f"The nearest {type_label(index.types[type_id])} is {far}; {kin}. "
+                    f"Would that work, or should I look in {city}?")
+        return f"We don't offer {what} within {miles(radius_mi or 0)} of {near}; {kin}. Would that work?"
     if code == "none_nearby":
         if near_kind == "state":
             # A state's centre is nowhere the caller is: the clinic is named, never a distance to it.

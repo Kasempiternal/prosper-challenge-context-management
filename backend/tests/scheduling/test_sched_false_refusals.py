@@ -8,7 +8,7 @@ import pytest
 from scheduling.availability import MockAvailability
 from scheduling.catalog_index import CatalogIndex
 from scheduling.decision import Verdict
-from scheduling.lexicon import fitting_kin
+from scheduling.lexicon import general_kin
 from scheduling.request import Request, Update, merge
 from scheduling.resolver import resolve
 
@@ -84,7 +84,7 @@ def test_a_visit_we_do_not_offer_asked_for_by_name_never_reaches_the_model(sf):
     assert (plan.status, plan.refusal.code, model.pools) == ("refuse", "not_offered", [])
 
 
-# ---- a related visit near the caller --------------------------------------------------------
+# ---- a more general visit near the caller ----------------------------------------------------
 
 @pytest.mark.parametrize("phrase, type_id, kin", [
     ("my doctor ordered a CT scan of my chest", "appt_210", ("appt_066",)),
@@ -92,15 +92,50 @@ def test_a_visit_we_do_not_offer_asked_for_by_name_never_reaches_the_model(sf):
     ("my doctor ordered an MRI of my ankle", "appt_207", ()),
     ("a CT of my chest", "appt_210", ()),
 ])
-def test_kin_are_visits_the_words_name_in_full(nat, phrase, type_id, kin):
-    assert fitting_kin(nat, phrase, type_id) == kin
+def test_kin_are_more_general_visits_the_words_name_in_full(nat, phrase, type_id, kin):
+    assert general_kin(nat, phrase, type_id) == kin
 
 
-def test_a_related_visit_the_words_name_is_offered_when_the_one_meant_is_far(nat):
-    plan = _talk(nat, {"service_phrase": "my doctor ordered a CT scan of my chest",
-                       "location_phrase": "the ZIP code is 60657"}, model=Sure(("appt_210",)))
-    assert plan.status == "offer" and {o.type_id for o in plan.offers} == {"appt_066"}
-    assert plan.say.startswith("We don't offer a CT - chest nearby. For a CT scan,")
+CT_CHEST_NEAR_CHICAGO = {"service_phrase": "my doctor ordered a CT scan of my chest",
+                         "location_phrase": "the ZIP code is 60657"}
+
+
+def test_a_more_general_visit_near_is_asked_about_and_the_far_one_kept(nat):
+    plan = _talk(nat, CT_CHEST_NEAR_CHICAGO, model=Sure(("appt_210",)))
+    assert (plan.status, plan.refusal.code) == ("refuse", "none_nearby")
+    assert plan.say == ("The nearest CT - chest is about 229 miles away, in Detroit; a CT scan is 1 mile away, "
+                        "at Hyde Park. Would that work, or should I look in Detroit?")
+    (far_type, _, far_loc), (near_type, _, near_loc) = plan.refusal.alternatives
+    assert (far_type, nat.locations[far_loc].metro_id, near_type) == ("appt_210", "detroit-mi", "appt_066")
+
+
+@pytest.mark.parametrize("pick, type_id", [(1, "appt_210"), (2, "appt_066")])
+def test_either_option_of_that_question_books_only_when_picked(nat, pick, type_id):
+    first = _talk(nat, CT_CHEST_NEAR_CHICAGO, model=Sure(("appt_210",)))
+    _, _, loc = first.refusal.alternatives[pick - 1]
+    plan = _talk(nat, CT_CHEST_NEAR_CHICAGO, {"pick_offer": pick}, model=Sure(("appt_210",)))
+    assert plan.status == "offer" and {(o.type_id, o.location_id) for o in plan.offers} == {(type_id, loc)}
+
+
+# Review round 5: each of these offered the second visit, "We don't offer X nearby. For a Y, ...".
+OTHER_VISITS = [
+    ("I need pelvic floor therapy after my delivery", "Austin, TX", "appt_226", "appt_060"),  # specialty
+    ("my daughter needs a pediatric echocardiogram", "Austin, TX", "appt_294", "appt_021"),  # age group
+    ("I'm 34 and want an adult ADHD evaluation", "Charlotte, NC", "appt_198", "appt_106"),  # age group
+    ("my doctor ordered a nuclear stress test", "Albuquerque, NM", "appt_117", "appt_022"),  # imaging
+    ("I need a prenatal ultrasound, I'm 12 weeks", "Denver, CO", "appt_156", "appt_042"),  # test, consultation
+    ("my doctor ordered an MRI of my spine", "Denver, CO", "appt_064", "appt_138"),  # test, consultation
+    ("I'd like to book a colonoscopy", "Chicago, IL", "appt_183", "appt_054"),  # procedure, consultation
+]
+
+
+@pytest.mark.parametrize("phrase, place, meant, other", OTHER_VISITS)
+def test_another_visit_is_never_offered_or_suggested_for_the_one_meant(nat, phrase, place, meant, other):
+    assert general_kin(nat, phrase, meant) == ()
+    for model in (None, Sure((meant,))):
+        plan = _talk(nat, {"service_phrase": phrase, "location_phrase": place}, model=model)
+        assert (plan.status, plan.refusal.code) == ("refuse", "none_nearby")
+        assert {a[0] for a in plan.refusal.alternatives} == {meant}
 
 
 def test_no_related_visit_leaves_the_refusal(nat):

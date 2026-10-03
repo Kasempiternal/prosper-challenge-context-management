@@ -13,10 +13,10 @@ from typing import Callable, Mapping
 import jellyfish
 
 from .catalog_index import Alias, CatalogIndex
-from .names import is_catalog_name
+from .names import is_catalog_name, leading_answer, specialties_named
 from .per_index import per_index
 from .request import TIME_WORDS
-from .text import normalize, stem, tokens
+from .text import FUNCTION_WORDS, normalize, stem, tokens
 
 _GENERIC = {"consultation", "consult", "visit", "exam", "test", "session", "evaluation", "screening", "of",
             "appointment", "a", "an", "the", "my", "for", "and", "with", "i", "need", "want", "to", "get", "some"}
@@ -444,11 +444,12 @@ def umbrella(index: CatalogIndex, phrase: str | None, type_id: str, within: tupl
     """The offered visits the caller's words fit exactly as well as `type_id`, sorted; () when the
     words tell `type_id` apart. "my baby's checkup": "baby" and "checkup" attach to Well-Child
     Visit and Newborn Visit alike ("well baby", "kid checkup", "newborn checkup"). A visit named
-    outright ("flu shot", "newborn visit") is told apart; so is one whose words a caller said in
-    full when the others' are not ("fasting blood test"). Words that say who sent the caller
-    ("my doctor said") and words that only name the visit's specialty ("my stomach doctor") tell
-    nothing apart. Any other word no visit's name or alias carries ("down the throat", "two weeks
-    old") may, so only a model can weigh it: ()."""
+    outright ("flu shot", "newborn visit") is told apart; so is one whose name a caller said in
+    full, its visit noun too, when the others' are not ("a blood test, the fasting kind"). Words of
+    the request rather than the visit (_of_request: "my nurse said", "I'm due for", "scheduled me
+    for") and words that only name the visit's specialty ("my stomach doctor") tell nothing apart.
+    Any other word no visit's name or alias carries ("down the throat", "two weeks old") may, so
+    only a model can weigh it: ()."""
     words = tokens(phrase or "")
     vocab = _vocab(index)
     kept = [w for w in words if w not in _NAME_STOP]
@@ -464,8 +465,7 @@ def umbrella(index: CatalogIndex, phrase: str | None, type_id: str, within: tupl
         (alias.phrase, frozenset(t for t, _ in alias.weights if t in offered)) for _, _, alias in multi]
     covered = {i for start, end, _ in multi for i in range(start, end)}
     terms += [(w, _attached(index, w)) for i, w in enumerate(words)
-              if i not in covered and i not in elsewhere and w not in TIME_WORDS and w not in _NO_VISIT
-              and (w not in _FILLER or w in _VISIT_NOUNS)]
+              if i not in covered and i not in elsewhere and not _of_request(w)]
     fit: set[str] | None = None
     names_specialty = False
     for w, tids in terms:
@@ -473,7 +473,7 @@ def umbrella(index: CatalogIndex, phrase: str | None, type_id: str, within: tupl
             fit = set(tids) if fit is None else fit & tids
             continue
         specialties = {index.types[t].specialty for t in tids} | (
-            {index.lay_terms[w]} if w in index.lay_terms else set())
+            {index.lay_terms[w]} if w in index.lay_terms else specialties_named(index, w))
         if not specialties or not specialties <= {spec}:
             return ()
         names_specialty = True
@@ -485,25 +485,42 @@ def umbrella(index: CatalogIndex, phrase: str | None, type_id: str, within: tupl
     heard = vocab.matched(words)
 
     def said_in_full(tid: str) -> bool:
-        return all(nw in heard for nw in vocab.name_words[tid])
+        # Every word of a name, a visit noun too: "dental" alone does not say Dental Exam.
+        return any(all(nw in heard for nw in part) for part in vocab.name_parts[tid])
     full = said_in_full(type_id)
     out = sorted(t for t in fit if said_in_full(t) == full and (not within or t in within))
     return tuple(out) if len(out) > 1 else ()
 
 
-def fitting_kin(index: CatalogIndex, phrase: str | None, type_id: str) -> tuple[str, ...]:
-    """Offered visits besides `type_id` that the caller's words name too, and that the catalog
-    relates to it: a shared distinctive name word, or confusable (catalog_index.confusables). "a CT
-    scan of my chest" names CT - Chest and, in full, CT Scan; "an MRI of my ankle" names no other
-    MRI in full ("ct" is an alias of every CT, but "head" names CT - Head and was not said)."""
+# "Scan" says no more than the modality before it: "CT Scan" is a CT.
+_SCAN = "scan"
+# Words that make a visit another one, not a narrower kind of it: whom it is for ("Pediatric
+# Echocardiogram") and what it is for ("Diagnostic Mammogram", "Lung Cancer Screening CT").
+_AGE_GROUPS = frozenset({"pediatric", "paediatric", "child", "children", "kid", "kids", "infant", "newborn", "baby",
+                         "adolescent", "teen", "adult", "geriatric", "senior", "elderly"})
+_PURPOSES = frozenset({"screening", "diagnostic"})
+
+
+def general_kin(index: CatalogIndex, phrase: str | None, type_id: str) -> tuple[str, ...]:
+    """Offered visits the caller's words name in full that are a strict generalization of
+    `type_id`: the same specialty and the same required capability (a test is never a consultation,
+    an imaging study never a plain one), and a name whose words are some but not all of its words,
+    none of the rest an age group or a purpose. "a CT scan of my chest": CT Scan for CT - Chest.
+    Not a Stress Test for a Nuclear Stress Test (imaging), a Prenatal Visit for a Prenatal Ultrasound,
+    a Colonoscopy Consultation for a Colonoscopy, or an Echocardiogram for a Pediatric one."""
     vocab = _vocab(index)
     heard = vocab.matched(tokens(phrase or ""))
-    own = set(vocab.name_words[type_id])
+    t = index.types[type_id]
+    words = set(tokens(t.name)) - _NAME_STOP
+
+    def generalizes(k) -> bool:
+        core = set(tokens(k.name)) - _NAME_STOP - {_SCAN}
+        return bool(core) and core < words and not (words - core) & (_AGE_GROUPS | _PURPOSES)
     return tuple(sorted(
-        t for t in index.types
-        if t != type_id and t not in index.unoffered_types
-        and (own & set(vocab.name_words[t]) or t in index.confusables.get(type_id, ()))
-        and vocab.name_words[t] and all(nw in heard for nw in vocab.name_words[t])))
+        kid for kid, k in index.types.items()
+        if kid != type_id and kid not in index.unoffered_types and k.specialty == t.specialty
+        and k.required_capability == t.required_capability and generalizes(k)
+        and vocab.name_words[kid] and all(nw in heard for nw in vocab.name_words[kid])))
 
 
 def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
@@ -527,18 +544,102 @@ def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
     return sorted(set(evidence) | {tid for tid in defaults if offered(tid)})
 
 
-# The catalog's alias for being sick names the visit a new problem goes to ("sick": Sick Visit).
-_SICK = "sick"
+# Words a visit's name uses for being sick now rather than for a routine visit.
+_ACUTE = frozenset({"sick", "acute", "urgent", "same", "day"})
 
 
 @per_index
 def _sick_visits(index: CatalogIndex) -> tuple[str, ...]:
-    """The visits the alias "sick" lists at its top weight; () if the catalog has no such alias."""
-    alias = next((a for a in index.aliases if a.phrase == _SICK), None)
-    if alias is None:
-        return ()
+    """The visit a new problem goes to, read off the catalog's names: an offered visit named for
+    being sick and nothing else besides a visit noun ("Sick Visit", "Same-Day Visit"), the most
+    general of them ("Sick Visit", not "Same-Day Sick Visit"). Neither catalog's General specialty
+    has one; a catalog with no such name gets none, and the shortlist adds no sick visit."""
+    acute = {tid: words for tid, t in index.types.items() if tid not in index.unoffered_types
+             and (words := frozenset(tokens(t.name)) - _VISIT_NOUNS) and words <= _ACUTE}
+    return tuple(sorted(tid for tid, words in acute.items() if not any(other < words for other in acute.values())))
+
+
+# A visit for a finding rather than a check: "Diagnostic Mammogram" beside "Mammogram".
+_DIAGNOSTIC = "diagnostic"
+_SCREENING = "screening"
+# Words that say the caller has something to have looked at: "a mammogram for a lump in my breast".
+_FINDINGS = frozenset({"lump", "lumps", "mass", "pain", "painful", "hurts", "hurting", "ache", "aching", "tender",
+                       "bleeding", "discharge", "abnormal", "swelling", "swollen", "symptom", "symptoms", "found",
+                       "noticed", "followup", "callback"})
+_NOT = frozenset({"no", "not", "never", "without", "nothing", "t"})
+
+
+@per_index
+def _diagnostic_variants(index: CatalogIndex) -> dict[str, str]:
+    """Offered visit -> the offered visit of its specialty named the same with "Diagnostic" added."""
+    by_words = {(t.specialty, frozenset(tokens(t.name)) - _NAME_STOP): tid
+                for tid, t in index.types.items() if tid not in index.unoffered_types}
+    return {plain: tid for (spec, words), tid in by_words.items()
+            if _DIAGNOSTIC in words and (plain := by_words.get((spec, words - {_DIAGNOSTIC})))}
+
+
+def diagnostic_variant(index: CatalogIndex, type_id: str) -> str | None:
+    return _diagnostic_variants(index).get(type_id)
+
+
+def is_screening(index: CatalogIndex, type_id: str) -> bool:
+    """A check for a problem nobody has found: "screening" in its name or in an alias that lists it
+    at its top weight, or a diagnostic visit beside it ("Mammogram" beside "Diagnostic Mammogram")."""
+    return (_SCREENING in tokens(index.types[type_id].name) or type_id in _diagnostic_variants(index)
+            or any(_SCREENING in a.phrase.split() and type_id in _top(a) for a in index.aliases))
+
+
+def describes_symptom(phrase: str | None) -> bool:
+    """The caller describes a finding ("a lump in my breast", "the follow-up after an abnormal
+    one"), not a routine check: a finding word no "no" or "not" governs ("no symptoms"), and no
+    "screening" said."""
+    words = tokens(phrase or "")
+    if _SCREENING in words:
+        return False
+    found = [i for i, w in enumerate(words) if w in _FINDINGS
+             or (w == "follow" and words[i + 1:i + 2] == ["up"]) or (w == "call" and words[i + 1:i + 2] == ["back"])]
+    return any(not _NOT & set(words[max(0, i - 3):i]) for i in found)
+
+
+def _top(alias: Alias) -> frozenset[str]:
     top = max(w for _, w in alias.weights)
-    return tuple(sorted(t for t, w in alias.weights if w >= top))
+    return frozenset(t for t, w in alias.weights if w >= top)
+
+
+# A visit you may have to fast for: "Fasting Blood Test" beside "Blood Draw / Lab Work".
+_FASTING = "fasting"
+_FAST = "fast"
+
+
+def fasting_pair(index: CatalogIndex, options: tuple[str, ...] | list[str]) -> str | None:
+    """The fasting visit of a question between it and its specialty's plain visit (the specialty
+    default): "Fasting Blood Test" or "Blood Draw / Lab Work". A caller can say whether they were
+    told to fast. Any other question, a lipid panel among them, has no such answer: None."""
+    if len(options) != 2:
+        return None
+    fasting = [o for o in options if _FASTING in tokens(index.types[o].name)]
+    if len(fasting) != 1:
+        return None
+    plain = next(o for o in options if o != fasting[0])
+    spec = index.types[fasting[0]].specialty
+    return fasting[0] if index.specialty_default.get(spec) == plain else None
+
+
+def fasting_answer(index: CatalogIndex, phrase: str | None, options: tuple[str, ...]) -> str | None:
+    """The visit an answer to "Did your doctor say to fast for it?" picks: a yes or no that opens
+    it ("yeah, nothing after midnight", "no"), else the word fast with or without a no ("I don't
+    have to fast"). None when the caller is unsure or says neither."""
+    fasting = fasting_pair(index, options)
+    words = tokens(phrase or "")
+    if fasting is None or not words or _doubt_markers(words):
+        return None
+    plain = next(o for o in options if o != fasting)
+    said = leading_answer(phrase)
+    if said is not None:
+        return fasting if said else plain
+    if any(stem(w) == _FAST for w in words):
+        return plain if _NOT & set(words) else fasting
+    return None
 
 
 # Filler that carries no meaning about which visit is wanted (contractions arrive split: "i m").
@@ -549,9 +650,29 @@ _TITLES = frozenset({"dr", "doctor", "doc"})
 _PLACE_PREPOSITIONS = frozenset({"at", "in", "near", "by", "around"})
 # What kind of visit a type is ("Lung Function Test" is a test, "Pulmonology Consultation" is not).
 _VISIT_NOUNS = frozenset({"consultation", "consult", "visit", "exam", "test", "session", "evaluation", "screening"})
-# Who sent the caller, never which visit: "my doctor sent me over for", "my stomach doctor said".
-_NO_VISIT = _TITLES | frozenset({"said", "says", "told", "tells", "sent", "sends", "ordered", "orders", "wants",
-                                 "wanted", "referred", "recommended", "suggested", "asked", "over"})
+# Who sent the caller, never which visit: "my doctor sent me over for", "my nurse said", "my GP ordered".
+_REFERRERS = _TITLES | frozenset({"nurse", "gp", "pcp", "physician", "specialist", "practitioner", "provider"})
+_NO_VISIT = _REFERRERS | frozenset({"said", "says", "told", "tells", "sent", "sends", "ordered", "orders", "wants",
+                                    "wanted", "referred", "recommended", "suggested", "asked", "over"})
+# Asking for a visit, not which one: "I'm due for", "they scheduled me for", "it's time for".
+_BOOKING = frozenset({"need", "needs", "needed", "want", "get", "gets", "getting", "got", "book", "booked", "booking",
+                      "schedule", "scheduled", "scheduling", "arrange", "arranged", "due", "time", "come", "coming",
+                      "came", "go", "going", "see", "seen", "have", "has", "had", "do", "done", "make", "set"})
+# When or how often, never which visit: "my regular six-month checkup".
+_HOW_OFTEN = frozenset({"regular", "routine", "usual", "normal", "every", "twice", "day", "days", "weeks", "months",
+                        "year", "years"})
+_NUMBER_WORDS = frozenset({"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
+                           "twelve", "twenty", "thirty"})
+
+
+def _of_request(w: str) -> bool:
+    """A word of the request rather than of the visit: an English function word, who sent the
+    caller and how, a booking verb, when or how often. Visit nouns ("test", "visit") stay: they say
+    what kind of visit."""
+    if w in _VISIT_NOUNS:
+        return False
+    return (w in FUNCTION_WORDS or w in _FILLER or w in _NO_VISIT or w in _BOOKING or w in TIME_WORDS
+            or w in _HOW_OFTEN or w in _NUMBER_WORDS or w.isdigit())
 # A combining form ("scope", "gram") ends a compound name word: a root of at least _ROOT_MIN letters
 # after a prefix of at least _ROOT_PREFIX_MIN ("colono-scop-y", "mammo-gram").
 _ROOT_MIN = 4

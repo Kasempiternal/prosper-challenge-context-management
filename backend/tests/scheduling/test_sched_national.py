@@ -544,12 +544,19 @@ def test_every_specialty_stays_reachable_when_nothing_lexical_matched():
 
 def test_the_sick_visit_is_a_choice_for_a_problem_no_word_reaches():
     """Round 4 (nat4-sym-03): "it burns when I pee ... since yesterday" could only reach Urology's
-    default; Family Medicine's default is the Annual Physical, so a sick visit was no option."""
-    sick = {"appt_105": 1.0, "appt_106": 0.6}
-    ix = build_index(_many_types_raw(), {**ALIASES, "aliases": {**ALIASES["aliases"], "sick": sick}})
-    pool = type_shortlist(ix, "my zorbly thing", None)
-    assert "appt_105" in pool and "appt_106" not in pool
-    assert "appt_105" not in type_shortlist(build_index(_many_types_raw(), ALIASES), "my zorbly thing", None)
+    default; Family Medicine's default is the Annual Physical, so a sick visit was no option. The
+    sick visit is read off the catalog's names: the most general visit named for being sick."""
+    raw = _many_types_raw()
+    names = {"appt_105": "Sick Visit", "appt_106": "Same-Day Sick Visit", "appt_107": "Urgent Care Visit"}
+    raw["appointment_types"] = [{**t, "name": names.get(t["id"], t["name"])} for t in raw["appointment_types"]]
+    pool = type_shortlist(build_index(raw, ALIASES), "my zorbly thing", None)
+    assert "appt_105" in pool and not {"appt_106", "appt_107"} & set(pool)
+
+
+def test_a_catalog_with_no_visit_named_for_being_sick_adds_none():
+    ix = build_index(_many_types_raw(), ALIASES)
+    assert set(type_shortlist(ix, "my zorbly thing", None)) == {
+        d for d in ix.specialty_default.values() if d not in ix.unoffered_types}
 
 
 def test_the_real_national_shortlist_offers_the_sick_visit_beside_the_specialists():
