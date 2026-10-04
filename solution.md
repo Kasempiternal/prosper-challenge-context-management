@@ -26,7 +26,18 @@ So the LLM never sees the catalog:
 3. **A deterministic resolver returns one move.** Offer up to 3 times, ask the one question that changes the valid set, or refuse with the reason and the nearest valid alternative. "Dr. Chen" for a new patient needs no question, because policy removes the Dr. Chen who takes no new patients. For a returning patient both are valid, so the agent asks.
 4. **Templates speak the result directly.** Names, times and clinics go straight to text-to-speech from the catalog. The LLM cannot paraphrase them into something false, and its second round trip is skipped.
 
-Result: the prompt stays near 600-2,300 tokens whatever the catalog size. Estimated gpt-4o input for 15 SF calls drops from about $0.32 to about $0.06. The resolver answers in under 7 ms at p95 on the national catalog (measured). After this, speech synthesis is about 80% of a call's cost, so the LLM is no longer the cost to cut.
+Result, measured on the shipped agents (`eval/prompt_tokens.py`: real node prompts and tool schemas, tool traffic from the eval cases, `o200k_base`, spoken history left out of both sides):
+
+| Input tokens per LLM request | SF | National |
+|---|---|---|
+| Greeting node (prompt + tools) | 967 | 1,031 |
+| Schedule node, first request | 1,800 | 1,919 |
+| Schedule node, request 5 (mean \| max) | 2,236 \| 2,500 | 2,463 \| 2,691 |
+| Schedule node, request 15 (mean \| max) | 3,326 \| 4,250 | 3,823 \| 4,621 |
+| Booked node | 1,037 | 1,101 |
+| Naive: same prompt + the whole catalog | 9,958 | 666,315 |
+
+The schedule node grows by about 109 (SF) or 136 (national) tokens per exchange, because each `update_request` call and its result stay in the context. It never depends on catalog size: the national figures are the SF ones plus a longer tool description. The schedule node's context is reset on entry, so earlier nodes add nothing. The chooser's own requests (JEV or OpenAI) are separate and small: about 400-600 tokens for a provider choice and about 2,455 for a visit-type choice over 74 types. Over 15 schedule requests on SF, gpt-4o input is about 38,000 tokens (about $0.10 at $2.50/M) against about 149,000 (about $0.37) for the naive prompt, computed from the table. The resolver answers in under 7 ms at p95 on the national catalog (measured). After this, speech synthesis is about 80% of a call's cost, so the LLM is no longer the cost to cut.
 
 ## Where a model still helps, and how it is kept safe
 

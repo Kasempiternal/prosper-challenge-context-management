@@ -40,6 +40,7 @@ Headline numbers (wrong commits per commit; top-1 per turn), from the commands b
 ```
 backend/.venv/Scripts/python eval/run_resolver_eval.py [--verbose]   # metrics + misses
 backend/.venv/Scripts/python eval/naive_baseline_tokens.py           # prompt size vs naive dump
+backend/.venv/Scripts/python eval/prompt_tokens.py                   # real per-node, per-request input tokens
 backend/.venv/Scripts/python -m pytest backend/tests/scheduling -q   # unit + policy property tests
 ```
 
