@@ -1432,3 +1432,73 @@ backend tests; 0 wrong commits on all 13 dev and stress sets with JEV, both stre
 gpt-4o with offers open, 3 runs each: "any other clinic?" -> `reject: [location]`, "another doctor?" ->
 `[provider]`, "none of those work, anything later?" -> `[time]`, "I do not like these, different ones?" -> `[time]`
 (12 of 12).
+
+### Off-script probe (2026-10-04)
+
+`eval/offscript_probe.py` measures which tool gpt-4o calls for a messy caller sentence. 40 probes, each a state of
+a National call (chooser `none`) plus one sentence, run twice. The four states are reached once with real caller
+turns ("Hi, I need a dental cleaning." -> "Which city are you in?"; "...I'm in New York." -> three offers;
+"The first one, today at eleven." -> "Shall I book it?"; a request with no visit -> "What's the visit for?"),
+snapshotted, and every run starts from a deep copy in a fresh `AgentSide`. Only the first model request of the
+probe turn is graded. The expected call of every probe was written into the file before the first run, from the
+node prompts and tool descriptions. Output: `eval/results/offscript_probe_2026-10-04.txt`. 97 model requests
+(setup 7, probes 81, a rerun of C1 9).
+
+Results, PASS / FAIL / OPEN (FAIL: at least one of the two runs missed):
+
+| State | Probes | Result |
+|---|---|---|
+| start (greeting) | 8 | 7 / 1 / 0 |
+| question ("Which city?", "What's the visit for?") | 10 | 10 / 0 / 0 |
+| offers (three times open) | 15 | 13 / 1 / 1 |
+| confirm ("Shall I book it?") | 7 | 6 / 1 / 0 |
+| all | 40 | 36 / 3 / 1 |
+
+| Situation | Result | Situation | Result |
+|---|---|---|---|
+| rambling story | 3 / 0 / 0 | two requests in one | 2 / 0 / 0 |
+| interruption mid-sentence | 1 / 0 / 1 | invented doctor or clinic | 3 / 0 / 0 |
+| "wait, go back" | 2 / 0 / 0 | only "uh" / "hello?" | 2 / 0 / 0 |
+| "what did you say?" | 2 / 0 / 0 | changing the visit with offers open | 2 / 0 / 0 |
+| correcting themselves | 2 / 0 / 0 | how long the visit takes | 2 / 0 / 0 |
+| complaint | 3 / 0 / 0 | parking, insurance, cost | 2 / 1 / 0 |
+| asking for a person | 2 / 0 / 0 | yes/no to the wrong thing | 1 / 1 / 0 |
+| wrong fact then the fix | 2 / 0 / 0 | number as a word | 3 / 0 / 0 |
+| booking for someone else | 2 / 1 / 0 | | |
+
+Failures by cause:
+
+- **A yes taken as consent to a different appointment** (C1, 2 of 2 runs). "Yes, Friday's perfect." to the
+  read-back of *today at 11* went to `confirm_booking`, which booked today at 11. This is the one failure that
+  books the wrong thing; the prompt line "call confirm_booking even if they ask for something else in the same
+  breath" pushes it there. General fix: a guard on `confirm_booking` that compares the caller's turn with the held
+  offer (a day, time, doctor or clinic the caller says that the read-back does not have refuses the edge and
+  points to `update_request`), the same kind of caller-words check as `grounded`.
+- **The caller's words dropped from `start.request`** (S6, 1 of 2 runs). "I'm calling for my mother, she's
+  eighty-two, she needs her eyes checked" arrived as `"eyes checked, in Chicago"`: who the visit is for was lost
+  (the reply itself was right: no eye exam near Chicago). General fix: the edge action builds the request from
+  the caller's own turn (`caller_turn`) instead of the model's copy, or restores dropped who-it-is-for sentences
+  as `with_dropped_clauses` does; its `_WHO` pattern has son, daughter and child but not mother, husband or wife.
+- **An information question answered without `lookup`** (O11, 1 of 2 runs). "How much is a cleaning going to
+  cost me?" got plain text, "I do not have that information...", which is what `lookup` would have led to.
+  Harmless here. General fix: none needed; if wanted, one prompt line that a question the catalog cannot answer
+  still goes to `lookup`.
+
+Passes worth a note (graded on the tool, not on everything the caller said):
+
+- **No argument for who the visit is for** in `schedule`: "it's for my husband, he's got this rash" (Q8) became
+  `service_phrase: "rash on his arm"`; only `book_another` has `for_someone_else`. A `for_someone_else` argument on
+  `start` and `update_request` would carry it.
+- **The second request in one sentence has no place to go**: the Brooklyn hours question (S7) and "book my
+  daughter right after" (O14, C3) are absent from every argument sent. O14's reply is the plain read-back; C3's
+  booked reply ends with "anything else?", which leaves room for it; S7's reply was not recorded. A prompt line
+  to say "I'll help with that next", or an `also_asked` argument kept in the summary, would cover it.
+- **Paraphrased argument**: one run of O4 sent `service_phrase: "tooth trouble"` (the caller said "a tooth looked
+  at... throbbing") together with an unasked `clear`. A phrase-grounding check outside an open question, like the
+  one `grounded` does while a question is open, would catch it.
+- O13 (OPEN), a half-finished pick: one run waited ("I'll hold on"), one took `pick_offer: 2`, which the read-back
+  still lets the caller refuse.
+
+Harness note: the in-process booking ledger was shared between runs in the full run, so later `confirm_booking`
+runs heard "that time was just taken"; no verdict depends on it (only the first tool call is graded). The script
+now clears the ledger per run, and C1 was rerun alone.

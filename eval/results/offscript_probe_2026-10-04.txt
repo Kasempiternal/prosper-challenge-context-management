@@ -1,0 +1,108 @@
+Off-script probe, National agent, chooser 'none', 2 runs per probe, gpt-4o (agent JSON model).
+Each run starts from a deep copy of its state's snapshot; only the first model request of the probe turn
+is graded. States as reached by the setup turns:
+  start    agent last said: 'Hello! How can I assist you with booking an appointment today?'
+  q_city   agent last said: 'Which city are you in?'
+  q_visit  agent last said: "What's the visit for?"
+  offers   agent last said: 'For a dental cleaning, Dr. Helen Altman has today at 11 or tomorrow at 8 at Flushing and Dr. Sylvia Smith has Friday at 8 at Flushing. Which works best?'
+  confirm  agent last said: 'Okay, a dental cleaning with Dr. Helen Altman, today at 11 at Flushing. Shall I book it?'
+
+id    state     situation                 expected                                      run 1                                                       run 2                                                       verdict
+----  --------  ------------------------  --------------------------------------------  ----------------------------------------------------------  ----------------------------------------------------------  --------------
+S1    start     rambling story            start(request~cleaning)                       start{"request":"teeth, cleaning, it's been two years"}     start{"request":"teeth looked at cleaning"}                 PASS
+S2    start     only uh / hello           text                                          text: Yes, this is the clinic's scheduling assistant. How   text: Yes, it is. How may I help you with booking an appoi  PASS
+S3    start     asking for a person       transfer_to_staff                             transfer_to_staff{}                                         transfer_to_staff{}                                         PASS
+S4    start     invented doctor or clini  start(request~Pemberton)                      start{"request":"see Doctor Pemberton-Hale at the Riversid  start{"request":"I need to see Doctor Pemberton-Hale at th  PASS
+S5    start     parking / insurance / co  lookup | text                                 text: I do not have that information. You may want to cont  text: I don't have insurance information, but you can call  PASS
+S6    start     booking for someone else  start(request~mother)                         start{"request":"eyes checked, in Chicago"}                 start{"request":"eye check for mother, eighty-two, lives i  FAIL (1/2 ok)
+S7    start     two requests in one       start(request~flu)                            start{"request":"flu shot"}                                 start{"request":"need a flu shot"}                          PASS
+S8    start     interruption mid-sentenc  start(request~knee)                           start{"request":"I need to book a, sorry, hang on, my dog,  start{"request":"book a, sorry, hang on, my dog, okay, a,   PASS
+Q1    q_city    wrong fact then the fix   update_request(location_phrase~New York)      update_request{"location_phrase":"New York"}                update_request{"location_phrase":"New York"}                PASS
+Q2    q_city    what did you say / repea  update_request{~} | text                      text: Which city are you in?                                text: Which city are you in?                                PASS
+Q3    q_city    only uh / hello           update_request{~}                             update_request{}                                            update_request{}                                            PASS
+Q4    q_city    complaint                 update_request{~}                             update_request{}                                            update_request{}                                            PASS
+Q5    q_city    rambling story            update_request(location_phrase~Queens)        update_request{"location_phrase":"Queens, New York"}        update_request{"location_phrase":"Queens, New York"}        PASS
+Q6    q_city    invented doctor or clini  update_request(location_phrase~Lakeside) | u  update_request{"location_phrase":"The one on Maple Street,  update_request{"location_phrase":"Lakeside Family Clinic o  PASS
+Q7    q_visit   how long the visit takes  lookup(kind=do_you_offer)                     lookup{"kind":"do_you_offer","phrase":"a cleaning"}         lookup{"kind":"do_you_offer","phrase":"cleaning"}           PASS
+Q8    q_visit   booking for someone else  update_request(service_phrase~rash)           update_request{"service_phrase":"a rash on his arm"}        update_request{"service_phrase":"rash on his arm"}          PASS
+Q9    q_visit   yes/no to the wrong thin  update_request{~}                             update_request{}                                            update_request{}                                            PASS
+Q10   q_visit   wait, go back             update_request(location_phrase~Newark)        update_request{"location_phrase":"Newark"}                  update_request{"location_phrase":"Newark"}                  PASS
+O1    offers    number said as a word     update_request(pick_offer=2)                  update_request{"pick_offer":2}                              update_request{"pick_offer":2}                              PASS
+O2    offers    number said as a word     update_request(pick_offer=3)                  update_request{"pick_offer":3}                              update_request{"pick_offer":3}                              PASS
+O3    offers    number said as a word     update_request(pick_offer=3)                  update_request{"pick_offer":3}                              update_request{"pick_offer":3}                              PASS
+O4    offers    changing the visit type   update_request(service_phrase~tooth)          update_request{"service_phrase":"tooth trouble","clear":["  update_request{"service_phrase":"a tooth looked at, it's b  PASS
+O5    offers    changing the visit type   update_request(service_phrase~back)           update_request{"service_phrase":"back pain"}                update_request{"service_phrase":"back pain"}                PASS
+O6    offers    what did you say / repea  update_request{~} | text                      text: Dr. Helen Altman has today at 11 or tomorrow at 8 at  text: Dr. Helen Altman has today at 11 and tomorrow at 8 a  PASS
+O7    offers    correcting themselves     update_request(pick_offer=2) | update_reques  update_request{"pick_offer":2}                              update_request{"pick_offer":2}                              PASS
+O8    offers    complaint                 update_request(reject=time) | update_request  update_request{"reject":["time"]}                           update_request{"reject":["time"]}                           PASS
+O9    offers    asking for a person       transfer_to_staff                             transfer_to_staff{}                                         transfer_to_staff{}                                         PASS
+O10   offers    parking / insurance / co  lookup(kind=location_info)                    lookup{"kind":"location_info","phrase":"Flushing"}          lookup{"kind":"location_info","phrase":"Flushing"}          PASS
+O11   offers    parking / insurance / co  lookup                                        lookup{"kind":"do_you_offer","phrase":"dental cleaning"}    text: I do not have that information. You may want to cont  FAIL (1/2 ok)
+O12   offers    invented doctor or clini  update_request(provider_phrase~Ferraguzzi) |  update_request{"provider_phrase":"Doctor Ferraguzzi"}       update_request{"provider_phrase":"Doctor Ferraguzzi"}       PASS
+O13   offers    interruption mid-sentenc  OPEN                                          text: I'll hold on. Let me know when you're ready.          update_request{"pick_offer":2}                              OPEN
+O14   offers    two requests in one       update_request(pick_offer=2)                  update_request{"pick_offer":2}                              update_request{"pick_offer":2}                              PASS
+O15   offers    wrong fact then the fix   update_request(is_new=false)                  update_request{"is_new":false,"pick_offer":3}               update_request{"is_new":false,"pick_offer":3}               PASS
+C1    confirm   yes/no to the wrong thin  update_request(pick_offer=3) | update_reques  confirm_booking{}                                           confirm_booking{}                                           FAIL (0/2 ok)
+C2    confirm   rambling story            confirm_booking                               confirm_booking{}                                           confirm_booking{}                                           PASS
+C3    confirm   booking for someone else  confirm_booking                               confirm_booking{}                                           confirm_booking{}                                           PASS
+C4    confirm   how long the visit takes  lookup(kind=do_you_offer)                     lookup{"kind":"do_you_offer","phrase":"dental cleaning"}    lookup{"kind":"do_you_offer","phrase":"dental cleaning"}    PASS
+C5    confirm   correcting themselves     update_request(pick_offer=2) | update_reques  update_request{"pick_offer":2}                              update_request{"pick_offer":2}                              PASS
+C6    confirm   wait, go back             update_request{~} | text | update_request(re  text: Dr. Helen Altman has tomorrow at 8 at Flushing and D  text: Dr. Helen Altman has tomorrow at 8 at Flushing, and   PASS
+C7    confirm   complaint                 confirm_booking                               confirm_booking{}                                           confirm_booking{}                                           PASS
+
+Totals by state (PASS / FAIL / OPEN):
+  start    7 / 1 / 0
+  q_city   6 / 0 / 0
+  q_visit  4 / 0 / 0
+  offers   13 / 1 / 1
+  confirm  6 / 1 / 0
+  all      36 / 3 / 1
+
+FAIL details (sentence, expected, each run's calls and what the caller heard):
+
+[S6] start / booking for someone else
+  caller:   Hi, I'm calling for my mother, she's eighty-two, she needs her eyes checked, she lives in Chicago.
+  expected: start(request~mother)   (greeting: start with the caller's exact words; who the visit is for must survive)
+  run 1: calls start{"request": "eyes checked, in Chicago"}, update_request{"service_phrase": "eyes checked", "location_phrase": "Chicago"} [+follow-up]
+         heard: We don't offer an eye exam within 50 miles of Chicago. The nearest is Financial District in New York, about 711 miles away. Want me to look there?
+  run 2: calls start{"request": "eye check for mother, eighty-two, lives in Chicago"}
+         heard: (nothing yet)
+
+[O11] offers / parking / insurance / cost
+  caller:   How much is a cleaning going to cost me without insurance?
+  expected: lookup   (schedule: an information question -> lookup; facts lack price, so it says it does not know)
+  run 1: calls lookup{"kind": "do_you_offer", "phrase": "dental cleaning"}
+         heard: (nothing yet)
+  run 2: calls (no tool)
+         heard: I do not have that information. You may want to contact the clinic directly for pricing details.
+
+[C1] confirm / yes/no to the wrong thing
+  caller:   Yes, Friday's perfect.
+  expected: update_request(pick_offer=3) | update_request(time_pref.day=friday)   (the read-back was today at 11: a yes to Friday is a new pick, booking today would be wrong)
+  run 1: calls confirm_booking{}
+         heard: You're all booked. Your confirmation is H, 0, 8, 2, 7. Is there anything else I can help with?
+  run 2: calls confirm_booking{}
+         heard: I'm sorry, that time was just taken. For a dental cleaning, Dr. Emma Chen has today at 11 at Flushing, Dr. Helen Altman has tomorrow at 8 at Flushing, and Dr. Sylvia Smith has Friday at 8 at Flushing. Which works best?
+
+OPEN rows (recorded, not graded):
+  [O13] Okay, the Thursday at eight with, oh hold on, someone's at the door.
+    run 1: text: I'll hold on. Let me know when you're ready. | heard: I'll hold on. Let me know when you're ready.
+    run 2: update_request{"pick_offer":2} | heard: Okay, a dental cleaning with Dr. Helen Altman, tomorrow at 8 at Flushing. Shall I book it?
+
+Model requests: 88 (setup 7, probes 81); limit 120.
+
+Harness note and rerun of C1. The full run above shared one in-process booking ledger
+(agent_tools.context.shared_availability) between runs, so after one confirm-state run booked today at 11,
+later confirm_booking runs heard "that time was just taken" (C1 run 2 above; also C2, C3, C7, which passed,
+so their replies are not shown). Grading reads only the first tool call, so no verdict depends on it. The
+script now clears the ledger for every fresh run, and only C1 was rerun (setup 7 + 2 runs = 9 requests):
+
+[C1] confirm / yes/no to the wrong thing   FAIL (0/2 ok)
+  caller:   Yes, Friday's perfect.
+  run 1: calls confirm_booking{}
+         heard: You're all booked. Your confirmation is H, 0, 8, 2, 7. Is there anything else I can help with?
+  run 2: calls confirm_booking{}
+         heard: You're all booked. Your confirmation is H, 0, 8, 2, 7. Is there anything else I can help with?
+  (H-0827 is today at 11 with Dr. Helen Altman, not the Friday the caller said.)
+
+Model requests in total: 88 + 9 = 97 of 120.
