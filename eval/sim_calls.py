@@ -73,7 +73,10 @@ VISIT_MODES = ["a concrete everyday reason or symptom", "an everyday description
 # ---------------------------------------------------------------- targets and personas
 
 
-def pick_targets(n: int, rng: random.Random) -> list[dict]:
+GENERIC = re.compile(r"follow-up|new patient|consultation", re.IGNORECASE)
+
+
+def pick_targets(n: int, rng: random.Random, generic: bool = True) -> list[dict]:
     """n targets from the catalogs: bookable rows for a patient the rules allow, plus ~10% the agent must not book."""
     indexes = {c: CatalogIndex.load(ROOT / path) for c, (_, path) in CATALOGS.items()}
     plan = [("sf", "normal")] * round(n * 0.5) + [("national", "normal")] * round(n * 0.4)
@@ -86,6 +89,8 @@ def pick_targets(n: int, rng: random.Random) -> list[dict]:
         for _ in range(5000):
             row = rng.choice(rows)
             t, p = row.type, row.provider
+            if not generic and GENERIC.search(t.name) and kind == "normal":
+                continue
             is_new = rng.random() < 0.4
             if kind == "no_new":
                 if p.accepting_new_patients or not t.new_patients_allowed or t.requires_referral:
@@ -121,7 +126,7 @@ The appointment they want (hidden truth; the caller does NOT know these exact ca
 - reason for the visit: {visit} ({specialty}). They talk about it as: {visit_mode}. Never use the catalog name "{visit_full_name}" unless it is a plain everyday phrase.
 - doctor: {provider}. They refer to the doctor as: {doctor_mode}. For "a description" give a vague memory (gender, a trait, "the one my neighbour saw"), not the name.
 - place: {location}, {location_address}, {location_city}. They refer to the place as: {place_mode}.
-- patient status: {status}.
+- patient status: {status}. The caller is an adult talking about their own visit, unless the visit is a child's (well-child, infant, pediatric).
 Real callers are imperfect: they leave things out, say them in the wrong order, hedge, and use everyday words. But every caller knows concretely what they came for: a symptom, a body part, a need such as a shot, a form, a test. Never write the words "vague" or "thing" as the whole reason, and never make the reason unanswerable. For "a description" of the doctor, give gender and at least one other concrete trait (where they work, who recommended them, something they said).
 
 JSON keys: name, age, background (1-2 sentences), speaking_style, visit_in_their_words, doctor_in_their_words (or "" if none in mind), place_in_their_words, time_preference_in_their_words, status_in_their_words (do they say they are new, a returning patient, have a referral, or not know), forgets (what they do NOT remember or will not volunteer)."""
@@ -417,8 +422,10 @@ def cmd_make(args) -> None:
     path = OUT / f"{args.set}_targets.jsonl"
     if path.exists():
         sys.exit(f"{path} exists: targets are frozen once written. Delete it on purpose to regenerate.")
-    rng = random.Random(SEED)
-    targets = asyncio.run(write_personas(pick_targets(args.n, rng)))
+    rng = random.Random(SEED + args.seed)
+    targets = asyncio.run(write_personas(pick_targets(args.n, rng, generic=args.seed == 0)))
+    for t in targets:
+        t["id"] = f"{args.set}-{t['id']}" if args.seed else t["id"]
     path.write_text("\n".join(json.dumps(t, ensure_ascii=False) for t in targets) + "\n", encoding="utf-8")
     print(f"wrote {len(targets)} targets with personas to {path.relative_to(ROOT)}")
 
@@ -479,6 +486,7 @@ def main() -> None:
         p.add_argument("--set", default="pilot")
         if name == "make":
             p.add_argument("--n", type=int, default=20)
+            p.add_argument("--seed", type=int, default=0, help="offset of the target seed; above 0 leaves out generic visit types")
         if name == "run":
             p.add_argument("--mode", default="jev", choices=["jev", "openai", "embed", "none"])
             p.add_argument("--parallel", type=int, default=4)
