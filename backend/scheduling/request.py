@@ -85,6 +85,7 @@ class Request:
     alternatives: tuple[AltRef, ...] = ()
     pick: int | None = None
     pending_ask: PendingAsk | None = None
+    avoid: tuple[str, ...] = ()      # locations the caller turned down ("any other clinic?"); cleared by a new place, visit or doctor
     turn: int = 0
     changed: tuple[str, ...] = ()    # request parts the latest merge changed (slots, time_pref)
 
@@ -109,6 +110,7 @@ class Request:
             alternatives=tuple(AltRef(**a) for a in d.get("alternatives", ())),
             pick=d.get("pick"),
             pending_ask=PendingAsk(pa["field"], tuple(pa.get("options", ())), pa.get("repeats", 0)) if pa else None,
+            avoid=tuple(d.get("avoid", ())),
             turn=d.get("turn", 0),
             changed=tuple(d.get("changed", ())),
         )
@@ -127,6 +129,7 @@ class Update:
     has_referral: bool | None = None
     time_pref: TimePref | None = None
     pick_offer: int | None = None
+    other_site: bool = False
     clear: tuple[str, ...] = field(default=())
 
     @classmethod
@@ -149,6 +152,10 @@ class Update:
                 if not isinstance(v, bool):
                     raise ValueError(f"{key} must be a boolean")
                 out[key] = v
+        if args.get("other_site") is not None:
+            if not isinstance(args["other_site"], bool):
+                raise ValueError("other_site must be a boolean")
+            out["other_site"] = args["other_site"]
         if args.get("pick_offer") is not None:
             n = args["pick_offer"]
             if not isinstance(n, int) or isinstance(n, bool) or not 1 <= n <= 3:
@@ -249,8 +256,15 @@ def merge(req: Request, update: Update) -> Request:
     new = replace(req, **changes, patient=patient, turn=turn, changed=tuple(changes))
     if update.pick_offer is not None:
         return replace(new, pick=update.pick_offer, pending_ask=None if changes else new.pending_ask)
+    if update.other_site and req.offered and not changes:
+        # "Is there any other clinic?": the same request, without the clinics just offered.
+        turned_down = (*req.avoid, *(o.location_id for o in req.offered))
+        return replace(new, avoid=tuple(dict.fromkeys(turned_down)), offered=(), alternatives=(), pick=None,
+                       pending_ask=None)
     if changes:
-        return replace(new, offered=(), alternatives=(), pick=None, pending_ask=None)
+        # A new visit, doctor or place starts the search again; a new time only narrows it.
+        keep = new.avoid if not set(changes) & {"service", "provider", "location"} else ()
+        return replace(new, avoid=keep, offered=(), alternatives=(), pick=None, pending_ask=None)
     if req.pending_ask and patient == req.patient:
         # An update with nothing in it ("I already told you"): the question is still open and unanswered.
         return replace(new, pending_ask=replace(req.pending_ask, repeats=req.pending_ask.repeats + 1))

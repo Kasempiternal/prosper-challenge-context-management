@@ -1396,3 +1396,22 @@ the next thing to improve, and the empty-reply fix above was made after this run
 failing tool calls, not by a third run. One call (`fresh10-sf-03`, "check on my prescriptions for blood pressure")
 went straight to staff from the greeting; it was not changed, because it was one of the frozen new calls.
 Spend for this round: about $1.8 (30 calls); the pilot in total about $5.2.
+
+### Improvised live call: "any other clinic?" (2026-10-04)
+
+A live call (National, dental cleaning in New York) booked correctly but showed two faults, both in how the
+conversation model uses the tools, not in what it remembered (its context held the offers and both caller
+sentences at every turn):
+- "Is there any other clinic I can book on?" arrived as `clear location`, so the agent asked the city again
+  ("I told you") and offered the same clinic. There was no way to say "another clinic" (New York also has
+  Jamaica). Added `other_site` to `update_request`: the resolver keeps the request and skips the clinics just
+  offered; when none are left it says "Flushing and Jamaica are the only clinics I have for that near you".
+  A new place, visit or doctor forgets the clinics turned down.
+- "Let's go with Dr. Kalem. Yeah, tomorrow, today" arrived as `clear provider`: the name and the time were
+  lost. A code guard now keeps a doctor the caller named (a capitalised "Dr. Name") as the doctor phrase, and
+  turns a `clear location` for "another clinic" into `other_site`, like the other transcript checks. A plain
+  "any doctor is fine" still clears.
+
+Replayed against gpt-4o three times each: the model uses `other_site` 3 of 3, and "Dr. Kalem" reaches the
+resolver as a name (the agent says it cannot book that doctor and names the ones it can). 13 dev and stress
+sets still read 0 wrong commits with JEV, both stress gates pass. 1,336 backend tests.

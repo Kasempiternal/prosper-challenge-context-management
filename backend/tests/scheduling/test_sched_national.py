@@ -786,3 +786,24 @@ def test_a_question_put_twice_to_a_caller_who_says_nothing_usable_hands_over():
 def test_a_real_answer_after_an_empty_update_does_not_hand_over():
     plans = _national_updates({"service_phrase": "my awful lower back pain"}, {}, {"location_phrase": "Dallas"})
     assert plans[2].status != "refuse"
+
+
+def test_asking_for_another_clinic_offers_the_next_one_then_says_there_is_no_more():
+    """Improvised call: "Is there any other clinic?" cleared the place, asked the city again ("I told you")
+    and returned the same clinic."""
+    plans = _national_updates({"service_phrase": "dental cleaning", "location_phrase": "New York"},
+                              {"other_site": True}, {"other_site": True})
+    sites = [{o.location_id for o in p.offers} for p in plans]
+    assert sites[0].isdisjoint(sites[1])
+    assert plans[2].say.split(". ")[0].endswith("the only clinics I have for that near you")
+
+
+def test_a_new_place_forgets_the_clinics_turned_down():
+    plans = _national_updates({"service_phrase": "dental cleaning", "location_phrase": "New York"},
+                              {"other_site": True}, {"location_phrase": "Boston"})
+    assert plans[1].req.avoid and plans[2].req.avoid == ()
+
+
+def test_other_site_with_nothing_offered_changes_nothing():
+    plans = _national_updates({"service_phrase": "dental cleaning"}, {"other_site": True})
+    assert plans[1].req.avoid == ()

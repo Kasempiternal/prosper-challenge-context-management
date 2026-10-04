@@ -521,6 +521,16 @@ class _Resolution:
                                              rows_p if provider_ids is not None else None, svc is not None)
                 ok = near
 
+        if self.req.avoid:
+            others = [r for r in ok if r.location.id not in self.req.avoid]
+            if others:
+                self.notes.append(f"the caller turned down {len(self.req.avoid)} clinic(s): {len(others)} rows left")
+                ok = others
+            else:
+                names = [T.site_label(self.ix, lid) for lid in sorted({r.location.id for r in ok})][:2]
+                self.notes.append("no other clinic: the offered one is the only one")
+                self.preface += (f"{' and '.join(names)} {'is' if len(names) == 1 else 'are'} the only "
+                                 f"clinic{'' if len(names) == 1 else 's'} I have for that near you. ")
         found = self._nearest_first(ok) if self.widened else self.av.find(ok, self.req.time_pref, MAX_OPTIONS)
         if not found:
             return self._refuse("no_availability", type_id=type_id)

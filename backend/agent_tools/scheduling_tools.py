@@ -118,6 +118,9 @@ def _update_request_properties(ctx: ToolContext) -> dict:
         },
         "pick_offer": {"type": "integer", "enum": [1, 2, 3],
                        "description": "Number of the offered time, or of the suggested alternative, the caller chose."},
+        "other_site": {"type": "boolean",
+                       "description": "True when the caller asks for a different clinic than the ones just offered, "
+                                      "for the same visit and area ('any other clinic?'). Use this, not clear."},
         "clear": {"type": "array", "items": {"type": "string", "enum": [*SLOT_NAMES, "time_pref"]},
                   "description": "Choices the caller withdrew without replacing (e.g. 'any doctor is fine')."},
     }
@@ -343,7 +346,35 @@ def grounded(args: dict, req: Request, said: str) -> tuple[dict, list[str]]:
     day = tp.get("day") if isinstance(tp, dict) else None
     if isinstance(day, str) and not any(day.lower().startswith(w) for w in heard if len(w) >= 3):
         args, replaced = {**args, "time_pref": {k: v for k, v in tp.items() if k != "day"}}, [*replaced, day]
+    args, replaced = with_misused_clear_undone(args, req, said, replaced)
     return args, replaced
+
+
+# "Let's go with Dr. Kalem": a name. "Is there any other clinic?": a request for another site.
+_NAMED_DOCTOR = re.compile(r"\b(?:[Dd]r\.?|[Dd]octor)\s+[A-Z][A-Za-z'-]+")  # a capitalised name, not "doctor is fine"
+_SITE_WORD = r"(?:clinics?|locations?|sites?|offices?|places?|branch(?:es)?)"
+_OTHER_WORD = r"(?:other|another|different|else)"
+_ANOTHER_SITE = re.compile(rf"\b{_OTHER_WORD}\b.*\b{_SITE_WORD}\b|\b{_SITE_WORD}\b.*\b{_OTHER_WORD}\b", re.IGNORECASE)
+
+
+def with_misused_clear_undone(args: dict, req: Request, said: str, replaced: list[str]) -> tuple[dict, list[str]]:
+    """`clear` withdraws a choice. The conversation model reached for it when it had no better tool: it
+    cleared the doctor for "Let's go with Dr. Kalem" (the name and the time were lost) and the place for
+    "Is there any other clinic?" (the city was asked again: "I told you"). A doctor the caller named stays
+    a doctor phrase; a request for another clinic becomes other_site."""
+    cleared = args.get("clear")
+    if not isinstance(cleared, list):
+        return args, replaced
+    if "provider" in cleared and not args.get("provider_phrase") and (named := _NAMED_DOCTOR.search(said)):
+        args = {**args, "provider_phrase": named.group(0)}
+        cleared = [c for c in cleared if c != "provider"]
+        replaced = [*replaced, "clear provider"]
+    if "location" in cleared and req.offered and not args.get("location_phrase") and _ANOTHER_SITE.search(said):
+        args = {**args, "other_site": True}
+        cleared = [c for c in cleared if c != "location"]
+        replaced = [*replaced, "clear location"]
+    args = {k: v for k, v in args.items() if k != "clear"}
+    return ({**args, "clear": cleared} if cleared else args), replaced
 
 
 def update_request_tool(ctx: ToolContext) -> FlowsFunctionSchema:

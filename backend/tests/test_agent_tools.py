@@ -12,6 +12,7 @@ from agent_tools.keyterms import LAY_TERMS
 from agent_tools.scheduling_tools import (caller_turn, grounded, REFUSED_PREFACE, TAKEN_PREFACE, EdgeOutcome, book_confirmed, new_request,
                                           spoken_ref)
 from scheduling.decision import DECLINE, Verdict
+from scheduling.request import OfferRef, PendingAsk, Request
 from scheduling.resolver import NoDisambiguator
 
 
@@ -665,3 +666,28 @@ def test_booking_for_someone_else_asks_their_details_again(make_ctx):
     fm2.state["req"] = {"patient": {"is_new": False, "has_referral": True}}
     asyncio.run(new_request(ctx, {"request": "a flu shot for me too"}, fm2))
     assert fm2.state["req"]["patient"] == {"is_new": False, "has_referral": True}
+
+
+def test_clearing_the_doctor_for_a_named_doctor_keeps_the_name():
+    """Improvised call: "Let's go with Dr. Kalem" arrived as clear provider; the name and the time were lost."""
+    out, replaced = grounded({"clear": ["provider"]}, Request(), "Okay. Let's go with Dr. Kalem. Yeah, today.")
+    assert out == {"provider_phrase": "Dr. Kalem"} and replaced == ["clear provider"]
+
+
+def test_clearing_the_doctor_for_any_doctor_is_left_alone():
+    out, replaced = grounded({"clear": ["provider"]}, Request(), "Any doctor is fine.")
+    assert out == {"clear": ["provider"]} and replaced == []
+
+
+OFFERED = (OfferRef(1, "appt_074", "prov_1", "loc_278", "2026-10-07T11:00:00", 45),)
+
+
+def test_clearing_the_place_for_another_clinic_becomes_other_site():
+    """Improvised call: "Is there any other clinic I can book on?" cleared the place and asked the city again."""
+    out, replaced = grounded({"clear": ["location"]}, Request(offered=OFFERED), "Is there any other clinic I can book on?")
+    assert out == {"other_site": True} and replaced == ["clear location"]
+
+
+def test_clearing_the_place_when_nothing_was_offered_is_left_alone():
+    out, _ = grounded({"clear": ["location"]}, Request(), "Is there any other clinic I can book on?")
+    assert out == {"clear": ["location"]}
