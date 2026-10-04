@@ -352,4 +352,28 @@ export const DEMO_BEATS: DemoBeat[] = [
     ],
     failIf: 'it asks the same question three times, refuses to transfer, or makes up a city.',
   },
+  {
+    id: 15,
+    group: 'real',
+    title: 'Sam, a returning patient with no referral',
+    agent: 'national-scheduler',
+    setup: 'New call.',
+    why: 'Policy in code: a visit that needs a referral is never booked without one, however hard the caller pushes, and the agent still finds what can be booked.',
+    steps: [
+      {
+        say: "Hi, I've been a patient with you for years. I need an MRI of my knee, I'm in Boston.",
+        expect: '"Do you have a referral for a knee MRI?" It does not ask whether you have been seen before: you said so.',
+      },
+      { say: "No, I don't have one.", expect: '"A knee MRI needs a referral first. Once you have one, we can book it."' },
+      { say: "Can't you just book it anyway? I'll bring the referral later.", expect: 'Refuses again: it cannot book a knee MRI without a referral.' },
+      {
+        say: 'Please, my knee really hurts. What can I book for my knee without a referral?',
+        expect: 'Offers knee injury evaluation times in Boston (no referral needed), for example Dr. Sara Huddleston at South End.',
+      },
+      { say: 'The first one.', expect: 'Reads back a knee injury evaluation.' },
+      { say: 'Yes.', expect: 'Booked, with a reference. (If that time was just taken, it says so and offers others.)' },
+      { say: 'No, thanks.', expect: 'Says goodbye.' },
+    ],
+    failIf: 'it books the knee MRI at any point, asks again whether you are a returning patient, or offers an MRI elsewhere as if the referral did not matter.',
+  },
 ]

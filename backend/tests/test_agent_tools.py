@@ -934,3 +934,27 @@ def test_a_language_the_caller_asked_about_goes_back_into_the_lookup(make_ctx):
         "provider_info", "Mission Bay spanish")
     assert with_language_kept(index, "location_info", "Mission Bay", "My English is not good. What are the hours?") == (
         "location_info", "Mission Bay")
+
+
+@pytest.mark.parametrize("said,is_new,has_referral", [
+    ("Hi, I've been a patient with you for years. I need an MRI of my knee, I'm in Boston.", False, None),
+    ("I'm a new patient and I have a referral. Cardiology with Dr. Chen.", True, True),
+    ("I'm a returning patient but I don't have a referral.", False, False),
+    ("She's never been to your clinics.", True, None),
+    ("I've been a patient for years, but my husband has never been.", None, None),
+    ("I'm not sure if I've been there before.", None, None),
+    ("I need a flu shot.", None, None),
+    ("I have never been sick like this. I need a sick visit.", None, None),
+])
+def test_the_status_said_first_survives_the_reset(said, is_new, has_referral):
+    """Live replay: "I've been a patient with you for years" was dropped from start's request, and the
+    agent asked "Have you been seen at one of our clinics before?"."""
+    from agent_tools.scheduling_tools import with_status_said
+    from scheduling.policy import Patient
+    assert with_status_said(Patient(), said) == Patient(is_new=is_new, has_referral=has_referral)
+
+
+def test_a_status_already_known_is_not_overwritten():
+    from agent_tools.scheduling_tools import with_status_said
+    from scheduling.policy import Patient
+    assert with_status_said(Patient(is_new=True), "I've been a patient for years.") == Patient(is_new=True)

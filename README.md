@@ -336,7 +336,7 @@ Trade-offs we accepted:
 
 ## Demo script
 
-The **Demo script** button in the studio's top bar has every beat below as a full call, from the first word to the goodbye, plus five messy real-caller calls (14 in all), with "If" branches where the agent can take more than one good path and a "Fail if" line for each. Every line was run against the real agent in text before it went in. Open the agent in Agent Studio, start a test call, and keep the Decisions tab open (or press D for Dev view). The lines below were checked offline against the real resolver. **The same script is in the studio**: the **Demo script** button in the top bar opens a card beside the canvas with every beat's lines (click one to copy it), what the agent should answer, a button that opens the right agent, and a tick for each beat done.
+The **Demo script** button in the studio's top bar has every beat below as a full call, from the first word to the goodbye, plus six messy real-caller calls (15 in all), with "If" branches where the agent can take more than one good path and a "Fail if" line for each. Every line was run against the real agent in text before it went in. Open the agent in Agent Studio, start a test call, and keep the Decisions tab open (or press D for Dev view). The lines below were checked offline against the real resolver. **The same script is in the studio**: the **Demo script** button in the top bar opens a card beside the canvas with every beat's lines (click one to copy it), what the agent should answer, a button that opens the right agent, and a tick for each beat done.
 
 1. **New patient with a referral** (Clinic Scheduler). "I'm a new patient and I have a referral. I need a cardiology consultation with Dr. Chen, soonest you have." Policy removes David Chen. The agent offers Dr. Emily Chen's times with no question. Pick a time, hear the read-back, say yes, and hear the confirmation reference.
 2. **Established patient, same request.** Both Chens are valid now, so the agent asks "Do you mean Dr. David Chen or Dr. Emily Chen?" Answer "the lady one". With JEV the agent asks "Do you mean Dr. Emily Chen?": gender is inferred from the first name and confirmed by name, never booked on its own. With the Disambiguator Off it asks between both again, because the catalog has no gender field.
@@ -378,7 +378,7 @@ cd frontend && pnpm test                                   # vitest
 cd frontend && pnpm typecheck && pnpm lint && pnpm build
 ```
 
-Last run: **1,495 backend tests passed, 1 live JEV smoke test skipped** (2026-10-04, after the real-caller fixes). **127 frontend tests passed**, and the frontend production build passed.
+Last run: **1,504 backend tests passed, 1 live JEV smoke test skipped** (2026-10-04, after the real-caller fixes). **127 frontend tests passed**, and the frontend production build passed.
 
 ## Final verification (2026-10-03, resolver frozen at `222eb22`)
 

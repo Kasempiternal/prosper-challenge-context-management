@@ -1548,3 +1548,13 @@ the studio's Demo script card from what the agent says. Three faults showed up a
 usual"), which flips between asking and committing from run to run. It does the same on the previous commit
 (`a5867c9`, 1 of 3 runs), so it is JEV variance on a case already listed as a known limit, not a regression.
 Both stress gates exit 0.
+
+### A returning patient with no referral (2026-10-04)
+
+"I've been a patient with you for years. I need an MRI of my knee, I'm in Boston" reached the schedule node as
+"MRI of my knee, I'm in Boston": the node resets the context, so the status said first was gone and the caller was
+asked "Have you been seen at one of our clinics before?". `start` now reads new or returning, and referral or not,
+from the caller's own words when they say it plainly (`with_status_said`; a sentence that fits both ways, or says it
+with doubt, decides nothing). Replayed twice with gpt-4o: the agent asks only about the referral, refuses the knee MRI
+after "no", refuses again on "can't you just book it anyway?" (no transfer), and books a knee injury evaluation (no
+referral needed) when asked what can be booked for the knee. 1,504 backend tests. Studio card call 15.

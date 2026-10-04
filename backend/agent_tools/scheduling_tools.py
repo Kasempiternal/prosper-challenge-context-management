@@ -700,6 +700,32 @@ async def book_confirmed(ctx: ToolContext, args: dict, flow_manager: FlowManager
     return EdgeOutcome(result, proceed=True, respond=not ctx.speak_direct)
 
 
+# What the caller says about themselves in the first breath. Only plain statements count: a phrase that
+# fits both ways ("I've been a patient for years; my husband has never been") decides nothing.
+_RETURNING = re.compile(r"\b(?:been (?:a )?patients?|been (?:coming|going|seeing)|(?:returning|existing|established|current) "
+                        r"patients?|(?:seen|been) (?:there|here|with you|at your \w+) before)\b", re.IGNORECASE)
+_NEW = re.compile(r"\b(?:new patients?|(?:never|have not|haven'?t) been (?:there|here|seen|to|before)|first time)\b"
+                  r"|\b(?:never|have not|haven'?t) been(?=\s*[.,!?]|\s*$)", re.IGNORECASE)  # not "never been sick"
+_HAS_REFERRAL = re.compile(r"\b(?:i|we) (?:have|got|'ve got|have got) (?:a |the |my )?referral\b", re.IGNORECASE)
+_NO_REFERRAL = re.compile(r"\b(?:no referral|(?:don'?t|do not|didn'?t) (?:have|get|got) (?:a |any )?referral|without (?:a )?referral)\b",
+                          re.IGNORECASE)
+
+
+def with_status_said(patient: Patient, said: str) -> Patient:
+    """"I've been a patient with you for years. I need an MRI of my knee" reached the schedule node as
+    "MRI of my knee, I'm in Boston": it resets the context, so the status the caller gave first was gone,
+    and they were asked "Have you been seen at one of our clinics before?". A status already known, or
+    said with doubt, is left alone."""
+    if not said or says_unsure(said):
+        return patient
+    is_new, has_referral = patient.is_new, patient.has_referral
+    if is_new is None and bool(_RETURNING.search(said)) != bool(_NEW.search(said)):
+        is_new = bool(_NEW.search(said))
+    if has_referral is None and bool(_HAS_REFERRAL.search(said)) != bool(_NO_REFERRAL.search(said)):
+        has_referral = bool(_HAS_REFERRAL.search(said))
+    return Patient(is_new=is_new, has_referral=has_referral)
+
+
 async def new_request(ctx: ToolContext, args: dict, flow_manager: FlowManager) -> EdgeOutcome:
     """Every way into scheduling starts a fresh request from the caller's latest words: nothing of
     an earlier request (or booking) carries over except who the caller is."""
@@ -714,6 +740,7 @@ async def new_request(ctx: ToolContext, args: dict, flow_manager: FlowManager) -
     # Another person ("can you do my husband too?") is a new patient record: nothing about them
     # carries over from the caller's own booking, so the resolver asks again.
     patient = Patient() if args.get("for_someone_else") is True else _request(flow_manager).patient
+    patient = with_status_said(patient, _caller_said(flow_manager))
     state["req"] = Request(patient=patient).to_dict()
     state.pop("status", None)
     state["summary"] = words
