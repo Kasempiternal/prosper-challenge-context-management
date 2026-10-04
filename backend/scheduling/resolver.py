@@ -23,8 +23,8 @@ from .decision import DECLINE, Verdict, gender_of, unanswered
 from .geo import (RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, option_named, over_state_line,
                   resolve_place)
 from .lexicon import (SHORTLIST_ABOVE, Doubt, TypeCandidate, describes_symptom, diagnostic_variant, fasting_answer,
-                      fasting_pair, general_kin, is_screening, match_types, nearest_type, pointed_default, said_visits, stated_doubt,
-                      type_shortlist, types_named, umbrella, unexplained_words)
+                      fasting_pair, general_kin, is_screening, match_types, nearest_type, pointed_default, said_for,
+                      said_visits, sick_visits, stated_doubt, type_shortlist, types_named, umbrella, unexplained_words)
 from .names import (STREET_TYPES, ProviderClues, clue_words, hear_place, match_locations, match_providers, only_no,
                     read_confirmation, read_provider_clues, unmatched_first_name)
 from .policy import IssueKind, Rule, Violation, check, has_violation
@@ -313,6 +313,11 @@ class _Resolution:
             if doubted == []:
                 return self._ask("service_open")
             svc = doubted or svc
+        s = self.slots["service"]
+        if svc == [] and len(s.within) == 1 and only_no(s.heard):
+            # "No" to "Is that X?": a model asked over X alone could only answer X.
+            self.notes.append(f"{s.within[0]} declined: asking openly")
+            return self._ask("service_open")
         if svc is not None and not svc:
             verdict = self._consult_types()
             if verdict.failed and verdict.ask:
@@ -334,7 +339,8 @@ class _Resolution:
                     return self._refuse_not_offered(tier[0].type_id)
                 offered = _model_candidates(instead)
             verdict = DECLINE
-            if all(c.via == "specialty" for c in offered):
+            by_specialty = all(c.via == "specialty" for c in offered)
+            if by_specialty:
                 # "lung test" only reached Pulmonology's default type; the model may know better.
                 verdict = self._consult_types()
             elif self.type_model and offered[0].via != "answer" and unexplained_words(
@@ -344,6 +350,8 @@ class _Resolution:
                 # The words needed the model and its answer never came: say what we understood.
                 return self._ask_type(sorted(verdict.ask or [c.type_id for c in offered]), True)
             offered = _model_candidates(verdict) or offered
+            if by_specialty:
+                offered = self._beside_hinted_default(offered)
             s = self.slots["service"]
             one = offered[0].type_id if len(offered) == 1 and not s.exact else None
             alike = umbrella(self.ix, s.heard, one, s.within) if one and not self.umbrella_off else ()
@@ -560,6 +568,9 @@ class _Resolution:
         cands: list[TypeCandidate] = []
         if s.exact and s.heard:
             cands = [TypeCandidate(tid, 1.0, "name") for tid in types_named(self.ix, s.heard)]
+        if not cands and len(s.within) == 1 and read_confirmation(s.heard):
+            # "Yes" to "Is that X?" names X as surely as saying it.
+            cands = [TypeCandidate(s.within[0], 1.0, "answer")]
         answered = fasting_answer(self.ix, s.heard, s.within) if not cands else None
         if answered:
             cands = [TypeCandidate(answered, 1.0, "answer")]
@@ -1441,7 +1452,56 @@ class _Resolution:
         if len(live_types) > MAX_OPTIONS:
             # Only words that did fit several visits alike have a likeliest; a failed model's guesses do not.
             return self._ask_hinted(live_types) if self.umbrella_pick else self._ask("service_open")
+        asked = self.req.pending_ask
+        if (len(live_types) > 1 and asked and asked.field == "service" and asked.repeats
+                and fasting_pair(self.ix, live_types) is None):
+            if len(asked.options) == 1 and asked.options[0] in live_types:
+                self.notes.append(f"suggested {asked.options[0]}, and a reply with nothing usable: handing over")
+                return self._refuse("handoff")
+            likeliest = self._likeliest(live_types) if set(asked.options) == set(live_types) else None
+            if likeliest:
+                self.notes.append(f"no usable answer to {list(asked.options)}: suggesting {likeliest}")
+                return self._ask("service_suggest", options=(likeliest,),
+                                 context=said_for(self.ix, self.slots["service"].heard, likeliest))
         return self._ask("service", options=tuple(live_types))
+
+    def _likeliest(self, options: list[str]) -> str | None:
+        """What a caller who could not choose ("I don't know") is asked to confirm instead: the
+        option the resolver ranks first, if no other is within TYPE_TIE_GAP of it; else, among a
+        tie, the option the caller's words alone fit best by more than that. The words are read
+        without the specialty hint, the conversation model's guess: "sprained ankle" with
+        Orthopedics ties Foot and Ankle Consultation and Sprain and Strain Evaluation (one
+        umbrella), and the catalog's alias for those words puts the sprain visit 0.2 ahead. A tie
+        on both has no likeliest, and the question is put again."""
+        heard = {c.type_id: c.score for c in match_types(self.ix, self.slots["service"].heard)}
+        for scores in (self.scores, heard):
+            ranked = sorted(options, key=lambda t: (-scores.get(t, 0.0), t))
+            if scores.get(ranked[1], 0.0) < scores.get(ranked[0], 0.0) - TYPE_TIE_GAP:
+                return ranked[0]
+        return None
+
+    def _beside_hinted_default(self, offered: list[TypeCandidate]) -> list[TypeCandidate]:
+        """Only the specialty hint, the conversation model's guess, chose its default: the hint's
+        penalty left the words' own visits below it ("I have a headache" with General: New Patient
+        Visit 0.75, Neurology Consultation 0.42). The caller is asked between the default and what
+        the words reach without the hint, and the sick visit when they describe a problem. The
+        default stays alone when the words reach nothing and describe no problem ("I want to see a
+        doctor"), when their own lay term points to it ("my knee hurts": Orthopedic
+        Consultation), or when a model chose another visit."""
+        s = self.slots["service"]
+        default = self.ix.specialty_default.get(s.hint) if s.hint else None
+        if default is None or [c.type_id for c in offered] != [default]:
+            return offered
+        alone = [c for c in match_types(self.ix, s.heard) if c.type_id not in self.ix.unoffered_types]
+        if any(c.type_id == default for c in alone):
+            return offered
+        words = [c.type_id for c in alone if c.score >= alone[0].score - TYPE_TIE_GAP]
+        sick = list(sick_visits(self.ix)) if describes_symptom(s.heard) else []
+        options = list(dict.fromkeys([default, *sick, *words]))
+        if len(options) == 1:
+            return offered
+        self.notes.append(f"{default} came from the hint alone: asking beside {options[1:]}")
+        return [TypeCandidate(t, 1.0, "hint") for t in options]
 
     def _ask_hinted(self, live_types: list[str]) -> Plan:
         """Too many visits fit the words ("a shot": five) to list them all, so the question names the
@@ -1601,6 +1661,7 @@ class _Resolution:
                          "provider_first_name": "provider", "location_retry": "location", "location_zip": "location",
                          "provider_confirm_again": "provider",
                          "location_open": "location", "service_open": "service", "service_hint": "service",
+                         "service_suggest": "service",
                          "metro_again": "metro"}
         new_req = replace(
             self.req,
@@ -1698,7 +1759,7 @@ def _option_labels(ix: CatalogIndex, field: str, options: tuple[str, ...]) -> li
 
 
 def _option_label(ix: CatalogIndex, field: str, option: str) -> str:
-    if field == "service":
+    if field in ("service", "service_suggest"):
         return ix.types[option].name
     if field.startswith("provider"):
         return ix.providers[option].name

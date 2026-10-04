@@ -783,6 +783,93 @@ def test_a_question_put_twice_to_a_caller_who_says_nothing_usable_hands_over():
     assert plans[3].refusal.code == "handoff"
 
 
+SPRAINED_ANKLE = ({"service_phrase": "sprained ankle", "specialty_hint": "Orthopedics"},
+                  {"location_phrase": "San Francisco"})
+
+
+def test_a_caller_who_cannot_choose_between_two_visits_is_asked_about_the_likeliest():
+    """Real call, round 4: "Is that a foot and ankle consultation or a sprain and strain evaluation?"
+    got "I don't know" twice (empty updates), and the call was handed to staff."""
+    plans = _national_updates(*SPRAINED_ANKLE, {})
+    assert plans[1].ask.options == ("appt_137", "appt_144")
+    assert (plans[2].ask.field, plans[2].ask.options) == ("service_suggest", ("appt_144",))
+    assert plans[2].say == ("It sounds like a sprain and strain evaluation, since you said sprained ankle. "
+                            "Shall I go with that?")
+    assert plans[2].req.pending_ask.field == "service"
+
+
+@pytest.mark.parametrize("yes", [{"service_phrase": "yes"}, {"service_phrase": "yeah, that's right"},
+                                 {"service_phrase": "sprain and strain evaluation"}])
+def test_yes_to_the_suggested_visit_offers_it_in_the_city_already_said(yes):
+    plan = _national_updates(*SPRAINED_ANKLE, {}, yes)[-1]
+    assert plan.status == "offer" and {o.type_id for o in plan.offers} == {"appt_144"}
+    assert [a.key for a in plan.area.anchors] == ["metro:san-francisco-ca"]
+
+
+def test_no_to_the_suggested_visit_asks_what_the_visit_is_for():
+    plan = _national_updates(*SPRAINED_ANKLE, {}, {"service_phrase": "no"})[-1]
+    assert (plan.status, plan.ask.field, plan.say) == ("ask", "service_open", "What's the visit for?")
+
+
+def test_nothing_usable_after_the_suggestion_hands_over():
+    plans = _national_updates(*SPRAINED_ANKLE, {}, {})
+    assert [p.status for p in plans] == ["ask", "ask", "ask", "refuse"]
+    assert plans[3].refusal.code == "handoff"
+
+
+HEADACHE_GENERAL = {"service_phrase": "I have a headache", "specialty_hint": "General"}
+
+
+def test_a_symptom_with_only_a_specialty_hint_asks_before_the_specialty_default():
+    """Real call, round 4: "I have a headache" with hint General booked General's default, a New
+    Patient Visit, without a question."""
+    plan = _national_updates(HEADACHE_GENERAL, {"location_phrase": "San Francisco"})[-1]
+    assert (plan.status, plan.ask.options) == ("ask", ("appt_001", "appt_007", "appt_036"))
+    assert plan.say == "Is that a new patient visit, a sick visit, or a neurology consultation?"
+
+
+@pytest.mark.parametrize("update, options", [
+    ({"service_phrase": "I sprained my ankle", "specialty_hint": "General"}, ("appt_001", "appt_144")),
+    ({"service_phrase": "fever and cough", "specialty_hint": "General"}, ("appt_001", "appt_007")),
+    ({"service_phrase": "a checkup", "specialty_hint": "General"}, ("appt_001", "appt_002", "appt_003")),
+])
+def test_the_hint_does_not_bury_the_visits_the_words_reach(update, options):
+    plan = _national_updates(update, {"location_phrase": "San Francisco"})[-1]
+    assert (plan.status, plan.ask.options) == ("ask", options)
+
+
+def test_after_a_non_answer_the_words_own_visit_is_suggested_over_the_hinted_default():
+    plan = _national_updates(HEADACHE_GENERAL, {"location_phrase": "San Francisco"}, {})[-1]
+    assert (plan.ask.field, plan.ask.options) == ("service_suggest", ("appt_036",))
+
+
+def test_a_true_tie_is_asked_again_and_never_suggested():
+    """"A checkup" fits Annual Physical and Annual Wellness Visit alike, with or without the hint."""
+    plans = _national_updates({"service_phrase": "a checkup", "specialty_hint": "General"},
+                              {"location_phrase": "San Francisco"}, {}, {})
+    assert [(p.status, p.ask and p.ask.field) for p in plans] == [
+        ("ask", "metro"), ("ask", "service"), ("ask", "service"), ("refuse", None)]
+    assert plans[2].say == plans[1].say and plans[3].refusal.code == "handoff"
+
+
+@pytest.mark.parametrize("phrase", ["new patient visit", "I want to see a doctor"])
+def test_the_specialty_default_is_still_offered_when_the_words_name_it_or_describe_no_problem(phrase):
+    plan = _national_updates({"service_phrase": phrase, "specialty_hint": "General", "is_new": True},
+                             {"location_phrase": "San Francisco"})[-1]
+    assert plan.status == "offer" and {o.type_id for o in plan.offers} == {"appt_001"}
+
+
+@pytest.mark.parametrize("update, options", [
+    ({"service_phrase": "I'm a new patient and need a new patient visit", "specialty_hint": "General",
+      "is_new": True}, ("appt_000", "appt_001")),
+    ({"service_phrase": "my knee hurts", "specialty_hint": "Orthopedics", "is_new": True, "has_referral": True},
+     ("appt_032", "appt_132", "appt_143")),
+])
+def test_words_that_name_the_visit_or_its_specialty_get_no_sick_visit_beside_it(update, options):
+    plan = _national_updates(update, {"location_phrase": "San Francisco"})[-1]
+    assert (plan.status, tuple(sorted(plan.ask.options))) == ("ask", options)
+
+
 def test_a_real_answer_after_an_empty_update_does_not_hand_over():
     plans = _national_updates({"service_phrase": "my awful lower back pain"}, {}, {"location_phrase": "Dallas"})
     assert plans[2].status != "refuse"

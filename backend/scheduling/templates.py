@@ -224,6 +224,9 @@ def say_ask(index: CatalogIndex, field: str, options: list[str], context: str | 
         return "Did your doctor say to fast for it?"
     if field == "service":
         return f"Is that {join_or([with_article(type_label(index.types[o])) for o in options])}?"
+    if field == "service_suggest":
+        why = f", since you said {context}" if context else ""
+        return f"It sounds like {with_article(type_label(index.types[options[0]]))}{why}. Shall I go with that?"
     if field == "service_open":
         return "What's the visit for?"
     if field == "service_hint":

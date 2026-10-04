@@ -756,6 +756,35 @@ def test_clearing_the_doctor_for_a_named_doctor_keeps_the_name():
     assert out == {"provider_phrase": "Dr. Kalem"} and replaced == ["clear provider"]
 
 
+@pytest.mark.parametrize("said", ["I don't know.", "I am not sure."])
+def test_clearing_the_visit_for_i_dont_know_leaves_the_question_open(said):
+    """Live replay, round 4: "I don't know" to "Is that a foot and ankle consultation or a sprain and
+    strain evaluation?" arrived as clear service, and the caller was asked what the visit was for."""
+    req = Request(pending_ask=PendingAsk("service", ("appt_137", "appt_144")))
+    out, replaced = grounded({"clear": ["service"]}, req, said)
+    assert out == {} and replaced == ["clear service"]
+
+
+@pytest.mark.parametrize("phrase", ["I don't know", "I'm not sure", "Yes"])
+def test_a_visit_phrase_that_picks_neither_option_is_no_answer(phrase):
+    """Live replay, round 4: "I don't know" arrived as the visit, and the same question came back as new."""
+    req = Request(pending_ask=PendingAsk("service", ("appt_137", "appt_144")))
+    out, replaced = grounded({"service_phrase": phrase}, req, phrase + ".")
+    assert out == {} and replaced == [phrase]
+
+
+@pytest.mark.parametrize("options, phrase", [(("appt_144",), "Yes"), (("appt_137", "appt_144"), "not sure, the sprain one")])
+def test_a_yes_to_one_visit_or_a_doubt_with_an_answer_is_kept(options, phrase):
+    req = Request(pending_ask=PendingAsk("service", options))
+    out, _ = grounded({"service_phrase": phrase}, req, phrase + ".")
+    assert out == {"service_phrase": phrase}
+
+
+def test_clearing_the_visit_with_no_question_open_is_left_alone():
+    out, _ = grounded({"clear": ["service"]}, Request(), "I don't know.")
+    assert out == {"clear": ["service"]}
+
+
 def test_clearing_the_doctor_for_any_doctor_is_left_alone():
     out, replaced = grounded({"clear": ["provider"]}, Request(), "Any doctor is fine.")
     assert out == {"clear": ["provider"]} and replaced == []

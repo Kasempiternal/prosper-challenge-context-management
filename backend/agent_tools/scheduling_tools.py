@@ -36,8 +36,8 @@ from scheduling.request import (PARTS_OF_DAY, REJECT_KINDS, SLOT_NAMES, WEEKDAY_
                                 merge)
 from scheduling.resolver import Offer, Plan, resolve
 from scheduling.templates import spoken_when, type_label
-from scheduling.lexicon import says_unsure
-from scheduling.names import _TENS, _UNITS, GENDER_WORDS, _location_words, is_catalog_name
+from scheduling.lexicon import only_unsure, says_unsure
+from scheduling.names import _TENS, _UNITS, GENDER_WORDS, _location_words, is_catalog_name, read_confirmation
 from scheduling.text import tokens
 
 from .context import ToolContext, model_call_event
@@ -352,6 +352,12 @@ def grounded(args: dict, req: Request, said: str) -> tuple[dict, list[str]]:
     phrase = args.get(key) if key else None
     if isinstance(phrase, str) and not all(w in heard or w in _FILLER_WORDS for w in tokens(phrase)):
         args, replaced = {**args, key: said}, [phrase]
+    service = args.get("service_phrase")
+    if (pa and pa.field == "service" and len(pa.options) > 1 and isinstance(service, str)
+            and set(args) <= {"service_phrase", "specialty_hint"} and (only_unsure(service) or read_confirmation(service))):
+        # "I don't know" or a bare "yes" to "Is that A or B?" picks neither and withdraws nothing:
+        # sent as the visit, it replaced the caller's words and the same question came back as new.
+        args, replaced = {}, [*replaced, service]
     provider = args.get("provider_phrase")
     if key != "provider_phrase" and isinstance(provider, str) and provider.strip():
         fuller = with_dropped_description(provider, said)
@@ -399,6 +405,11 @@ def with_misused_clear_undone(args: dict, req: Request, said: str, replaced: lis
         args = {**args, "provider_phrase": named.group(0)}
         cleared = [c for c in cleared if c != "provider"]
         replaced = [*replaced, "clear provider"]
+    pa = req.pending_ask
+    if "service" in cleared and not args.get("service_phrase") and pa and pa.field == "service" and says_unsure(said):
+        # "I don't know" to "Is that A or B?" withdraws nothing: the question is still open, unanswered.
+        cleared = [c for c in cleared if c != "service"]
+        replaced = [*replaced, "clear service"]
     for name, field, words, kind in _CLEAR_AS_REJECT:
         if name in cleared and req.offered and not args.get(field) and words.search(said):
             rejected = args.get("reject") if isinstance(args.get("reject"), list) else []

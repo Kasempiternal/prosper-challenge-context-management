@@ -560,7 +560,7 @@ def type_shortlist(index: CatalogIndex, phrase: str | None, hint: str | None,
         default = index.specialty_default.get(spec)
         ranked += ([default] if default else []) + sorted(t.id for t in index.types.values() if t.specialty == spec)
     evidence = [tid for tid in dict.fromkeys(ranked) if offered(tid)][:SHORTLIST_SIZE]
-    defaults = [index.specialty_default[s] for s in sorted(index.specialty_default)] + list(_sick_visits(index))
+    defaults = [index.specialty_default[s] for s in sorted(index.specialty_default)] + list(sick_visits(index))
     return sorted(set(evidence) | {tid for tid in defaults if offered(tid)})
 
 
@@ -569,7 +569,7 @@ _ACUTE = frozenset({"sick", "acute", "urgent", "same", "day"})
 
 
 @per_index
-def _sick_visits(index: CatalogIndex) -> tuple[str, ...]:
+def sick_visits(index: CatalogIndex) -> tuple[str, ...]:
     """The visit a new problem goes to, read off the catalog's names: an offered visit named for
     being sick and nothing else besides a visit noun ("Sick Visit", "Same-Day Visit"), the most
     general of them ("Sick Visit", not "Same-Day Sick Visit"). Neither catalog's General specialty
@@ -616,9 +616,20 @@ def describes_symptom(phrase: str | None) -> bool:
     words = tokens(phrase or "")
     if _SCREENING in words:
         return False
-    found = [i for i, w in enumerate(words) if w in _FINDINGS
+    found = [i for i, w in enumerate(words) if w in _FINDINGS or w.endswith(("ache", "aches"))
              or (w == "follow" and words[i + 1:i + 2] == ["up"]) or (w == "call" and words[i + 1:i + 2] == ["back"])]
     return any(not _NOT & set(words[max(0, i - 3):i]) for i in found)
+
+
+def said_for(index: CatalogIndex, phrase: str | None, type_id: str) -> str | None:
+    """The caller's words that point to `type_id`: the longest alias said in the phrase that lists
+    it at its top weight ("sprained ankle" for Sprain and Strain Evaluation); None when none does."""
+    words = tokens(phrase or "")
+    spans = [(end - start, start, end) for start, end, alias in _said_aliases(index, words) if type_id in _top(alias)]
+    if not spans:
+        return None
+    _, start, end = max(spans, key=lambda s: (s[0], -s[1]))
+    return " ".join(words[start:end])
 
 
 def _top(alias: Alias) -> frozenset[str]:
@@ -790,6 +801,16 @@ def stated_doubt(index: CatalogIndex, phrase: str | None) -> Doubt | None:
 def says_unsure(phrase: str | None) -> bool:
     """A doubt marker anywhere: "I don't remember if", "not sure", "maybe"."""
     return any(_doubt_markers(tokens(c)) for c in _CLAUSE.split(phrase or ""))
+
+
+_UNSURE_FILLER = frozenset({"i", "m", "am", "im", "don", "do", "really", "which", "one", "it", "that", "s", "is",
+                            "um", "uh", "honestly", "totally", "exactly"})
+
+
+def only_unsure(phrase: str | None) -> bool:
+    """A doubt and nothing else ("I don't know", "not sure, honestly"): no answer to a question."""
+    words = tokens(phrase or "")
+    return says_unsure(phrase) and all(w in _NEGATIONS | _KNOWING | _DOUBTFUL | _UNSURE_FILLER for w in words)
 
 
 def _doubt_markers(words: list[str]) -> list[tuple[int, int]]:

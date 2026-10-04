@@ -381,3 +381,13 @@ def test_a_second_answer_that_still_fits_them_all_hands_over(index):
 
 def test_a_specific_answer_after_the_likeliest_question_goes_on(index):
     assert _said(index, "shot", "a flu shot")[1].status == "offer"
+
+
+@pytest.mark.parametrize("phrase, say", [
+    ("I have a headache", "Is that a new patient visit, a sick visit, or a neurology consultation?"),
+    ("a sore throat", "Is that a new patient visit or a sick visit?"),
+])
+def test_a_symptom_with_only_the_general_hint_is_asked_about_not_booked_as_a_new_patient_visit(index, phrase, say):
+    plan = resolve(index, merge(Request(), Update.from_args({"service_phrase": phrase, "specialty_hint": "General"})),
+                   MockAvailability(index))
+    assert (plan.status, plan.say) == ("ask", say)
