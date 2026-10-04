@@ -1361,3 +1361,38 @@ Faults in the agent this found (not fixed; pilot only):
 Limits of the pilot: 20 calls is a smoke test, not a rate; the caller model is more cooperative than people;
 targets whose lay description fits several visit types should be left out of the next set. Spend: about $3.4
 (gpt-4o agent for 60 calls, gpt-4o-mini callers and personas, JEV fractions of a cent).
+
+### Pilot fixes and second run (2026-10-04)
+
+Two faults the pilot exposed were fixed in the resolver, each with tests (1,329 backend tests):
+- **"I need a shot" looped.** Five visits fit the word, more than a question lists, so it fell to the open
+  "What's the visit for?" and repeated it twenty times. It now names the likeliest ("What kind of visit is it: a
+  vaccination, a flu shot, or a COVID-19 vaccine, or something else?") and hands over if the next answer still
+  fits them all. Only for words that fit several visits alike; a failed model's guesses still get the open question.
+- **A question put again and again to a caller who says nothing usable.** The conversation model sends an empty
+  `update_request` for "I already told you", and nothing counted it: "Which city are you in?" was asked four
+  times. An unanswered question now keeps a count of empty replies (`PendingAsk.repeats`); the second hands over.
+  An answer to "which city" that leaves the place open asks once more for a ZIP code, then hands over.
+
+After these fixes all 13 dev and stress sets still read 0 wrong commits with JEV, and both stress gates pass.
+
+The 20 calls were run again (JEV only, to save money) and 10 new calls were frozen before the fixes
+(`fresh10_targets.jsonl`; generic visit types left out) and run once. Callers are sampled again each run, so the
+same persona does not say the same words twice.
+
+| Calls | Right | Wrong (automatic) | Safe, no booking | Stuck |
+|---|---|---|---|---|
+| 20 old, before the fixes | 7 | 4 | 8 | 1 |
+| 20 old, after the first fix | 7 | 5 | 8 | 0 |
+| 10 new, after the first fix | 3 | 1 | 6 | 0 |
+
+The score did not improve, and a sample this small cannot show a change of this size. What changed is that the
+loop is gone (stuck 1 to 0). Reading every "wrong" call: all 6 are cases the caller's words cannot decide (a back
+problem against "new patient consultation", chest pain against "urgent care visit"), or a persona that did not state
+the place or doctor it was scored on, and the caller accepted what was offered; none is an agent commit made
+without asking. 14 of 30 calls ended with no booking, mostly a handoff after the caller could not answer a fair
+question ("which doctor was that?", "vaccination or flu shot?") or described a doctor without a name. That is
+the next thing to improve, and the empty-reply fix above was made after this run, so it is checked by replaying the
+failing tool calls, not by a third run. One call (`fresh10-sf-03`, "check on my prescriptions for blood pressure")
+went straight to staff from the greeting; it was not changed, because it was one of the frozen new calls.
+Spend for this round: about $1.8 (30 calls); the pilot in total about $5.2.

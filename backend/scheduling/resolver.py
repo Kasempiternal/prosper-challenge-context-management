@@ -39,6 +39,7 @@ RIVAL_MIN_P = 0.05
 LEXICAL_DOUBT_P = 0.2
 MAX_OPTIONS = 3
 HANDOFF_AFTER_MISSES = 3
+EMPTY_ANSWERS_BEFORE_HANDOFF = 2   # a question put twice to a caller who says nothing usable
 # An area search widens from the place's own radius to twice that, then to this, before refusing.
 # No ring goes past it: an anchor whose own radius is wider (a state with no catalog city of its
 # own) refuses with none_nearby at once, naming the nearest clinic that has the visit, in the state
@@ -219,6 +220,10 @@ class _Resolution:
     # ---- entry ---------------------------------------------------------------------------
 
     def run(self) -> Plan:
+        asked = self.req.pending_ask
+        if asked and asked.repeats >= EMPTY_ANSWERS_BEFORE_HANDOFF:
+            self.notes.append(f"{asked.field} asked, and {asked.repeats} replies with nothing usable: handing over")
+            return self._refuse("handoff")
         if self.req.pick is not None:
             plan = self._picked()
             if plan:
@@ -799,6 +804,12 @@ class _Resolution:
                     return self._refuse("handoff")
                 return self._ask("metro_again", options=tuple(ids))
             return self._ask("metro", options=tuple(ids))
+        s = self.slots["location"]
+        if s.region:
+            # "Which city are you in?" was answered ("I'm in your city") and the place is still open:
+            # asked once more with a ZIP code as the way out, then handed off, never the same question.
+            self.slots["location"] = replace(s, asks=s.asks + 1)
+            return self._refuse("handoff") if s.asks + 1 >= 2 else self._ask("location_zip")
         return self._ask("metro", context=state)
 
     def _confirm_place(self, place: PlaceMatch) -> Plan:
@@ -1376,9 +1387,24 @@ class _Resolution:
         return self._ask("service_open")
 
     def _ask_type(self, live_types: list[str], has_service: bool) -> Plan:
-        if not has_service or len(live_types) > MAX_OPTIONS:
+        if not has_service:
             return self._ask("service_open")
+        if len(live_types) > MAX_OPTIONS:
+            # Only words that did fit several visits alike have a likeliest; a failed model's guesses do not.
+            return self._ask_hinted(live_types) if self.umbrella_pick else self._ask("service_open")
         return self._ask("service", options=tuple(live_types))
+
+    def _ask_hinted(self, live_types: list[str]) -> Plan:
+        """Too many visits fit the words ("a shot": five) to list them all, so the question names the
+        likeliest and leaves the door open. Repeating "What's the visit for?" to a caller who has just
+        answered it looped for ever; a second answer that still fits them all hands over."""
+        self.notes.append(f"{len(live_types)} visits fit the words: naming the likeliest")
+        s = self.slots["service"]
+        if s.hints:
+            return self._refuse("handoff")
+        self.slots["service"] = replace(s, hints=1)
+        likeliest = sorted(live_types, key=lambda t: (-self.scores.get(t, 0.0), t))[:MAX_OPTIONS]
+        return self._ask("service_hint", options=tuple(likeliest))
 
     def _ask_location(self, location_ids) -> Plan:
         if len(location_ids) <= MAX_OPTIONS:
@@ -1512,12 +1538,21 @@ class _Resolution:
         refusal = Refusal(code, kw.get("type_id"), tuple(kw.get("alternatives", ())), kw.get("alt_type_id"))
         return self._finish("refuse", say, refusal=refusal)
 
+    def _pending(self, ask: Ask, pending_field: dict[str, str]) -> PendingAsk:
+        """The question now open. Asking the same one again keeps the count of replies that said nothing."""
+        field = pending_field.get(ask.field, ask.field)
+        options = () if ask.field == "service_hint" else ask.options
+        before = self.req.pending_ask
+        again = before is not None and before.field == field and before.options == options
+        return PendingAsk(field, options, before.repeats if again else 0)
+
     def _finish(self, status: str, say: str, ask: Ask | None = None, offers: tuple[Offer, ...] = (),
                 refusal: Refusal | None = None, confirm: Offer | None = None, keep_pick: bool = False) -> Plan:
         pending_field = {"provider_retry": "provider", "provider_spelling": "provider",
                          "provider_first_name": "provider", "location_retry": "location", "location_zip": "location",
                          "provider_confirm_again": "provider",
-                         "location_open": "location", "service_open": "service", "metro_again": "metro"}
+                         "location_open": "location", "service_open": "service", "service_hint": "service",
+                         "metro_again": "metro"}
         new_req = replace(
             self.req,
             service=self.slots["service"], provider=self.slots["provider"], location=self.slots["location"],
@@ -1526,7 +1561,7 @@ class _Resolution:
             alternatives=refusal.refs() if refusal else (),
             pick=self.req.pick if keep_pick else None,
             changed=(),
-            pending_ask=PendingAsk(pending_field.get(ask.field, ask.field), ask.options) if ask else None,
+            pending_ask=self._pending(ask, pending_field) if ask else None,
         )
         summary = _summary(self.ix, new_req, status, ask)
         result = _tool_result(self.ix, status, say, ask, offers, new_req, confirm)

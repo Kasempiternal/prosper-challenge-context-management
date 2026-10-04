@@ -31,6 +31,7 @@ class Slot:
     candidates: tuple[tuple[str, float], ...] = ()
     within: tuple[str, ...] = ()     # options of the question this phrase answered
     asks: int = 0                    # consecutive failed matches (drives spell -> handoff)
+    hints: int = 0                   # times a question named the likeliest of too many visits
     turn: int = 0                    # turn on which heard/hint last changed
     region: str | None = None        # location only: the answer to "which city?", narrowing heard
 
@@ -70,6 +71,7 @@ class AltRef:
 class PendingAsk:
     field: str
     options: tuple[str, ...] = ()
+    repeats: int = 0                 # empty updates since it was asked: the caller said nothing usable
 
 
 @dataclass(frozen=True)
@@ -106,7 +108,7 @@ class Request:
             offered=tuple(OfferRef(**o) for o in d.get("offered", ())),
             alternatives=tuple(AltRef(**a) for a in d.get("alternatives", ())),
             pick=d.get("pick"),
-            pending_ask=PendingAsk(pa["field"], tuple(pa.get("options", ()))) if pa else None,
+            pending_ask=PendingAsk(pa["field"], tuple(pa.get("options", ())), pa.get("repeats", 0)) if pa else None,
             turn=d.get("turn", 0),
             changed=tuple(d.get("changed", ())),
         )
@@ -214,6 +216,7 @@ def merge(req: Request, update: Update) -> Request:
             exact=bool(update.service_name),
             within=_answered(req, "service"),
             asks=svc.asks,
+            hints=svc.hints,
             turn=turn,
         )
         changes["service"] = svc
@@ -248,4 +251,7 @@ def merge(req: Request, update: Update) -> Request:
         return replace(new, pick=update.pick_offer, pending_ask=None if changes else new.pending_ask)
     if changes:
         return replace(new, offered=(), alternatives=(), pick=None, pending_ask=None)
+    if req.pending_ask and patient == req.patient:
+        # An update with nothing in it ("I already told you"): the question is still open and unanswered.
+        return replace(new, pending_ask=replace(req.pending_ask, repeats=req.pending_ask.repeats + 1))
     return new

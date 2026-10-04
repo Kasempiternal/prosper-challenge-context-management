@@ -226,6 +226,8 @@ def say_ask(index: CatalogIndex, field: str, options: list[str], context: str | 
         return f"Is that {join_or([with_article(type_label(index.types[o])) for o in options])}?"
     if field == "service_open":
         return "What's the visit for?"
+    if field == "service_hint":
+        return f"What kind of visit is it: {join_or([with_article(type_label(index.types[o])) for o in options])}, or something else?"
     if field == "provider":
         return f"Do you mean {join_or(_distinct_provider_labels(index, options))}?"
     if field == "provider_first_name":

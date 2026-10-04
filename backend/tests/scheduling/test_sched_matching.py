@@ -356,3 +356,28 @@ def test_candidate_rounding_edge_is_kept(index):
     assert match_providers(index, "Dr. Mckirezi") == _oracle_match_providers(index, "Dr. Mckirezi")
     assert {c.id for c in match_providers(index, "Dr. Mckirezi")} == {
         p.id for p in index.providers.values() if p.last_name == "Ramirez"}
+
+
+def _said(index, *phrases):
+    """The plans of a caller who says each phrase as the service in turn."""
+    req, plans = Request(), []
+    for phrase in phrases:
+        plans.append(resolve(index, merge(req, Update.from_args({"service_phrase": phrase})), MockAvailability(index)))
+        req = plans[-1].req
+    return plans
+
+
+def test_a_word_that_fits_many_visits_names_the_likeliest_instead_of_repeating_the_open_question(index):
+    """Unscripted call: "I need a shot" fits five visits, more than a question lists, so the agent asked
+    "What's the visit for?" twenty times to a caller who kept saying "a shot"."""
+    first = _said(index, "shot")[0]
+    assert (first.status, first.ask.field) == ("ask", "service_hint")
+    assert "flu shot" in first.say and "something else" in first.say
+
+
+def test_a_second_answer_that_still_fits_them_all_hands_over(index):
+    assert _said(index, "shot", "for a shot")[1].refusal.code == "handoff"
+
+
+def test_a_specific_answer_after_the_likeliest_question_goes_on(index):
+    assert _said(index, "shot", "a flu shot")[1].status == "offer"

@@ -762,3 +762,27 @@ def test_jev_site_chooser_request_and_gate(nat, talk):
         "Downtown Health Center; Downtown, 400 N Lamar Blvd, Austin; on site: lab")
     assert body["questions"]["pick"]["criteria"]["loc_a3"] == (
         "Mueller Clinic; Hyde Park, 1 Main St, Austin; on site: general visits only")
+
+
+def _national_updates(*updates):
+    ix = CatalogIndex.load(Path(__file__).resolve().parents[2] / "data" / "national" / "catalog.json")
+    req, plans = Request(), []
+    for u in updates:
+        plans.append(resolve(ix, merge(req, Update.from_args(u)), MockAvailability(ix)))
+        req = plans[-1].req
+    return plans
+
+
+def test_a_question_put_twice_to_a_caller_who_says_nothing_usable_hands_over():
+    """Unscripted call: "Which city are you in?" was asked four times to "I already said, your city",
+    which the conversation model sends as an empty update."""
+    plans = _national_updates(
+        {"service_phrase": "my awful lower back pain"},
+        {"location_phrase": "your city, near the grocery store by the park on Medical Center Drive"}, {}, {})
+    assert [p.status for p in plans] == ["ask", "ask", "ask", "refuse"]
+    assert plans[3].refusal.code == "handoff"
+
+
+def test_a_real_answer_after_an_empty_update_does_not_hand_over():
+    plans = _national_updates({"service_phrase": "my awful lower back pain"}, {}, {"location_phrase": "Dallas"})
+    assert plans[2].status != "refuse"
