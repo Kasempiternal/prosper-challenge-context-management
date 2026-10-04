@@ -21,6 +21,7 @@ import time
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from functools import lru_cache
+from itertools import takewhile
 from typing import Awaitable, Callable
 
 import tiktoken
@@ -31,11 +32,12 @@ from pipecat.frames.frames import TTSSpeakFrame
 from scheduling.availability import Slot as TimeSlot
 from scheduling.lookup import KINDS, MAX_FACTS, lookup as catalog_lookup
 from scheduling.policy import check
-from scheduling.request import PARTS_OF_DAY, REJECT_KINDS, SLOT_NAMES, WEEKDAY_NAMES, Patient, Request, Update, merge
+from scheduling.request import (PARTS_OF_DAY, REJECT_KINDS, SLOT_NAMES, WEEKDAY_NAMES, OfferRef, Patient, Request, Update,
+                                merge)
 from scheduling.resolver import Offer, Plan, resolve
 from scheduling.templates import spoken_when, type_label
 from scheduling.lexicon import says_unsure
-from scheduling.names import GENDER_WORDS
+from scheduling.names import _TENS, _UNITS, GENDER_WORDS, _location_words, is_catalog_name
 from scheduling.text import tokens
 
 from .context import ToolContext, model_call_event
@@ -262,10 +264,26 @@ def caller_turn(messages: list[dict]) -> str:
     return " ".join(reversed(said)).strip()
 
 
-# Who the visit is for: "my 10-year-old", "my daughter". It decides between a child's visit and
-# an adult's, and the conversation model drops it ("physical and a form signed by the doctor").
-_WHO = re.compile(r"\b\d+[- ]?(?:year|month|week)s?[- ]?olds?\b|\b(?:son|daughter|kid|kids|child|children|baby|"
-                  r"toddler|infant|newborn|teen|teenager|boy|girl)\b", re.IGNORECASE)
+def _caller_said(flow_manager: FlowManager) -> str:
+    try:
+        return caller_turn(flow_manager.get_current_context())
+    except (FlowError, AttributeError):  # test doubles carry no conversation
+        return ""
+
+
+# Who the visit is for: "my 10-year-old", "my daughter", "for my mother". It decides between a child's
+# visit and an adult's, and the conversation model drops it ("physical and a form signed by the doctor").
+# An adult is the patient only when the visit is for them ("for my mother", "my husband needs"): in
+# "my mother recommended Dr. Chen" she is not.
+_AGE = r"\b\d+[- ]?(?:year|month|week)s?[- ]?olds?\b"
+_CHILD = r"son|daughter|kid|kids|child|children|baby|toddler|infant|newborn|teen|teenager|boy|girl"
+_ADULT = (r"mother|father|mom|mum|dad|parents?|husband|wife|partner|grandmother|grandfather|grandma|grandpa|"
+          r"grandparents?|grandson|granddaughter|brother|sister|aunt|uncle|niece|nephew|cousin|friend|neighbou?r|"
+          r"boyfriend|girlfriend|fianc\w*|roommate")
+_WHO = re.compile(rf"{_AGE}|\b(?:{_CHILD})\b|\bfor (?:my|our|his|her) (?:\w+ )?(?:{_ADULT})\b"
+                  rf"|\b(?:my|our) (?:{_ADULT}) needs?\b", re.IGNORECASE)
+# A phrase that names the person already says whom the visit is for ("eye check for mother").
+_NAMES_WHO = re.compile(rf"{_AGE}|\b(?:{_CHILD}|{_ADULT})\b", re.IGNORECASE)
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 # Patient status said in the same breath: the update carries it in is_new and has_referral.
 _STATUS = re.compile(r"\b(?:i'?m|i am|we'?re|we are)\b[^.]*\b(?:patients?|referral)\b.*$", re.IGNORECASE)
@@ -281,7 +299,7 @@ def with_dropped_clauses(phrase: str, said: str) -> str:
         words = tokens(sentence)
         if not words:
             continue
-        who = _WHO.search(sentence) and not _WHO.search(phrase)
+        who = _WHO.search(sentence) and not _NAMES_WHO.search(phrase)
         unsure = says_unsure(sentence) and not says_unsure(phrase)
         if who or unsure or (kept and words[0] == "or" and says_unsure(kept[-1])):
             kept.append(sentence)
@@ -394,10 +412,7 @@ def with_misused_clear_undone(args: dict, req: Request, said: str, replaced: lis
 def update_request_tool(ctx: ToolContext) -> FlowsFunctionSchema:
     async def handler(args: dict, flow_manager: FlowManager):
         today = ctx.availability.now.date()
-        try:
-            said = caller_turn(flow_manager.get_current_context())
-        except (FlowError, AttributeError):  # test doubles carry no conversation
-            said = ""
+        said = _caller_said(flow_manager)
         # The schedule node resets the context on entry: the first update after start has no caller
         # message to check against, only the words start was given.
         started = flow_manager.state.pop("started_with", "")
@@ -502,16 +517,98 @@ async def _offer_again(ctx: ToolContext, flow_manager: FlowManager, req: Request
     return EdgeOutcome({**result, "booked": False}, proceed=False, respond=not spoken)
 
 
+def _clock_times(words: list[str]) -> list[tuple[int, int | None, str | None]]:
+    """The clock times said as times: "at 11", "eight thirty", "3 pm", "10 o'clock", "noon", as
+    (hour 1-12, minute or None, "am" / "pm" or None). A bare number ("my 2 kids") is no time."""
+    out = []
+    for i, w in enumerate(words):
+        if w == "noon":
+            out.append((12, 0, "pm"))
+            continue
+        hour = int(w) if w.isdigit() else _UNITS.get(w)
+        if hour is None or not 1 <= hour <= 12:
+            continue
+        first, second = (words[i + 1:i + 3] + ["", ""])[:2]
+        minute, used = None, 0
+        if first.isdigit() and len(first) == 2:  # "8:30" reaches here as "8", "30"
+            minute, used = int(first), 1
+        elif first in _TENS or first == "oh":  # "thirty", "forty five", "oh five"
+            unit = _UNITS.get(second, 10)
+            minute, used = (_TENS.get(first, 0) + unit, 2) if unit < 10 else (_TENS.get(first), 1)
+        elif _UNITS.get(first, 0) >= 10:  # "fifteen"
+            minute, used = _UNITS[first], 1
+        if minute is None or minute >= 60:
+            minute, used = None, 0
+        after = words[i + 1 + used:i + 3 + used]
+        half = next((h for h in ("am", "pm") if after[:1] == [h] or after == [h[0], "m"]), None)
+        oclock = after[:1] == ["oclock"] or after == ["o", "clock"]
+        if (i and words[i - 1] in ("at", "around")) or used or half or oclock:
+            out.append((hour, minute, half))
+    return out
+
+
+def read_back_mismatch(ctx: ToolContext, offer: OfferRef, said: str) -> str | None:
+    """What the caller's words name that the read-back offer is not: a day, a clock time, a
+    doctor or a clinic ("Yes, Friday's perfect" to "today at 11" -> "friday"). None when nothing
+    they name contradicts it, which is every plain yes."""
+    # "11am", "8:30" and "a.m." come apart into number and word.
+    words = [p for w in tokens(said) for p in re.findall(r"\d+|\D+", w)]
+    start = datetime.fromisoformat(offer.start)
+    ahead = (start.date() - ctx.availability.now.date()).days
+    days = {WEEKDAY_NAMES[start.weekday()], *(("today",) if ahead == 0 else ("tomorrow",) if ahead == 1 else ())}
+    for i, w in enumerate(words):
+        day = w.removesuffix("s") if w.removesuffix("s") in WEEKDAY_NAMES else w
+        # "next Wednesday", said on a Wednesday, is not today.
+        if day in DAY_WORDS and (day not in days or (ahead == 0 and i and words[i - 1] == "next")):
+            return day
+    for hour, minute, half in _clock_times(words):
+        if (hour != (start.hour % 12 or 12) or minute not in (None, start.minute)
+                or half not in (None, "am" if start.hour < 12 else "pm")):
+            return f"{hour}" + (f":{minute:02d}" if minute is not None else "") + (f" {half}" if half else "")
+    ni = ctx.index.name_index
+    for i, w in enumerate(words[:-1]):
+        if w not in ("dr", "doctor"):
+            continue
+        # Only a catalog name said after "Dr.": a garbled or unknown name is no evidence of another doctor.
+        run = list(takewhile(lambda n: is_catalog_name(ctx.index, n), words[i + 1:i + 3]))
+        first, last = run if len(run) == 2 and run[1] in ni.by_last else (None, run[0] if run else None)
+        if last in ni.by_last and (last != ni.last_of[offer.provider_id]
+                                   or first not in (None, ni.first_of[offer.provider_id])):
+            return "Dr. " + " ".join(n for n in (first, last) if n).title()
+    held = ctx.index.locations[offer.location_id]
+    held_words = {*tokens(held.short_name), *_location_words(held), *tokens(held.city), *tokens(held.neighborhood or "")}
+    joined = f" {' '.join(words)} "
+    for loc in ctx.index.locations.values():
+        name = tokens(loc.short_name)
+        # Only another clinic the caller could pick: one in the same metro, by its own name.
+        if (loc.metro_id == held.metro_id and loc.id != held.id and set(name) & _location_words(loc)
+                and not set(name) <= held_words and f" {' '.join(name)} " in joined):
+            return loc.short_name
+    return None
+
+
 async def book_confirmed(ctx: ToolContext, args: dict, flow_manager: FlowManager) -> EdgeOutcome:
     """Book exactly the offer update_request read back, whatever the LLM passed. Re-checks the
     booking rules and holds the slot; holding a slot this call already holds returns the same
-    reference, so a retry converges on one booking."""
+    reference, so a retry converges on one booking. A yes that names another day, time, doctor or
+    clinic is not booked: the LLM is sent back to update_request with the new choice."""
     state = flow_manager.state
     req = _request(flow_manager)
     offer = next((o for o in req.offered if o.n == req.pick), None)
     if state.get("status") != "confirm" or offer is None:
         return EdgeOutcome(_error("nothing confirmed to book: the caller must pick a time with update_request "
                                   "and say yes to its read-back first"), proceed=False, respond=True)
+    said = _caller_said(flow_manager)
+    named = read_back_mismatch(ctx, offer, said)
+    if named:
+        logger.info(f"confirm_booking {offer.slot_id} not booked: the caller said {said!r}")
+        # The yes was to something else, so it no longer stands for the read-back: a later yes
+        # books only after update_request reads the new choice back.
+        state["status"] = "offer"
+        return EdgeOutcome({"status": "not_booked", "booked": False, "error": (
+            f"Not booked: the caller said {named!r}, which is not the appointment read back ({state['summary']}) "
+            "Pass the caller's new choice to update_request now, in their words: pick_offer for an offered time, "
+            "time_pref.day for a day. It reads the new appointment back to them.")}, proceed=False, respond=True)
 
     slot = TimeSlot(offer.type_id, offer.provider_id, offer.location_id,
                     datetime.fromisoformat(offer.start), offer.duration_min)
@@ -558,12 +655,15 @@ async def new_request(ctx: ToolContext, args: dict, flow_manager: FlowManager) -
     if not isinstance(words, str) or not words.strip():
         return EdgeOutcome(_error("request is required: the caller's own words about what they want booked now"),
                            proceed=False, respond=True)
+    # The words are all the next node gets of this turn (it resets the context): whom the visit is
+    # for must survive the conversation model's summary ("eyes checked, in Chicago").
+    words = with_dropped_clauses(words.strip(), _caller_said(flow_manager))
     state = flow_manager.state
     # Another person ("can you do my husband too?") is a new patient record: nothing about them
     # carries over from the caller's own booking, so the resolver asks again.
     patient = Patient() if args.get("for_someone_else") is True else _request(flow_manager).patient
     state["req"] = Request(patient=patient).to_dict()
     state.pop("status", None)
-    state["summary"] = words.strip()
-    state["started_with"] = words.strip()
-    return EdgeOutcome({"status": "success", "request": words.strip()}, proceed=True, respond=True)
+    state["summary"] = words
+    state["started_with"] = words
+    return EdgeOutcome({"status": "success", "request": words}, proceed=True, respond=True)

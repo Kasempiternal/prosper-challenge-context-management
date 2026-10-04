@@ -1502,3 +1502,14 @@ Passes worth a note (graded on the tool, not on everything the caller said):
 Harness note: the in-process booking ledger was shared between runs in the full run, so later `confirm_booking`
 runs heard "that time was just taken"; no verdict depends on it (only the first tool call is graded). The script
 now clears the ledger per run, and C1 was rerun alone.
+
+### Confirmation must match the read-back (2026-10-04)
+
+C1 failed: "Yes, Friday's perfect." to a read-back for today at 11 went to `confirm_booking` (2 of 2) and code booked today at 11.
+Rule, in `book_confirmed`: before booking, the caller's own turn (`read_back_mismatch`) is compared with the held offer; a weekday,
+"today"/"tomorrow", a clock time said as one ("at 11", "8:30", "3 pm"), a catalog doctor after "Dr." or a same-metro clinic by name that
+differs from it is not booked: the edge stays, consent is withdrawn (status `offer`) and the result sends the model to `update_request`.
+A plain yes, or one naming the held day, time, doctor or clinic, books as before. The schedule prompt no longer says "even if they ask for something else".
+Replay (`offscript_probe.py --only S6,C1,C2,C3,C5,C7 --details`, `results/offscript_probe_confirm_2026-10-04.txt`): C1 2/2 (`update_request` day friday), C2, C3, C5, C7 2/2 each, the yeses booked;
+C1 against the old prompt: `confirm_booking` 4 of 4, none booked, and the one run given a follow-up re-offered Friday. S6 1/2 on the model's `start` argument, but `new_request`
+now restores "for my mother" (`_WHO` covers adults after "for my"), so the run that dropped it still sent the caller's sentence to the resolver. Regression sets 0 wrong commits; both stress gates exit 0.

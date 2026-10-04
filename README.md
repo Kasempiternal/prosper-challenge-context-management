@@ -378,7 +378,7 @@ cd frontend && pnpm test                                   # vitest
 cd frontend && pnpm typecheck && pnpm lint && pnpm build
 ```
 
-Last run: **1,377 backend tests passed, 1 live JEV smoke test skipped** (2026-10-04, after the unscripted-call fixes). **127 frontend tests passed**, and the frontend production build passed.
+Last run: **1,410 backend tests passed, 1 live JEV smoke test skipped** (2026-10-04, after the unscripted-call fixes). **127 frontend tests passed**, and the frontend production build passed.
 
 ## Final verification (2026-10-03, resolver frozen at `222eb22`)
 

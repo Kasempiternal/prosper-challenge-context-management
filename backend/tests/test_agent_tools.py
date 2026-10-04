@@ -308,6 +308,63 @@ def test_a_slot_taken_by_another_call_is_re_offered_not_booked(make_ctx):
     assert "bookings" not in fm_b.state
 
 
+READ_BACK = "Okay, a cardiology consultation with Dr. Emily Chen, tomorrow at 8 at Downtown. Shall I book it?"
+
+
+@pytest.mark.parametrize("said", [
+    "Yes.", "Yes please.", "Sure.", "That works.", "Yes, tomorrow at 8 is fine.", "Yes, Thursday works.",
+    "Yes, 8 a.m. is great.", "Yes, at 8:00.", "Yes, Dr. Chen.", "Yes, Dr. Emily Chen at Downtown.",
+    "Yes, and can you book the same thing for my wife after?", "Yes, my 2 kids will come along.", "I'm 82, so yes.",
+    "Yes, Dr. Pemberton said I should come.", "Fine, yes, whatever, just book it, this took forever.",
+])
+def test_a_yes_that_names_nothing_else_books_the_read_back(make_ctx, said):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    confirm_pick(ctx, fm)
+    fm.messages = turn(said, asked=READ_BACK)
+    result = book(ctx, fm).result
+    assert (result["status"], result["when"], result["location"]) == ("booked", "tomorrow at 8", "Downtown")
+
+
+@pytest.mark.parametrize("said,named", [
+    ("Yes, Friday's perfect.", "friday"),
+    ("Yes, today works.", "today"),
+    ("Yes, at 11.", "11"),
+    ("Yes, eight thirty.", "8:30"),
+    ("Yes, 8 pm.", "8 pm"),
+    ("Yes, with Dr. Garcia.", "Dr. Garcia"),
+    ("Yes, Dr. David Chen.", "Dr. David Chen"),
+    ("Yes, at Richmond.", "Richmond"),
+])
+def test_a_yes_that_names_something_else_is_not_booked(make_ctx, said, named):
+    """Probe C1: "Yes, Friday's perfect." to a read-back for today at 11 booked today at 11."""
+    ctx, fm = make_ctx(), FakeFlowManager()
+    confirm_pick(ctx, fm)
+    spoken_before = len(fm.worker.frames)
+    fm.messages = turn(said, asked=READ_BACK)
+    outcome = book(ctx, fm)
+    assert (outcome.proceed, outcome.respond) == (False, True)
+    assert (outcome.result["status"], outcome.result["booked"]) == ("not_booked", False)
+    assert f"the caller said {named!r}" in outcome.result["error"]
+    assert "update_request" in outcome.result["error"]
+    assert "bookings" not in fm.state and fm.state["status"] != "confirm"
+    assert len(fm.worker.frames) == spoken_before
+
+
+def test_a_new_choice_in_the_yes_is_read_back_before_it_is_booked(make_ctx):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    confirm_pick(ctx, fm)
+    fm.messages = turn("Yes, Friday's perfect.", asked=READ_BACK)
+    book(ctx, fm)
+    # A later yes no longer stands for the first read-back.
+    fm.messages = turn("Yes.", asked="Did you want Friday?")
+    assert book(ctx, fm).result["status"] == "error" and "bookings" not in fm.state
+    result, _ = call(ctx, fm, "update_request", {"pick_offer": 2})
+    assert result["status"] == "confirm"
+    fm.messages = turn("Yes, Friday's perfect.", asked=spoken(fm)[-1])
+    result = book(ctx, fm).result
+    assert (result["status"], result["when"], result["location"]) == ("booked", "Friday at 8", "Richmond")
+
+
 def new(ctx, fm, args):
     return asyncio.run(new_request(ctx, args, fm))
 
@@ -591,10 +648,35 @@ def test_the_lady_one_is_not_rewritten_into_a_booking(make_ctx):
     ("flu shot", "A flu shot in Washington. I'm a returning patient.", "flu shot"),
     ("sick visit", "I'm a person with a fever, for a sick visit.", "sick visit"),
     ("well-child visit for my daughter", "My daughter needs her well-child visit.", "well-child visit for my daughter"),
+    ("eyes checked, in Chicago",
+     "Hi, I'm calling for my mother, she's eighty-two, she needs her eyes checked, she lives in Chicago.",
+     "Hi, I'm calling for my mother, she's eighty-two, she needs her eyes checked, she lives in Chicago."),
+    ("rash on his arm", "It's not for me actually, it's for my husband, he's got this rash on his arm.",
+     "It's not for me actually, it's for my husband, he's got this rash on his arm."),
+    ("physical", "My dad needs a physical.", "My dad needs a physical."),
+    ("checkup", "I'd like a checkup. It's for my elderly grandmother.", "checkup. It's for my elderly grandmother."),
+    ("dental cleaning", "A dental cleaning for my wife's teeth.", "A dental cleaning for my wife's teeth."),
+    # Someone who is not the patient: the caller is.
+    ("eye exam with Dr. Chen", "My mother recommended Dr. Chen. I need an eye exam.", "eye exam with Dr. Chen"),
+    ("flu shot", "My friend told me you do flu shots. I'd like one.", "flu shot"),
+    ("eye check for mother", "I'm calling for my mother, she needs her eyes checked.", "eye check for mother"),
 ])
 def test_the_visit_keeps_whom_it_is_for_and_a_stated_doubt(phrase, said, sent):
     from agent_tools.scheduling_tools import with_dropped_clauses
     assert with_dropped_clauses(phrase, said) == sent
+
+
+def test_start_keeps_whom_the_visit_is_for():
+    """Probe S6: start got "eyes checked, in Chicago", and the schedule node, its context reset, had
+    nothing else to check the first update against."""
+    said = "Hi, I'm calling for my mother, she's eighty-two, she needs her eyes checked, she lives in Chicago."
+    fm = FakeFlowManager(turn(said, asked="Hi, what can I help you book today?"))
+    outcome = asyncio.run(new_request(None, {"request": "eyes checked, in Chicago"}, fm))
+    assert outcome.result == {"status": "success", "request": said}
+    assert fm.state["started_with"] == fm.state["summary"] == said
+    fm = FakeFlowManager(turn("My mother recommended Dr. Chen, I need a checkup.", asked="Hi!"))
+    asyncio.run(new_request(None, {"request": "checkup with Dr. Chen"}, fm))
+    assert fm.state["started_with"] == "checkup with Dr. Chen"
 
 
 def test_an_answer_to_a_visit_question_is_the_callers():

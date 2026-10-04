@@ -7,7 +7,7 @@ from a deep copy of its snapshot in a fresh AgentSide, so runs never see each ot
 first model request of the probe turn is graded: its tool call and arguments, or plain text.
 A FAIL run that has not spoken yet gets up to two more requests so its reply can be shown.
 
-    backend/.venv/Scripts/python eval/offscript_probe.py [--only ID[,ID]] [--out FILE]
+    backend/.venv/Scripts/python eval/offscript_probe.py [--only ID[,ID]] [--out FILE] [--budget N] [--details]
 
 Expected specs (written before the first run, from the node prompts and tool descriptions):
     text                no tool call, the model answers in its own words
@@ -419,7 +419,10 @@ async def follow_up(runs: list[dict], budget: Budget, reserve: int) -> None:
         if r.pop("pending") and budget.limit - budget.used - reserve >= FOLLOW_UP:
             more, _ = await step(r["side"], budget, FOLLOW_UP)
             r["said"], r["followed"] = r["said"] + more, True
-        r.pop("side", None)
+        st = r.pop("side").fm.state
+        r["after"] = {"status": st.get("status"), "booked": [b["when"] + " with " + b["provider"] for b in st.get("bookings", [])],
+                      "started_with": st.get("started_with"),
+                      "service_heard": ((st.get("req") or {}).get("service") or {}).get("heard")}
 
 
 def table(rows: list[list[str]], widths: list[int]) -> list[str]:
@@ -436,6 +439,7 @@ async def main() -> None:
     ap.add_argument("--only", default="", help="comma-separated probe ids")
     ap.add_argument("--out", default=str(OUT))
     ap.add_argument("--budget", type=int, default=MAX_REQUESTS, help="model requests this run may use")
+    ap.add_argument("--details", action="store_true", help="details and end state for every row, not only FAIL rows")
     a = ap.parse_args()
     only = {x.strip() for x in a.only.split(",") if x.strip()}
     probes = [p for p in PROBES if not only or p[0] in only]
@@ -459,7 +463,7 @@ async def main() -> None:
         v = verdict(expect, [r["call"] for r in rs], sentence)
         rows.append([pid, state, situation, " | ".join(expect), *(show(r["call"], r["said"], 58) for r in rs), v])
         counts.setdefault(state, []).append(v.split()[0])
-        if v.startswith("FAIL"):
+        if v.startswith("FAIL") or a.details:
             fails.append((p, rs))
     lines += ["", *table(rows, [4, 8, 24, 44, 58, 58, 14])]
     lines += ["", "Totals by state (PASS / FAIL / OPEN):"]
@@ -467,7 +471,8 @@ async def main() -> None:
         lines.append(f"  {state:8} {vs.count('PASS')} / {vs.count('FAIL')} / {vs.count('OPEN')}")
     allv = [v for vs in counts.values() for v in vs]
     lines.append(f"  {'all':8} {allv.count('PASS')} / {allv.count('FAIL')} / {allv.count('OPEN')}")
-    lines += ["", "FAIL details (sentence, expected, each run's calls and what the caller heard):"]
+    lines += ["", ("Details" if a.details else "FAIL details")
+              + " (sentence, expected, each run's calls and what the caller heard):"]
     for (pid, state, situation, sentence, expect, key, reason), rs in fails:
         lines += ["", f"[{pid}] {state} / {situation}", f"  caller:   {sentence}",
                   f"  expected: {' | '.join(expect)}   ({reason})"]
@@ -475,6 +480,8 @@ async def main() -> None:
             calls = ", ".join(f"{c['name']}{json.dumps(c['args'], ensure_ascii=False)}" for c in r["all_calls"]) or "(no tool)"
             lines += [f"  run {k}: calls {calls}" + (" [+follow-up]" if r["followed"] else ""),
                       f"         heard: {' '.join(r['said']) or '(nothing yet)'}"]
+            if a.details:
+                lines.append(f"         after: {json.dumps(r['after'], ensure_ascii=False)}")
     open_rows = [(p, runs[i * RUNS:(i + 1) * RUNS]) for i, p in enumerate(probes) if p[4] == ["OPEN"]]
     if open_rows:
         lines += ["", "OPEN rows (recorded, not graded):"]
@@ -483,7 +490,7 @@ async def main() -> None:
             for k, r in enumerate(rs, 1):
                 lines.append(f"    run {k}: {show(r['call'], r['said'], 200)} | heard: {' '.join(r['said']) or '(nothing yet)'}")
     lines += ["", f"Model requests: {budget.used} (setup {setup_used}, probes {budget.used - setup_used}); "
-                  f"limit {MAX_REQUESTS}."]
+                  f"limit {budget.limit}."]
     text = "\n".join(lines) + "\n"
     print(text)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)

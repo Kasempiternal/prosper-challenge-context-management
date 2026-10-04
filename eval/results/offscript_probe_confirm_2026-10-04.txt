@@ -1,0 +1,86 @@
+Off-script probe, National agent, chooser 'none', 2 runs per probe, gpt-4o (agent JSON model).
+Each run starts from a deep copy of its state's snapshot; only the first model request of the probe turn
+is graded. States as reached by the setup turns:
+  start    agent last said: 'Hello! How can I assist you with booking an appointment today?'
+  q_city   agent last said: 'Which city are you in?'
+  q_visit  agent last said: "What's the visit for?"
+  offers   agent last said: 'For a dental cleaning, Dr. Helen Altman has today at 11 or tomorrow at 8 at Flushing and Dr. Sylvia Smith has Friday at 8 at Flushing. Which works best?'
+  confirm  agent last said: 'Okay, a dental cleaning with Dr. Helen Altman, today at 11 at Flushing. Shall I book it?'
+
+id    state     situation                 expected                                      run 1                                                       run 2                                                       verdict
+----  --------  ------------------------  --------------------------------------------  ----------------------------------------------------------  ----------------------------------------------------------  --------------
+S6    start     booking for someone else  start(request~mother)                         start{"request":"needs her eyes checked, she lives in Chic  start{"request":"eyes checked for my mother in Chicago"}    FAIL (1/2 ok)
+C1    confirm   yes/no to the wrong thin  update_request(pick_offer=3) | update_reques  update_request{"time_pref":{"day":"friday"}}                update_request{"time_pref":{"day":"friday"}}                PASS
+C2    confirm   rambling story            confirm_booking                               confirm_booking{}                                           confirm_booking{}                                           PASS
+C3    confirm   booking for someone else  confirm_booking                               confirm_booking{}                                           confirm_booking{}                                           PASS
+C5    confirm   correcting themselves     update_request(pick_offer=2) | update_reques  update_request{"pick_offer":2}                              update_request{"pick_offer":2}                              PASS
+C7    confirm   complaint                 confirm_booking                               confirm_booking{}                                           confirm_booking{}                                           PASS
+
+Totals by state (PASS / FAIL / OPEN):
+  start    0 / 1 / 0
+  confirm  5 / 0 / 0
+  all      5 / 1 / 0
+
+Details (sentence, expected, each run's calls and what the caller heard):
+
+[S6] start / booking for someone else
+  caller:   Hi, I'm calling for my mother, she's eighty-two, she needs her eyes checked, she lives in Chicago.
+  expected: start(request~mother)   (greeting: start with the caller's exact words; who the visit is for must survive)
+  run 1: calls start{"request": "needs her eyes checked, she lives in Chicago"}, update_request{"service_phrase": "needs her eyes checked", "location_phrase": "Chicago"} [+follow-up]
+         heard: We don't offer an eye exam within 50 miles of Chicago. The nearest is Financial District in New York, about 711 miles away. Want me to look there?
+         after: {"status": "refuse", "booked": [], "started_with": null, "service_heard": "Hi, I'm calling for my mother, she's eighty-two, she needs her eyes checked, she lives in Chicago."}
+  run 2: calls start{"request": "eyes checked for my mother in Chicago"}
+         heard: (nothing yet)
+         after: {"status": null, "booked": [], "started_with": "eyes checked for my mother in Chicago", "service_heard": null}
+
+[C1] confirm / yes/no to the wrong thing
+  caller:   Yes, Friday's perfect.
+  expected: update_request(pick_offer=3) | update_request(time_pref.day=friday)   (the read-back was today at 11: a yes to Friday is a new pick, booking today would be wrong)
+  run 1: calls update_request{"time_pref": {"day": "friday"}}
+         heard: For a dental cleaning, Dr. Sylvia Smith has Friday at 8 or Friday the 16th at 8 at Flushing and Dr. Colby Cagle has Friday the 23rd at 8 at Jamaica. Which works best?
+         after: {"status": "offer", "booked": [], "started_with": null, "service_heard": "dental cleaning"}
+  run 2: calls update_request{"time_pref": {"day": "friday"}}
+         heard: For a dental cleaning, Dr. Sylvia Smith has Friday at 8 or Friday the 16th at 8 at Flushing and Dr. Colby Cagle has Friday the 23rd at 8 at Jamaica. Which works best?
+         after: {"status": "offer", "booked": [], "started_with": null, "service_heard": "dental cleaning"}
+
+[C2] confirm / rambling story
+  caller:   Oh that's lovely, you know my last dentist retired and I've been putting this off since, well, since before Christmas, so yes, that's fine, go ahead.
+  expected: confirm_booking   (schedule: yes to the read-back -> confirm_booking)
+  run 1: calls confirm_booking{}
+         heard: You're all booked. Your confirmation is H, 0, 8, 2, 7. Is there anything else I can help with?
+         after: {"status": "booked", "booked": ["today at 11 with Dr. Helen Altman"], "started_with": null, "service_heard": null}
+  run 2: calls confirm_booking{}
+         heard: You're all booked. Your confirmation is H, 0, 8, 2, 7. Is there anything else I can help with?
+         after: {"status": "booked", "booked": ["today at 11 with Dr. Helen Altman"], "started_with": null, "service_heard": null}
+
+[C3] confirm / booking for someone else
+  caller:   Yes, and can you book the same thing for my wife after?
+  expected: confirm_booking   (schedule: yes -> confirm_booking even if they ask for something else in the same breath)
+  run 1: calls confirm_booking{}
+         heard: You're all booked. Your confirmation is H, 0, 8, 2, 7. Is there anything else I can help with?
+         after: {"status": "booked", "booked": ["today at 11 with Dr. Helen Altman"], "started_with": null, "service_heard": null}
+  run 2: calls confirm_booking{}
+         heard: You're all booked. Your confirmation is H, 0, 8, 2, 7. Is there anything else I can help with?
+         after: {"status": "booked", "booked": ["today at 11 with Dr. Helen Altman"], "started_with": null, "service_heard": null}
+
+[C5] confirm / correcting themselves
+  caller:   Yes, actually no, I meant tomorrow, can we do tomorrow at eight instead?
+  expected: update_request(pick_offer=2) | update_request(time_pref.day=tomorrow)   (the corrected answer is no to today and a pick of tomorrow at 8 (offer 2))
+  run 1: calls update_request{"pick_offer": 2}
+         heard: Okay, a dental cleaning with Dr. Helen Altman, tomorrow at 8 at Flushing. Shall I book it?
+         after: {"status": "confirm", "booked": [], "started_with": null, "service_heard": "dental cleaning"}
+  run 2: calls update_request{"pick_offer": 2}
+         heard: Okay, a dental cleaning with Dr. Helen Altman, tomorrow at 8 at Flushing. Shall I book it?
+         after: {"status": "confirm", "booked": [], "started_with": null, "service_heard": "dental cleaning"}
+
+[C7] confirm / complaint
+  caller:   Fine, yes, whatever, just book it, this took forever.
+  expected: confirm_booking   (schedule: yes to the read-back -> confirm_booking)
+  run 1: calls confirm_booking{}
+         heard: You're all booked. Your confirmation is H, 0, 8, 2, 7. Is there anything else I can help with?
+         after: {"status": "booked", "booked": ["today at 11 with Dr. Helen Altman"], "started_with": null, "service_heard": null}
+  run 2: calls confirm_booking{}
+         heard: You're all booked. Your confirmation is H, 0, 8, 2, 7. Is there anything else I can help with?
+         after: {"status": "booked", "booked": ["today at 11 with Dr. Helen Altman"], "started_with": null, "service_heard": null}
+
+Model requests: 20 (setup 7, probes 13); limit 40.
