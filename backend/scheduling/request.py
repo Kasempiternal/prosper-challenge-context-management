@@ -256,9 +256,9 @@ def merge(req: Request, update: Update) -> Request:
     """Apply one caller turn. A new phrase replaces the slot (the caller changed their mind);
     offers made against the old request are dropped, since they no longer answer it, unless the
     same turn picks one ("the Tuesday one at Downtown"): then the resolver confirms the pick if it
-    satisfies the change and says so if it does not. Provider and location choices survive a
-    service change here and are re-validated by the resolver, which drops and reports any that
-    no longer fit."""
+    satisfies the change and says so if it does not; a pick that comes with a reject is dropped.
+    Provider and location choices survive a service change here and are re-validated by the
+    resolver, which drops and reports any that no longer fit."""
     turn = req.turn + 1
     changes: dict[str, Any] = {}
 
@@ -302,9 +302,11 @@ def merge(req: Request, update: Update) -> Request:
         )
 
     new = replace(req, **changes, patient=patient, turn=turn, changed=tuple(changes))
-    if update.pick_offer is not None:
-        return replace(new, pick=update.pick_offer, pending_ask=None if changes else new.pending_ask)
     reject = update.reject if req.offered else ()
+    # A reject turns down the offers a pick would take, so the reject wins and the pick goes. It is
+    # settled here, not in the tool layer, so any caller of merge gets the same reading.
+    if update.pick_offer is not None and not reject:
+        return replace(new, pick=update.pick_offer, pending_ask=None if changes else new.pending_ask)
     if changes or reject:
         new = replace(new, rejected=_rejected(req, changes, reject), offered=(), alternatives=(), pick=None,
                       pending_ask=None)

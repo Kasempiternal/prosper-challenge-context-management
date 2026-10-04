@@ -20,13 +20,13 @@ import jellyfish
 from .availability import Availability, Slot as TimeSlot
 from .catalog_index import BookableRow, CatalogIndex
 from .decision import DECLINE, Verdict, gender_of, unanswered
-from .geo import (RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, option_named, over_state_line,
-                  resolve_place)
+from .geo import (RADIUS_MI, Place, PlaceMatch, haversine, names_own_area, nearby, option_at, option_named,
+                  over_state_line, resolve_place)
 from .lexicon import (SHORTLIST_ABOVE, Doubt, TypeCandidate, describes_symptom, diagnostic_variant, fasting_answer,
                       fasting_pair, general_kin, is_screening, match_types, nearest_type, pointed_default, said_for,
                       said_visits, sick_visits, stated_doubt, type_shortlist, types_named, umbrella, unexplained_words)
-from .names import (STREET_TYPES, ProviderClues, clue_words, hear_place, match_locations, match_providers, only_no,
-                    read_confirmation, read_provider_clues, unmatched_first_name)
+from .names import (STREET_TYPES, NameCandidate, ProviderClues, clue_words, hear_place, match_locations,
+                    match_providers, only_no, read_confirmation, read_provider_clues, unmatched_first_name)
 from .policy import IssueKind, Rule, Violation, check, has_violation
 from .request import WEEKDAY_NAMES, AltRef, OfferRef, PendingAsk, Request, Slot, TimePref, slot_id, slot_start
 from .text import phonetic_keys, tokens
@@ -571,6 +571,9 @@ class _Resolution:
         if not cands and len(s.within) == 1 and read_confirmation(s.heard):
             # "Yes" to "Is that X?" names X as surely as saying it.
             cands = [TypeCandidate(s.within[0], 1.0, "answer")]
+        # "Did your doctor say to fast?" lists no options for a position to point at.
+        if not cands and not fasting_pair(self.ix, s.within) and (picked := self._option_at(s, s.within)):
+            cands = [TypeCandidate(picked, 1.0, "answer")]
         answered = fasting_answer(self.ix, s.heard, s.within) if not cands else None
         if answered:
             cands = [TypeCandidate(answered, 1.0, "answer")]
@@ -606,10 +609,22 @@ class _Resolution:
             return self._refuse("handoff")
         return self._ask("service", options=s.within)
 
+    def _option_at(self, s: Slot, options: tuple[str, ...]) -> str | None:
+        """The option of the open question the caller's words pick by its place in it ("the second
+        one"). Only a question that listed its options, at most MAX_OPTIONS of them, has one. The
+        slot keeps the words and the options, so every later turn reads them the same way."""
+        picked = option_at(s.heard, options) if len(options) <= MAX_OPTIONS else None
+        if picked:
+            self.notes.append(f"{s.heard!r} picks {picked} by its place in {list(options)}")
+        return picked
+
     def _name_candidates(self, slot_name: str) -> list[str] | None:
         s = self.slots[slot_name]
         if not s.heard:
             return None
+        if picked := self._option_at(s, s.within):
+            self.slots[slot_name] = replace(s, asks=0, candidates=((picked, 1.0),))
+            return [picked]
         if slot_name == "provider" and len(s.within) == 1:
             answer = read_confirmation(s.heard)
             if answer is None:
@@ -863,7 +878,9 @@ class _Resolution:
             return None
         at_sites = [w for w in s.within if w in ix.locations]
         if at_sites:
-            m = PlaceMatch(sites=tuple(match_locations(ix, s.heard, at_sites)))
+            picked = self._option_at(s, tuple(at_sites))
+            m = PlaceMatch(sites=(NameCandidate(picked, 1.0, "exact"),) if picked
+                           else tuple(match_locations(ix, s.heard, at_sites)))
         else:
             m = resolve_place(ix, s.heard)
             options = frozenset(w for w in s.within if w in ix.metros)

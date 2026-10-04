@@ -22,7 +22,7 @@ import jellyfish
 
 from .names import (NameCandidate, STRONG_LOCATION_SCORE, _location_words, _same_word, hear_place,
                     match_locations)
-from .text import normalize, phonetic_keys, tokens
+from .text import FUNCTION_WORDS, normalize, phonetic_keys, tokens
 
 if TYPE_CHECKING:
     from .catalog_index import CatalogIndex, Location, Metro
@@ -257,7 +257,29 @@ def _inside(ix: CatalogIndex, found: PlaceMatch, region: tuple[Place, ...]) -> b
 
 _ORDER_WORDS = {"first": 0, "1st": 0, "former": 0, "second": 1, "2nd": 1, "third": 2, "3rd": 2,
                 "latter": -1, "last": -1}
+_NUMBERED = {"one": "first", "1": "first", "two": "second", "2": "second", "three": "third", "3": "third"}
+# Words that may sit around a position without saying anything else: "I'll take the second one, please".
+_POSITION_FILLER = FUNCTION_WORDS | {"take", "pick", "choose", "go", "let", "lets", "want", "prefer", "option",
+                                     "number", "choice", "works", "sounds", "good", "fine"}
 _STATE_OF = {abbrev: name for abbrev, name, _, _ in US_STATES}
+
+
+def _by_order(words: list[str], options: tuple[str, ...]) -> set[str]:
+    return {options[i] for w in words if (i := _ORDER_WORDS.get(w)) is not None and -len(options) <= i < len(options)}
+
+
+def option_at(answer: str | None, options: tuple[str, ...]) -> str | None:
+    """The one option an answer picks by its place in the question, in no other words ("the second
+    one", "the last", "number two, please"). `options` are in the order they were spoken. None when
+    the answer says anything more ("the first name is Maria") or points at no single option."""
+    if len(options) < 2:
+        return None
+    words = tokens(answer or "")
+    words = [_NUMBERED[w] if w in _NUMBERED and i and words[i - 1] in ("number", "option", "choice") else w
+             for i, w in enumerate(words)]
+    said = [w for w in words if w not in _POSITION_FILLER]
+    picked = _by_order(said, options)
+    return picked.pop() if len(said) == 1 and len(picked) == 1 else None
 
 
 def option_named(ix: CatalogIndex, answer: str | None, options: tuple[str, ...]) -> str | None:
@@ -267,7 +289,7 @@ def option_named(ix: CatalogIndex, answer: str | None, options: tuple[str, ...])
     if len(options) < 2:
         return None
     words = tokens(answer or "")
-    by_order = {options[i] for w in words if (i := _ORDER_WORDS.get(w)) is not None and -len(options) <= i < len(options)}
+    by_order = _by_order(words, options)
     if len(by_order) == 1:
         return by_order.pop()
     if "state" in words:

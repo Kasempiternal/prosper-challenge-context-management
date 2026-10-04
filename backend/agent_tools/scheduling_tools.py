@@ -341,6 +341,18 @@ def grounded(args: dict, req: Request, said: str) -> tuple[dict, list[str]]:
         return args, []
     heard = set(tokens(said))
     replaced: list[str] = []
+    if len(req.alternatives) == 1 and args.get("pick_offer") is None and read_confirmation(said) is True:
+        # "Yes, please" to "...the nearest is Cherry Hill. Want me to look there?" arrived as the place
+        # "New Jersey", and the same question came back three times. A bare yes takes the one suggestion.
+        replaced = [f"{k} {v}" for k, v in args.items()]
+        args = {"pick_offer": 1}
+    if says_unsure(said) and "no" not in heard:
+        # "I don't know" to "Do you have a referral?" arrived as has_referral false and the visit was
+        # refused. Not knowing is not a no: the status stays unknown and the question stays open.
+        for key in ("has_referral", "is_new"):
+            if args.get(key) is False:
+                args = {k: v for k, v in args.items() if k != key}
+                replaced = [*replaced, f"{key} false"]
     pa = req.pending_ask
     field = _ANSWER_FIELD.get(pa.field) if pa else None
     if field and args.get("pick_offer") is not None and not req.offered:
@@ -373,12 +385,14 @@ def grounded(args: dict, req: Request, said: str) -> tuple[dict, list[str]]:
     if isinstance(day, str) and not any(day.lower().startswith(w) for w in heard if len(w) >= 3):
         args, replaced = {**args, "time_pref": {k: v for k, v in tp.items() if k != "day"}}, [*replaced, day]
     args, replaced = with_misused_clear_undone(args, req, said, replaced)
+    args, replaced = with_named_doctor_kept(args, said, replaced)
     return args, replaced
 
 
 # "Let's go with Dr. Kalem": a name. "Is there any other clinic?", "someone else?", "anything later?": the
 # offers turned down. "Any doctor is fine" and "I don't care which clinic" withdraw a choice, and stay a clear.
-_NAMED_DOCTOR = re.compile(r"\b(?:[Dd]r\.?|[Dd]octor)\s+[A-Z][A-Za-z'-]+")  # a capitalised name, not "doctor is fine"
+# A capitalised name, first and last when both are said ("Dr. Maria Garcia"), not "doctor is fine".
+_NAMED_DOCTOR = re.compile(r"\b(?:[Dd]r\.?|[Dd]octor)\s+[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+)?")
 _SITE_WORD = r"(?:clinics?|locations?|sites?|offices?|places?|branch(?:es)?)"
 _OTHER_WORD = r"(?:other|another|different|else)"
 _ANOTHER_SITE = re.compile(rf"\b{_OTHER_WORD}\b.*\b{_SITE_WORD}\b|\b{_SITE_WORD}\b.*\b{_OTHER_WORD}\b", re.IGNORECASE)
@@ -391,6 +405,21 @@ _OTHER_TIMES = re.compile(r"\b(?:other|another|different|more|later|earlier)\s+(
 _CLEAR_AS_REJECT = (("location", "location_phrase", _ANOTHER_SITE, "location"),
                     ("provider", "provider_phrase", _ANOTHER_DOCTOR, "provider"),
                     ("time_pref", "time_pref", _OTHER_TIMES, "time"))
+
+
+def with_named_doctor_kept(args: dict, said: str, replaced: list[str]) -> tuple[dict, list[str]]:
+    """"Yes, but with Dr. Maria Garcia" to a read-back of Dr. Carlos Garcia arrived as `reject: ["provider"]`:
+    it turned down every doctor offered, Maria Garcia too, and the caller was offered someone they never
+    asked for. A doctor the caller names is what they want, so the name goes in as the doctor phrase."""
+    rejected = args.get("reject")
+    if not isinstance(rejected, list) or "provider" not in rejected or args.get("provider_phrase"):
+        return args, replaced
+    named = _NAMED_DOCTOR.search(said)
+    if not named:
+        return args, replaced
+    rest = [r for r in rejected if r != "provider"]
+    args = {k: v for k, v in args.items() if k != "reject"}
+    return {**args, "provider_phrase": named.group(0), **({"reject": rest} if rest else {})}, [*replaced, "reject provider"]
 
 
 def with_misused_clear_undone(args: dict, req: Request, said: str, replaced: list[str]) -> tuple[dict, list[str]]:
@@ -470,6 +499,17 @@ def update_request_tool(ctx: ToolContext) -> FlowsFunctionSchema:
 
 # ---- lookup --------------------------------------------------------------------------------
 
+def with_language_kept(index, kind: str, phrase: str, said: str) -> tuple[str, str]:
+    """"Does anyone at Mission Bay speak Spanish?" reached lookup as provider_info "Mission Bay": the
+    language, the whole question, was dropped and the facts had nothing to say. A language a doctor
+    speaks that the caller named goes back into the phrase, as a question about doctors. English is left
+    out: "my English is not good" asks nothing about the doctors."""
+    heard, have = set(tokens(said)), set(tokens(phrase))
+    named = sorted({lang.lower() for p in index.providers.values() for lang in p.languages}
+                   & heard - have - {"english"})
+    return ("provider_info", f"{phrase} {' '.join(named)}") if named else (kind, phrase)
+
+
 def lookup_tool(ctx: ToolContext) -> FlowsFunctionSchema:
     async def handler(args: dict, flow_manager: FlowManager):
         kind, phrase = args.get("kind"), args.get("phrase")
@@ -477,7 +517,8 @@ def lookup_tool(ctx: ToolContext) -> FlowsFunctionSchema:
             return _error(f"kind must be one of {list(KINDS)}"), None
         if not isinstance(phrase, str) or not phrase.strip():
             return _error("phrase is required"), None
-        facts = catalog_lookup(ctx.index, kind, phrase.strip())[:MAX_FACTS]
+        kind, phrase = with_language_kept(ctx.index, kind, phrase.strip(), _caller_said(flow_manager))
+        facts = catalog_lookup(ctx.index, kind, phrase)[:MAX_FACTS]
         return {"status": "ok", "facts": facts}, None
 
     return FlowsFunctionSchema(

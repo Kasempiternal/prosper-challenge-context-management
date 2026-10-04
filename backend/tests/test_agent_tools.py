@@ -845,3 +845,92 @@ def test_a_reject_the_model_sent_is_kept_when_a_clear_joins_it():
     out, _ = grounded({"reject": ["provider"], "clear": ["time_pref"]}, Request(offered=OFFERED),
                       "Someone else, and none of those times.")
     assert out == {"reject": ["provider", "time"]}
+
+
+FLU_SHOT_TURN = {"service_phrase": "flu shot", "is_new": False, "has_referral": False}
+MARIA_PEDIATRICS, MARIA_FAMILY, CARLOS_GARCIA = "prov_002", "prov_003", "prov_008"
+
+
+def _read_back_carlos_garcia(ctx, fm):
+    """Offers of Dr. Maria Garcia (twice) and Dr. Carlos Garcia, and the caller took "the last one"."""
+    call(ctx, fm, "update_request", FLU_SHOT_TURN)
+    fm.messages = turn("The last one.", asked="Which works best?")
+    result, _ = call(ctx, fm, "update_request", {"pick_offer": 3})
+    assert result["status"] == "confirm" and fm.state["req"]["offered"][2]["provider_id"] == CARLOS_GARCIA
+
+
+def test_which_maria_garcia_is_answered_by_position_not_asked_again(make_ctx):
+    """Live replay: "The first one." became provider "Dr. Maria Garcia in pediatrics", which the caller never
+    said, so it was replaced by the caller's words and the same question came back."""
+    ctx, fm = make_ctx(), FakeFlowManager()
+    _read_back_carlos_garcia(ctx, fm)
+    fm.messages = turn("Yes, but with Dr. Maria Garcia.", asked="Shall I book it?")
+    result, _ = call(ctx, fm, "update_request", {"provider_phrase": "Dr. Maria Garcia"})
+    assert result["ask"]["field"] == "provider"
+    fm.messages = turn("The first one.", asked="Do you mean Dr. Maria Garcia in pediatrics or Dr. Maria Garcia in family medicine?")
+    result, _ = call(ctx, fm, "update_request", {"provider_phrase": "Dr. Maria Garcia in pediatrics"})
+    assert result["status"] == "offer"
+    assert {o["provider_id"] for o in fm.state["req"]["offered"]} == {MARIA_PEDIATRICS}
+
+
+def test_a_reject_and_a_pick_sent_together_for_a_named_doctor_ask_which_one_she_is(make_ctx):
+    """Live replay: "Yes, but with Dr. Maria Garcia." arrived as reject provider plus pick_offer 3. First
+    Dr. Carlos Garcia was read back again; then, with the reject winning, every doctor offered was turned
+    down, Maria Garcia too. The name she said is the doctor she wants, and two doctors have it."""
+    ctx, fm = make_ctx(), FakeFlowManager()
+    _read_back_carlos_garcia(ctx, fm)
+    fm.messages = turn("Yes, but with Dr. Maria Garcia.", asked="Shall I book it?")
+    result, _ = call(ctx, fm, "update_request", {"reject": ["provider"], "pick_offer": 3})
+    assert result["status"] == "ask" and fm.state["status"] == "ask"
+    assert set(fm.state["req"]["pending_ask"]["options"]) == {MARIA_PEDIATRICS, MARIA_FAMILY}
+
+
+def test_a_reject_and_a_pick_sent_together_search_again_without_the_doctors_offered(make_ctx):
+    ctx, fm = make_ctx(), FakeFlowManager()
+    _read_back_carlos_garcia(ctx, fm)
+    fm.messages = turn("No, someone else.", asked="Shall I book it?")
+    result, _ = call(ctx, fm, "update_request", {"reject": ["provider"], "pick_offer": 3})
+    assert result["status"] == "offer" and fm.state["status"] == "offer"
+    assert not {o["provider_id"] for o in fm.state["req"]["offered"]} & {MARIA_PEDIATRICS, MARIA_FAMILY, CARLOS_GARCIA}
+
+
+def test_a_doctor_named_with_a_reject_is_kept_as_the_doctor():
+    """Live replay: "Yes, but with Dr. Maria Garcia" to a read-back of Dr. Carlos Garcia arrived as reject
+    provider plus the pick; Maria Garcia was turned down with the rest and Dr. Wei Chen was booked."""
+    out, replaced = grounded({"reject": ["provider"], "pick_offer": 3}, Request(offered=OFFERED),
+                             "Yes, but with Dr. Maria Garcia.")
+    assert out == {"provider_phrase": "Dr. Maria Garcia", "pick_offer": 3} and replaced == ["reject provider"]
+
+
+def test_another_doctor_without_a_name_stays_a_reject():
+    out, replaced = grounded({"reject": ["provider"]}, Request(offered=OFFERED), "Do you have another doctor?")
+    assert out == {"reject": ["provider"]} and replaced == []
+
+
+def test_a_bare_yes_to_one_suggested_alternative_takes_it():
+    """Live replay, demo beat 4: "Yes, please" to "...the nearest is Cherry Hill. Want me to look there?"
+    arrived as the place "New Jersey", and the same question came back three times."""
+    from scheduling.request import AltRef
+    req = Request(alternatives=(AltRef(1, "appt_011", "prov_1", "loc_1"),))
+    out, replaced = grounded({"location_phrase": "New Jersey"}, req, "Yes, please.")
+    assert out == {"pick_offer": 1} and replaced == ["location_phrase New Jersey"]
+    out, _ = grounded({"location_phrase": "Newark"}, req, "Yes, but in Newark.")
+    assert out == {"location_phrase": "Newark"}
+
+
+def test_not_knowing_about_a_referral_is_not_a_no():
+    """Live replay: "I don't know" to "Do you have a referral?" arrived as has_referral false; the visit was refused."""
+    out, replaced = grounded({"has_referral": False}, Request(), "I don't know.")
+    assert out == {} and replaced == ["has_referral false"]
+    out, _ = grounded({"has_referral": False}, Request(), "No, I don't have one.")
+    assert out == {"has_referral": False}
+
+
+def test_a_language_the_caller_asked_about_goes_back_into_the_lookup(make_ctx):
+    """Live replay, demo beat 8: "Does anyone at Mission Bay speak Spanish?" reached lookup as "Mission Bay"."""
+    from agent_tools.scheduling_tools import with_language_kept
+    index = make_ctx().index
+    assert with_language_kept(index, "location_info", "Mission Bay", "Does anyone at Mission Bay speak Spanish?") == (
+        "provider_info", "Mission Bay spanish")
+    assert with_language_kept(index, "location_info", "Mission Bay", "My English is not good. What are the hours?") == (
+        "location_info", "Mission Bay")
