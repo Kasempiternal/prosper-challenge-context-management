@@ -788,22 +788,67 @@ def test_a_real_answer_after_an_empty_update_does_not_hand_over():
     assert plans[2].status != "refuse"
 
 
+NEW_YORK_CLEANING = {"service_phrase": "dental cleaning", "location_phrase": "New York"}
+
+
 def test_asking_for_another_clinic_offers_the_next_one_then_says_there_is_no_more():
     """Improvised call: "Is there any other clinic?" cleared the place, asked the city again ("I told you")
     and returned the same clinic."""
-    plans = _national_updates({"service_phrase": "dental cleaning", "location_phrase": "New York"},
-                              {"other_site": True}, {"other_site": True})
+    plans = _national_updates(NEW_YORK_CLEANING, {"reject": ["location"]}, {"reject": ["location"]})
     sites = [{o.location_id for o in p.offers} for p in plans]
     assert sites[0].isdisjoint(sites[1])
-    assert plans[2].say.split(". ")[0].endswith("the only clinics I have for that near you")
+    assert plans[2].say.split(". ")[0] == "Flushing and Jamaica are the only clinics I have for that near you"
+    assert sites[2] == sites[0] and plans[2].req.rejected.locations == ()
 
 
 def test_a_new_place_forgets_the_clinics_turned_down():
-    plans = _national_updates({"service_phrase": "dental cleaning", "location_phrase": "New York"},
-                              {"other_site": True}, {"location_phrase": "Boston"})
-    assert plans[1].req.avoid and plans[2].req.avoid == ()
+    plans = _national_updates(NEW_YORK_CLEANING, {"reject": ["location"]}, {"location_phrase": "Boston"})
+    assert plans[1].req.rejected.locations and plans[2].req.rejected.locations == ()
 
 
-def test_other_site_with_nothing_offered_changes_nothing():
-    plans = _national_updates({"service_phrase": "dental cleaning"}, {"other_site": True})
-    assert plans[1].req.avoid == ()
+def test_reject_with_nothing_offered_changes_nothing():
+    plans = _national_updates({"service_phrase": "dental cleaning"}, {"reject": ["location", "provider", "time"]})
+    assert not plans[1].req.rejected
+
+
+def test_asking_for_another_doctor_offers_other_doctors_in_the_same_area():
+    plans = _national_updates(NEW_YORK_CLEANING, {"reject": ["provider"]})
+    before, after = ({o.provider_id for o in p.offers} for p in plans)
+    assert plans[1].status == "offer" and before.isdisjoint(after)
+    assert plans[1].req.rejected.providers == tuple(dict.fromkeys(o.provider_id for o in plans[0].offers))
+
+
+def test_asking_for_later_times_offers_none_of_the_times_turned_down():
+    plans = _national_updates(NEW_YORK_CLEANING, {"reject": ["time"]}, {"reject": ["time"]})
+    starts = [{o.start for o in p.offers} for p in plans]
+    assert starts[0].isdisjoint(starts[1]) and (starts[0] | starts[1]).isdisjoint(starts[2])
+    assert len(plans[2].req.rejected.slots) == 6
+
+
+def test_another_doctor_at_another_clinic_rejects_both():
+    plans = _national_updates(NEW_YORK_CLEANING, {"reject": ["provider", "location"]})
+    assert {o.location_id for o in plans[0].offers}.isdisjoint(o.location_id for o in plans[1].offers)
+    assert {o.provider_id for o in plans[0].offers}.isdisjoint(o.provider_id for o in plans[1].offers)
+
+
+def test_the_only_dentist_is_offered_again_and_said_to_be_the_only_one(talk):
+    """Dental cleaning in Austin: Dr. Sam Park, at Cedar Park, and nobody else."""
+    cleaning = {"service_phrase": "dental cleaning", "is_new": True, "location_phrase": "Austin"}
+    first = talk(cleaning)
+    again = talk(cleaning, {"reject": ["provider"]})
+    assert again.say.startswith("Dr. Sam Park is the only doctor I have for that. ")
+    assert again.offers == first.offers and again.req.rejected.providers == ()
+
+
+class ThreeTimes(SameTimeEverywhere):
+    """Three openings in all: the times turned down are all there is."""
+
+    def find(self, rows, time_pref, limit=3, exclude=()):
+        return [s for s in super().find(rows, time_pref, limit) if s.id not in exclude]
+
+
+def test_times_run_out_after_turning_them_all_down(talk, nat):
+    plan = talk({**FOLLOW_UP, "provider_phrase": "Dr. Ken Ito", "location_phrase": "Hyde Park"}, {"reject": ["time"]},
+                av=ThreeTimes(nat))
+    assert plan.say.startswith("Those are the only times I have for that. ")
+    assert plan.offers and plan.req.rejected.slots == ()

@@ -73,6 +73,15 @@ def test_time_preferences(index):
     assert all(s.start >= datetime(2026, 10, 19) for s in later)
 
 
+def test_excluded_slots_are_left_out_before_the_offers_are_spread(index):
+    av = MockAvailability(index)
+    rows = index.rows_by_type["appt_002"]
+    first = av.find(rows, TimePref())
+    nxt = av.find(rows, TimePref(), exclude={s.id for s in first})
+    assert len(nxt) == 3 and not set(first) & set(nxt)
+    assert nxt == av.find(rows, TimePref(), exclude={s.id for s in first})
+
+
 def test_hold_is_idempotent_and_blocks_overlaps(index):
     av = MockAvailability(index)
     slot = av.find(_emily_consult_rows(index), TimePref())[0]

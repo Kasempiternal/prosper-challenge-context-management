@@ -115,10 +115,10 @@ class CallAvailability:
         self._mine: set[str] = set()
         self.now = shared.now
 
-    def find(self, rows, time_pref, limit: int = 3) -> list[Slot]:
+    def find(self, rows, time_pref, limit: int = 3, exclude=()) -> list[Slot]:
         rows = list(rows)
         with self._lock:
-            return self._shared.find(rows, time_pref, limit)
+            return self._shared.find(rows, time_pref, limit, exclude)
 
     def is_open(self, slot: Slot) -> bool:
         with self._lock:

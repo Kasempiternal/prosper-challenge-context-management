@@ -1415,3 +1415,20 @@ sentences at every turn):
 Replayed against gpt-4o three times each: the model uses `other_site` 3 of 3, and "Dr. Kalem" reaches the
 resolver as a name (the agent says it cannot book that doctor and names the ones it can). 13 dev and stress
 sets still read 0 wrong commits with JEV, both stress gates pass. 1,336 backend tests.
+
+### From `other_site` to a general `reject` (2026-10-04)
+
+The improvised-call fix above handled one phrase ("any other clinic?"). Callers have a thousand more, so the
+tool takes one general argument instead: `reject`, a list of `location`, `provider` and `time`. It means "the
+caller turned down the options just offered and wants others for the same request". The resolver keeps what was
+rejected (`Request.rejected`: clinic ids, doctor ids, slot ids), searches without them, and when none are left
+says so and offers the same ones again ("Flushing and Jamaica are the only clinics I have for that near you").
+A new visit forgets everything rejected; a new doctor or place forgets the doctors or places; any change forgets the
+times. The code guard now turns a `clear` the model used for these intents into `reject` ("any other clinic",
+"someone else", "none of those", "anything later"), and still leaves "any doctor is fine" as a clear.
+
+Written by Devin CLI (Claude Opus 5.5 medium) from a written brief, reviewed and verified by hand. Checks: 1,377
+backend tests; 0 wrong commits on all 13 dev and stress sets with JEV, both stress gates pass; replayed against
+gpt-4o with offers open, 3 runs each: "any other clinic?" -> `reject: [location]`, "another doctor?" ->
+`[provider]`, "none of those work, anything later?" -> `[time]`, "I do not like these, different ones?" -> `[time]`
+(12 of 12).

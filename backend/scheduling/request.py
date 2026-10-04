@@ -7,12 +7,13 @@ Requests; both return new values and never mutate.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, replace
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from .policy import Patient
 
 SLOT_NAMES = ("service", "provider", "location")
+REJECT_KINDS = ("location", "provider", "time")
 WEEKDAY_NAMES = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 PARTS_OF_DAY = ("morning", "afternoon")
 # Words about when, not what: the time preference takes them, so a service phrase that carries
@@ -56,6 +57,30 @@ class OfferRef:
     start: str                       # ISO datetime
     duration_min: int
 
+    @property
+    def slot_id(self) -> str:
+        return slot_id(self.type_id, self.provider_id, self.location_id, datetime.fromisoformat(self.start))
+
+
+def slot_id(type_id: str, provider_id: str, location_id: str, start: datetime) -> str:
+    return f"{type_id}|{provider_id}|{location_id}|{start:%Y%m%dT%H%M}"
+
+
+def slot_start(slot_id: str) -> datetime:
+    return datetime.strptime(slot_id.rsplit("|", 1)[1], "%Y%m%dT%H%M")
+
+
+@dataclass(frozen=True)
+class Rejected:
+    """Offered options the caller turned down ("any other clinic?", "someone else?", "anything later?")."""
+
+    locations: tuple[str, ...] = ()
+    providers: tuple[str, ...] = ()
+    slots: tuple[str, ...] = ()      # slot_id of each time turned down
+
+    def __bool__(self) -> bool:
+        return bool(self.locations or self.providers or self.slots)
+
 
 @dataclass(frozen=True)
 class AltRef:
@@ -85,7 +110,7 @@ class Request:
     alternatives: tuple[AltRef, ...] = ()
     pick: int | None = None
     pending_ask: PendingAsk | None = None
-    avoid: tuple[str, ...] = ()      # locations the caller turned down ("any other clinic?"); cleared by a new place, visit or doctor
+    rejected: Rejected = Rejected()
     turn: int = 0
     changed: tuple[str, ...] = ()    # request parts the latest merge changed (slots, time_pref)
 
@@ -110,7 +135,7 @@ class Request:
             alternatives=tuple(AltRef(**a) for a in d.get("alternatives", ())),
             pick=d.get("pick"),
             pending_ask=PendingAsk(pa["field"], tuple(pa.get("options", ())), pa.get("repeats", 0)) if pa else None,
-            avoid=tuple(d.get("avoid", ())),
+            rejected=Rejected(**{k: tuple(v) for k, v in (d.get("rejected") or {}).items()}),
             turn=d.get("turn", 0),
             changed=tuple(d.get("changed", ())),
         )
@@ -129,7 +154,7 @@ class Update:
     has_referral: bool | None = None
     time_pref: TimePref | None = None
     pick_offer: int | None = None
-    other_site: bool = False
+    reject: tuple[str, ...] = field(default=())
     clear: tuple[str, ...] = field(default=())
 
     @classmethod
@@ -152,10 +177,6 @@ class Update:
                 if not isinstance(v, bool):
                     raise ValueError(f"{key} must be a boolean")
                 out[key] = v
-        if args.get("other_site") is not None:
-            if not isinstance(args["other_site"], bool):
-                raise ValueError("other_site must be a boolean")
-            out["other_site"] = args["other_site"]
         if args.get("pick_offer") is not None:
             n = args["pick_offer"]
             if not isinstance(n, int) or isinstance(n, bool) or not 1 <= n <= 3:
@@ -168,6 +189,13 @@ class Update:
             if bad:
                 raise ValueError(f"cannot clear {bad}")
             out["clear"] = tuple(args["clear"])
+        if args.get("reject"):
+            if not isinstance(args["reject"], list):
+                raise ValueError("reject must be a list")
+            bad = [r for r in args["reject"] if r not in REJECT_KINDS]
+            if bad:
+                raise ValueError(f"cannot reject {bad}")
+            out["reject"] = tuple(dict.fromkeys(args["reject"]))
         if args.get("time_pref") is not None:
             out["time_pref"] = _parse_time_pref(args["time_pref"])
         return cls(**out)
@@ -202,6 +230,26 @@ _ASK_SLOT = {"metro": "location", "place_confirm": "location"}
 def _answered(req: Request, slot_name: str) -> tuple[str, ...]:
     pa = req.pending_ask
     return pa.options if pa and _ASK_SLOT.get(pa.field, pa.field) == slot_name else ()
+
+
+_REJECTED_FIELD = {"location": "locations", "provider": "providers", "time": "slots"}
+
+
+def _rejected(req: Request, changes: dict[str, Any], reject: tuple[str, ...]) -> Rejected:
+    """What stays turned down after a turn. A new visit starts the search again and forgets it all;
+    a new doctor or place forgets the doctors or places turned down; any change forgets the times.
+    Then the offers of each kind rejected now ("any other clinic?") are added, unless the same turn
+    names a new one of that kind."""
+    offered = {"locations": [o.location_id for o in req.offered], "providers": [o.provider_id for o in req.offered],
+               "slots": [o.slot_id for o in req.offered]}
+    named = {k for k in ("service", "provider", "location") if k in changes and changes[k].given}
+    out = {}
+    for kind, f in _REJECTED_FIELD.items():
+        forget = "service" in named or kind in named or (f == "slots" and bool(changes))
+        out[f] = () if forget else getattr(req.rejected, f)
+        if kind in reject and kind not in named:
+            out[f] = tuple(dict.fromkeys((*out[f], *offered[f])))
+    return Rejected(**out)
 
 
 def merge(req: Request, update: Update) -> Request:
@@ -256,15 +304,14 @@ def merge(req: Request, update: Update) -> Request:
     new = replace(req, **changes, patient=patient, turn=turn, changed=tuple(changes))
     if update.pick_offer is not None:
         return replace(new, pick=update.pick_offer, pending_ask=None if changes else new.pending_ask)
-    if update.other_site and req.offered and not changes:
-        # "Is there any other clinic?": the same request, without the clinics just offered.
-        turned_down = (*req.avoid, *(o.location_id for o in req.offered))
-        return replace(new, avoid=tuple(dict.fromkeys(turned_down)), offered=(), alternatives=(), pick=None,
-                       pending_ask=None)
-    if changes:
-        # A new visit, doctor or place starts the search again; a new time only narrows it.
-        keep = new.avoid if not set(changes) & {"service", "provider", "location"} else ()
-        return replace(new, avoid=keep, offered=(), alternatives=(), pick=None, pending_ask=None)
+    reject = update.reject if req.offered else ()
+    if changes or reject:
+        new = replace(new, rejected=_rejected(req, changes, reject), offered=(), alternatives=(), pick=None,
+                      pending_ask=None)
+        if "provider" in reject and "provider" not in changes and req.provider.given:
+            # "Someone else?" after naming a doctor: the name is what they turned down.
+            new = replace(new, provider=Slot(turn=turn))
+        return new
     if req.pending_ask and patient == req.patient:
         # An update with nothing in it ("I already told you"): the question is still open and unanswered.
         return replace(new, pending_ask=replace(req.pending_ask, repeats=req.pending_ask.repeats + 1))

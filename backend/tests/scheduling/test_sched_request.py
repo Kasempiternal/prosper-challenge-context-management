@@ -1,9 +1,10 @@
 import json
+from dataclasses import replace
 
 import pytest
 
 from scheduling.policy import Patient
-from scheduling.request import OfferRef, PendingAsk, Request, TimePref, Update, merge
+from scheduling.request import OfferRef, PendingAsk, Rejected, Request, TimePref, Update, merge
 
 
 def test_update_rejects_bad_args():
@@ -77,6 +78,83 @@ def test_not_before_must_be_an_iso_date(bad):
 
 def test_not_before_is_kept_as_iso_date():
     assert Update.from_args({"time_pref": {"not_before": "2026-10-19"}}).time_pref.not_before == "2026-10-19"
+
+
+OFFERS = (OfferRef(1, "appt_020", "prov_046", "loc_004", "2026-10-08T08:00:00", 40),
+          OfferRef(2, "appt_020", "prov_046", "loc_005", "2026-10-09T08:00:00", 40),
+          OfferRef(3, "appt_020", "prov_000", "loc_004", "2026-10-12T08:00:00", 40))
+SLOTS = ("appt_020|prov_046|loc_004|20261008T0800", "appt_020|prov_046|loc_005|20261009T0800",
+         "appt_020|prov_000|loc_004|20261012T0800")
+
+
+def _offered(**kw):
+    req = merge(Request(), Update.from_args({"service_phrase": "physical", "location_phrase": "Downtown"}))
+    return replace(req, offered=OFFERS, **kw)
+
+
+@pytest.mark.parametrize("kind, field, ids", [("location", "locations", ("loc_004", "loc_005")),
+                                              ("provider", "providers", ("prov_046", "prov_000")),
+                                              ("time", "slots", SLOTS)])
+def test_reject_turns_down_the_offered_options_of_that_kind(kind, field, ids):
+    req = _offered()
+    out = merge(req, Update.from_args({"reject": [kind]}))
+    assert getattr(out.rejected, field) == ids
+    assert out.rejected == Rejected(**{field: ids})
+    assert (out.offered, out.pick, out.pending_ask) == ((), None, None)
+    assert (out.service, out.location) == (req.service, req.location)
+
+
+def test_reject_several_kinds_and_again_accumulates():
+    out = merge(_offered(), Update.from_args({"reject": ["provider", "location"]}))
+    assert out.rejected == Rejected(locations=("loc_004", "loc_005"), providers=("prov_046", "prov_000"))
+    more = (OfferRef(1, "appt_020", "prov_009", "loc_006", "2026-10-08T09:00:00", 40),)
+    again = merge(replace(out, offered=more), Update.from_args({"reject": ["provider"]}))
+    assert again.rejected.providers == ("prov_046", "prov_000", "prov_009")
+    assert again.rejected.locations == ("loc_004", "loc_005")
+
+
+def test_reject_with_nothing_offered_changes_nothing():
+    req = merge(Request(), Update.from_args({"service_phrase": "physical"}))
+    assert merge(req, Update.from_args({"reject": ["location", "time"]})).rejected == Rejected()
+
+
+def test_rejecting_the_doctor_named_withdraws_the_name():
+    req = _offered(provider=merge(Request(), Update.from_args({"provider_phrase": "Dr. Chen"})).provider)
+    out = merge(req, Update.from_args({"reject": ["provider"]}))
+    assert out.provider.heard is None and out.rejected.providers == ("prov_046", "prov_000")
+
+
+ALL_REJECTED = Rejected(locations=("loc_004",), providers=("prov_046",), slots=SLOTS[:1])
+
+
+@pytest.mark.parametrize("args, kept", [
+    ({"service_phrase": "flu shot"}, Rejected()),
+    ({"provider_phrase": "Dr. Patel"}, Rejected(locations=("loc_004",))),
+    ({"location_phrase": "Sunset"}, Rejected(providers=("prov_046",))),
+    ({"time_pref": {"days": ["friday"]}}, Rejected(locations=("loc_004",), providers=("prov_046",))),
+    ({"is_new": True}, ALL_REJECTED),
+])
+def test_a_new_choice_forgets_what_was_turned_down_of_its_kind(args, kept):
+    assert merge(Request(rejected=ALL_REJECTED), Update.from_args(args)).rejected == kept
+
+
+def test_reject_with_a_new_place_in_the_same_turn_keeps_only_the_place():
+    out = merge(_offered(), Update.from_args({"reject": ["location", "time"], "location_phrase": "Sunset"}))
+    assert out.rejected == Rejected(slots=SLOTS)
+
+
+def test_reject_must_name_known_kinds():
+    with pytest.raises(ValueError, match="cannot reject"):
+        Update.from_args({"reject": ["clinic"]})
+    with pytest.raises(ValueError, match="reject must be a list"):
+        Update.from_args({"reject": "location"})
+
+
+def test_rejected_round_trips_through_the_flow_state():
+    req = merge(_offered(), Update.from_args({"reject": ["location", "provider", "time"]}))
+    restored = Request.from_dict(json.loads(json.dumps(req.to_dict())))
+    assert restored == req and restored.rejected.slots == SLOTS
+    assert Request.from_dict({}).rejected == Rejected()
 
 
 def test_pick_with_a_change_keeps_offers_for_the_resolver_to_judge():

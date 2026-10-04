@@ -6,10 +6,10 @@ import hashlib
 import random
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Iterable, Protocol
+from typing import Collection, Iterable, Protocol
 
 from .catalog_index import BookableRow, CatalogIndex, Provider
-from .request import WEEKDAY_NAMES, TimePref
+from .request import WEEKDAY_NAMES, TimePref, slot_id
 
 DEMO_NOW = datetime(2026, 10, 7, 9, 0)  # a Wednesday morning, so demos read "Thursday at 9:30"
 HORIZON_DAYS = 21
@@ -28,7 +28,7 @@ class Slot:
 
     @property
     def id(self) -> str:
-        return f"{self.type_id}|{self.provider_id}|{self.location_id}|{self.start:%Y%m%dT%H%M}"
+        return slot_id(self.type_id, self.provider_id, self.location_id, self.start)
 
     @property
     def end(self) -> datetime:
@@ -45,7 +45,8 @@ class Hold:
 class Availability(Protocol):
     now: datetime
 
-    def find(self, rows: Iterable[BookableRow], time_pref: TimePref, limit: int = 3) -> list[Slot]: ...
+    def find(self, rows: Iterable[BookableRow], time_pref: TimePref, limit: int = 3,
+             exclude: Collection[str] = ()) -> list[Slot]: ...
 
     def is_open(self, slot: Slot) -> bool: ...
 
@@ -156,12 +157,14 @@ class MockAvailability:
             d += timedelta(days=1)
         return days
 
-    def find(self, rows: Iterable[BookableRow], time_pref: TimePref, limit: int = 3) -> list[Slot]:
+    def find(self, rows: Iterable[BookableRow], time_pref: TimePref, limit: int = 3,
+             exclude: Collection[str] = ()) -> list[Slot]:
+        """exclude: slot ids the caller turned down; left out before the offers are spread."""
         rows = list(rows)
         days: list[list[Slot]] = []
         for day in self._days(time_pref):
             todays = sorted((s for row in rows if self._works_at(row, day) for s in self._day_slots(row, day)
-                             if _in_part(s, time_pref.part_of_day)),
+                             if _in_part(s, time_pref.part_of_day) and s.id not in exclude),
                             key=lambda s: (s.start, s.provider_id, s.location_id))
             if todays:
                 days.append(todays)

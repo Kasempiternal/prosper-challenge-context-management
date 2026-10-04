@@ -343,3 +343,55 @@ def test_a_new_patient_asking_for_a_returning_only_type_is_refused_not_offered_a
     plan = resolve(ix, merge(Request(), Update.from_args({**NEW_REF, "service_phrase": "I need my allergy shots"})),
                    MockAvailability(ix))
     assert (plan.status, plan.refusal.code, plan.refusal.alt_type_id) == ("refuse", "new_patient_type", "appt_080")
+
+
+FLU_SHOT = {"service_phrase": "flu shot", "is_new": False}
+
+
+def _plans(index, availability, *updates):
+    req, plans = Request(), []
+    for u in updates:
+        plans.append(resolve(index, merge(req, Update.from_args(u)), availability))
+        req = plans[-1].req
+    return plans
+
+
+def test_another_clinic_offers_the_next_clinics(index, availability):
+    plans = _plans(index, availability, FLU_SHOT, {"reject": ["location"]}, {"reject": ["location"]})
+    sites = [{o.location_id for o in p.offers} for p in plans]
+    assert all(p.status == "offer" for p in plans)
+    assert sites[0].isdisjoint(sites[1]) and (sites[0] | sites[1]).isdisjoint(sites[2])
+
+
+def test_another_clinic_after_naming_one_searches_the_others(index, availability):
+    named, other = _plans(index, availability, {**FLU_SHOT, "location_phrase": "North Beach"}, {"reject": ["location"]})
+    assert {o.location_id for o in named.offers} == {"loc_002"}
+    assert other.status == "offer" and "loc_002" not in {o.location_id for o in other.offers}
+    assert "only clinic" not in other.say and other.req.location.heard is None
+
+
+def test_every_clinic_turned_down_offers_them_again_and_says_so(index, availability):
+    """Flu shots are at all eight SF clinics: offered three, three, one and one at a time."""
+    plans = _plans(index, availability, FLU_SHOT, *[{"reject": ["location"]}] * 4)
+    assert len(set().union(*({o.location_id for o in p.offers} for p in plans[:4]))) == 8
+    assert plans[4].say.startswith("Those are all the clinics I have for that. For a flu shot")
+    assert plans[4].offers == plans[0].offers and plans[4].req.rejected.locations == ()
+
+
+def test_another_doctor_offers_other_doctors(index, availability):
+    plans = _plans(index, availability, FLU_SHOT, {"reject": ["provider"]})
+    before, after = ({o.provider_id for o in p.offers} for p in plans)
+    assert plans[1].status == "offer" and before.isdisjoint(after)
+
+
+def test_someone_else_after_naming_a_doctor_drops_the_name(index, availability):
+    named, other = _plans(index, availability, {**FLU_SHOT, "provider_phrase": "Dr. Carlos Garcia"},
+                          {"reject": ["provider"]})
+    assert {o.provider_id for o in named.offers} == {"prov_008"}
+    assert other.status == "offer" and "prov_008" not in {o.provider_id for o in other.offers}
+
+
+def test_later_times_offer_none_of_the_times_turned_down(index, availability):
+    plans = _plans(index, availability, FLU_SHOT, {"reject": ["time"]})
+    before, after = ({o.start for o in p.offers} for p in plans)
+    assert plans[1].status == "offer" and len(after) == 3 and before.isdisjoint(after)

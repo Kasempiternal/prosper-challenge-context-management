@@ -31,7 +31,7 @@ from pipecat.frames.frames import TTSSpeakFrame
 from scheduling.availability import Slot as TimeSlot
 from scheduling.lookup import KINDS, MAX_FACTS, lookup as catalog_lookup
 from scheduling.policy import check
-from scheduling.request import PARTS_OF_DAY, SLOT_NAMES, WEEKDAY_NAMES, Patient, Request, Update, merge
+from scheduling.request import PARTS_OF_DAY, REJECT_KINDS, SLOT_NAMES, WEEKDAY_NAMES, Patient, Request, Update, merge
 from scheduling.resolver import Offer, Plan, resolve
 from scheduling.templates import spoken_when, type_label
 from scheduling.lexicon import says_unsure
@@ -118,9 +118,11 @@ def _update_request_properties(ctx: ToolContext) -> dict:
         },
         "pick_offer": {"type": "integer", "enum": [1, 2, 3],
                        "description": "Number of the offered time, or of the suggested alternative, the caller chose."},
-        "other_site": {"type": "boolean",
-                       "description": "True when the caller asks for a different clinic than the ones just offered, "
-                                      "for the same visit and area ('any other clinic?'). Use this, not clear."},
+        "reject": {"type": "array", "items": {"type": "string", "enum": list(REJECT_KINDS)},
+                   "description": "What the caller turned down among the options just offered, wanting others for the "
+                                  "same visit: 'location' for another clinic ('any other clinic?'), 'provider' for "
+                                  "another doctor ('someone else?'), 'time' for other times ('none of those', "
+                                  "'anything later?'). Use this, not clear."},
         "clear": {"type": "array", "items": {"type": "string", "enum": [*SLOT_NAMES, "time_pref"]},
                   "description": "Choices the caller withdrew without replacing (e.g. 'any doctor is fine')."},
     }
@@ -350,18 +352,28 @@ def grounded(args: dict, req: Request, said: str) -> tuple[dict, list[str]]:
     return args, replaced
 
 
-# "Let's go with Dr. Kalem": a name. "Is there any other clinic?": a request for another site.
+# "Let's go with Dr. Kalem": a name. "Is there any other clinic?", "someone else?", "anything later?": the
+# offers turned down. "Any doctor is fine" and "I don't care which clinic" withdraw a choice, and stay a clear.
 _NAMED_DOCTOR = re.compile(r"\b(?:[Dd]r\.?|[Dd]octor)\s+[A-Z][A-Za-z'-]+")  # a capitalised name, not "doctor is fine"
 _SITE_WORD = r"(?:clinics?|locations?|sites?|offices?|places?|branch(?:es)?)"
 _OTHER_WORD = r"(?:other|another|different|else)"
 _ANOTHER_SITE = re.compile(rf"\b{_OTHER_WORD}\b.*\b{_SITE_WORD}\b|\b{_SITE_WORD}\b.*\b{_OTHER_WORD}\b", re.IGNORECASE)
+_ANOTHER_DOCTOR = re.compile(r"\b(?:other|another|different)\b.*\b(?:doctors?|physicians?|providers?)\b"
+                             r"|\b(?:some|any)(?:one|body) else\b", re.IGNORECASE)
+_OTHER_TIMES = re.compile(r"\b(?:other|another|different|more|later|earlier)\s+(?:times?|days?|dates?|slots?|openings?)\b"
+                          r"|\banything\s+(?:later|earlier|else)\b|\bnone of (?:those|these|them)\b"
+                          r"|\b(?:those|these|they)\s+(?:don'?t|do not|won'?t|will not)\s+work\b", re.IGNORECASE)
+# A cleared choice the caller's words show to be a rejection: (clear name, field of a new choice, words, reject kind).
+_CLEAR_AS_REJECT = (("location", "location_phrase", _ANOTHER_SITE, "location"),
+                    ("provider", "provider_phrase", _ANOTHER_DOCTOR, "provider"),
+                    ("time_pref", "time_pref", _OTHER_TIMES, "time"))
 
 
 def with_misused_clear_undone(args: dict, req: Request, said: str, replaced: list[str]) -> tuple[dict, list[str]]:
     """`clear` withdraws a choice. The conversation model reached for it when it had no better tool: it
     cleared the doctor for "Let's go with Dr. Kalem" (the name and the time were lost) and the place for
     "Is there any other clinic?" (the city was asked again: "I told you"). A doctor the caller named stays
-    a doctor phrase; a request for another clinic becomes other_site."""
+    a doctor phrase; with offers open, a request for another clinic, doctor or time becomes reject."""
     cleared = args.get("clear")
     if not isinstance(cleared, list):
         return args, replaced
@@ -369,10 +381,12 @@ def with_misused_clear_undone(args: dict, req: Request, said: str, replaced: lis
         args = {**args, "provider_phrase": named.group(0)}
         cleared = [c for c in cleared if c != "provider"]
         replaced = [*replaced, "clear provider"]
-    if "location" in cleared and req.offered and not args.get("location_phrase") and _ANOTHER_SITE.search(said):
-        args = {**args, "other_site": True}
-        cleared = [c for c in cleared if c != "location"]
-        replaced = [*replaced, "clear location"]
+    for name, field, words, kind in _CLEAR_AS_REJECT:
+        if name in cleared and req.offered and not args.get(field) and words.search(said):
+            rejected = args.get("reject") if isinstance(args.get("reject"), list) else []
+            args = {**args, "reject": list(dict.fromkeys([*rejected, kind]))}
+            cleared = [c for c in cleared if c != name]
+            replaced = [*replaced, f"clear {name}"]
     args = {k: v for k, v in args.items() if k != "clear"}
     return ({**args, "clear": cleared} if cleared else args), replaced
 

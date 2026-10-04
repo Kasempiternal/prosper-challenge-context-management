@@ -682,12 +682,55 @@ def test_clearing_the_doctor_for_any_doctor_is_left_alone():
 OFFERED = (OfferRef(1, "appt_074", "prov_1", "loc_278", "2026-10-07T11:00:00", 45),)
 
 
-def test_clearing_the_place_for_another_clinic_becomes_other_site():
+def test_clearing_the_place_for_another_clinic_becomes_reject():
     """Improvised call: "Is there any other clinic I can book on?" cleared the place and asked the city again."""
     out, replaced = grounded({"clear": ["location"]}, Request(offered=OFFERED), "Is there any other clinic I can book on?")
-    assert out == {"other_site": True} and replaced == ["clear location"]
+    assert out == {"reject": ["location"]} and replaced == ["clear location"]
 
 
 def test_clearing_the_place_when_nothing_was_offered_is_left_alone():
     out, _ = grounded({"clear": ["location"]}, Request(), "Is there any other clinic I can book on?")
     assert out == {"clear": ["location"]}
+
+
+@pytest.mark.parametrize("cleared, said, kind", [
+    ("location", "Do you have a different location?", "location"),
+    ("location", "Is there another office closer?", "location"),
+    ("provider", "Do you have another doctor?", "provider"),
+    ("provider", "Can I see someone else?", "provider"),
+    ("provider", "I'd rather have a different doctor.", "provider"),
+    ("time_pref", "None of those work, anything later?", "time"),
+    ("time_pref", "Do you have other times?", "time"),
+    ("time_pref", "Those don't work for me.", "time"),
+])
+def test_clearing_for_another_option_becomes_reject(cleared, said, kind):
+    out, replaced = grounded({"clear": [cleared]}, Request(offered=OFFERED), said)
+    assert out == {"reject": [kind]} and replaced == [f"clear {cleared}"]
+
+
+@pytest.mark.parametrize("cleared, said", [
+    ("provider", "Any doctor is fine."),
+    ("location", "I don't care which clinic."),
+    ("time_pref", "Any time works."),
+    ("provider", "Whoever is free."),
+])
+def test_clearing_for_a_withdrawn_choice_stays_a_clear(cleared, said):
+    out, replaced = grounded({"clear": [cleared]}, Request(offered=OFFERED), said)
+    assert out == {"clear": [cleared]} and replaced == []
+
+
+def test_clearing_doctor_and_place_for_another_doctor_elsewhere_rejects_both():
+    out, replaced = grounded({"clear": ["provider", "location"]}, Request(offered=OFFERED),
+                             "Is there another doctor at a different clinic?")
+    assert out == {"reject": ["location", "provider"]} and replaced == ["clear location", "clear provider"]
+
+
+def test_a_named_doctor_with_offers_open_stays_a_doctor_phrase():
+    out, _ = grounded({"clear": ["provider"]}, Request(offered=OFFERED), "Let's go with Dr. Kalem. Yeah, today.")
+    assert out == {"provider_phrase": "Dr. Kalem"}
+
+
+def test_a_reject_the_model_sent_is_kept_when_a_clear_joins_it():
+    out, _ = grounded({"reject": ["provider"], "clear": ["time_pref"]}, Request(offered=OFFERED),
+                      "Someone else, and none of those times.")
+    assert out == {"reject": ["provider", "time"]}

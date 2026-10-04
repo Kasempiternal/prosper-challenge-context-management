@@ -28,7 +28,7 @@ from .lexicon import (SHORTLIST_ABOVE, Doubt, TypeCandidate, describes_symptom, 
 from .names import (STREET_TYPES, ProviderClues, clue_words, hear_place, match_locations, match_providers, only_no,
                     read_confirmation, read_provider_clues, unmatched_first_name)
 from .policy import IssueKind, Rule, Violation, check, has_violation
-from .request import WEEKDAY_NAMES, AltRef, OfferRef, PendingAsk, Request, Slot, TimePref
+from .request import WEEKDAY_NAMES, AltRef, OfferRef, PendingAsk, Request, Slot, TimePref, slot_id, slot_start
 from .text import phonetic_keys, tokens
 
 TYPE_TIE_GAP = 0.1
@@ -209,6 +209,8 @@ class _Resolution:
         self.provider_clues: ProviderClues | None = None
         self.described_sites: tuple[str, ...] = ()  # clinics named to describe the doctor
         self.described_ask: tuple[str, ...] = ()  # the facts' one doctor, unsettled by the gender said
+        self.rejected = req.rejected       # less a kind that ran out, once the caller is told so
+        self.skip_slots = frozenset(req.rejected.slots)  # times the caller turned down ("anything later?")
         self.patient = req.patient
         self.slots: dict[str, Slot] = {"service": req.service, "provider": req.provider, "location": req.location}
         self.notes: list[str] = []
@@ -405,6 +407,13 @@ class _Resolution:
                 return self._refuse("provider_type", type_id=self._best_type(rows), who=self._who(provider_ids),
                                     alternatives=alts)
 
+        if (not self.geo and location_ids is not None and self.req.rejected.locations
+                and set(location_ids) <= set(self.req.rejected.locations)):
+            # "Any other clinic?" after naming one: without an area around it, the clinic named is
+            # what was turned down.
+            self.notes.append("the clinic named was turned down: searching the others")
+            self.slots["location"] = Slot(turn=self.req.turn)
+            location_ids = None
         # "Dr. Michael Sato, the one at the Sunset clinic": with no place of their own, the caller
         # goes where they described the doctor.
         at_described_site = location_ids is None and bool(self.described_sites)
@@ -521,17 +530,14 @@ class _Resolution:
                                              rows_p if provider_ids is not None else None, svc is not None)
                 ok = near
 
-        if self.req.avoid:
-            others = [r for r in ok if r.location.id not in self.req.avoid]
-            if others:
-                self.notes.append(f"the caller turned down {len(self.req.avoid)} clinic(s): {len(others)} rows left")
-                ok = others
-            else:
-                names = [T.site_label(self.ix, lid) for lid in sorted({r.location.id for r in ok})][:2]
-                self.notes.append("no other clinic: the offered one is the only one")
-                self.preface += (f"{' and '.join(names)} {'is' if len(names) == 1 else 'are'} the only "
-                                 f"clinic{'' if len(names) == 1 else 's'} I have for that near you. ")
-        found = self._nearest_first(ok) if self.widened else self.av.find(ok, self.req.time_pref, MAX_OPTIONS)
+        ok = self._without_rejected(ok)
+        found = self._nearest_first(ok) if self.widened else self._find(ok, MAX_OPTIONS)
+        if not found and self.skip_slots:
+            self.notes.append("no other time: the offered ones are the only ones")
+            self.preface += "Those are the only times I have for that. "
+            self.skip_slots = frozenset()
+            self.rejected = replace(self.rejected, slots=())
+            found = self._nearest_first(ok) if self.widened else self._find(ok, MAX_OPTIONS)
         if not found:
             return self._refuse("no_availability", type_id=type_id)
         if self.dist:
@@ -1001,10 +1007,43 @@ class _Resolution:
             by_loc.setdefault(r.location.id, []).append(r)
         found: list[TimeSlot] = []
         for lid in sorted(by_loc, key=lambda l: (self.dist.get(l, math.inf), l)):
-            found += self.av.find(by_loc[lid], self.req.time_pref, MAX_OPTIONS - len(found))
+            found += self._find(by_loc[lid], MAX_OPTIONS - len(found))
             if len(found) == MAX_OPTIONS:
                 break
         return found
+
+    def _find(self, rows: list[BookableRow], limit: int) -> list[TimeSlot]:
+        """Open slots without the times the caller turned down (exclude is passed only then, so an
+        availability that never sees a rejection need not take it). A time turned down is turned
+        down with every doctor and clinic: "anything later?" is not the same hour with someone else."""
+        if not self.skip_slots:
+            return self.av.find(rows, self.req.time_pref, limit)
+        starts = {slot_start(s) for s in self.skip_slots}
+        exclude = {slot_id(r.type.id, r.provider.id, r.location.id, t) for r in rows for t in starts}
+        return self.av.find(rows, self.req.time_pref, limit, exclude=exclude)
+
+    def _without_rejected(self, ok: list[BookableRow]) -> list[BookableRow]:
+        """The rows without the clinics and doctors the caller turned down. When none is left of a
+        kind, the same ones are offered again and the caller hears they are the only ones."""
+        rej = self.req.rejected
+        for turned_down, of, kind, field in ((rej.locations, lambda r: r.location.id, "clinic", "locations"),
+                                             (rej.providers, lambda r: r.provider.id, "doctor", "providers")):
+            if not turned_down:
+                continue
+            others = [r for r in ok if of(r) not in turned_down]
+            if others:
+                self.notes.append(f"the caller turned down {len(turned_down)} {kind}(s): {len(others)} rows left")
+                ok = others
+                continue
+            self.rejected = replace(self.rejected, **{field: ()})
+            names = list(dict.fromkeys(T.site_label(self.ix, i) if kind == "clinic" else self.ix.providers[i].name
+                                       for i in sorted({of(r) for r in ok})))
+            near = " near you" if kind == "clinic" and self.slots["location"].given else ""
+            self.notes.append(f"no other {kind}: the ones turned down are all there is")
+            self.preface += (f"{names[0]} is the only {kind} I have for that{near}. " if len(names) == 1 else
+                             f"{names[0]} and {names[1]} are the only {kind}s I have for that{near}. "
+                             if len(names) == 2 else f"Those are all the {kind}s I have for that{near}. ")
+        return ok
 
     def _nearer_ties(self, found: list[TimeSlot], ok: list[BookableRow]) -> list[TimeSlot]:
         """Soonest first; at the same start, the nearer site. Each offer may be swapped for an
@@ -1572,6 +1611,7 @@ class _Resolution:
             pick=self.req.pick if keep_pick else None,
             changed=(),
             pending_ask=self._pending(ask, pending_field) if ask else None,
+            rejected=self.rejected,
         )
         summary = _summary(self.ix, new_req, status, ask)
         result = _tool_result(self.ix, status, say, ask, offers, new_req, confirm)
