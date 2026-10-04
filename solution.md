@@ -54,7 +54,15 @@ The guiding rule: **in healthcare a wrong booking is the costly error, and one m
 ## Evidence
 
 - **Blind rounds.** Case sets written without seeing the code, frozen in a commit before the fixes they judge, scored once. Latest (round 5, JEV): SF 4 wrong commits in 38 (10.5%), national 1 in 35 (2.9%). Dev sets read 0 wrong commits; that gap is the honest measure. Re-run after the later live-call fixes (no longer blind, not tuned on): SF 3 in 36, national 0 in 36, so those fixes broke nothing there.
-- **Modes compared** on every blind set: JEV has the fewest wrong commits on SF doctor descriptions; OpenAI matches or beats it on some national sets; Off is the rules path and asks more.
+- **Modes compared** on every blind set. Round 5, scored once in all four modes (wrong commits per commit, then fully correct turns; `eval/results/round5_*.txt`):
+
+  | Set | Off (rules only) | Embeddings | OpenAI (gpt-4o-mini) | JEV (default) |
+  |---|---|---|---|---|
+  | SF (heldout5) | 11/26, 30/64 | 15/30, 31/64 | 8/40, 48/64 | **4/38, 52/64** |
+  | National (national5) | 4/37, 50/59 | 5/37, 49/59 | 3/38, 52/59 | **1/35**, 51/59 |
+  | Hard cases, unsafe (SF 40 + national 48) | 6 + 3 | 9 + 3 | 1 + 0 (cache only) | **0 + 0** |
+
+  JEV halves OpenAI's wrong commits on SF doctor and visit descriptions. On national the two are close (OpenAI gets one more turn fully right). Round 5 spend: JEV $0.006, OpenAI $0.010. Off asks more and commits wrong more often, so a model on the ambiguous turns pays for itself; embeddings alone do not.
 - **88 hard cases** (the most critical and the ones that failed in earlier runs): 0 unsafe JEV outcomes.
 - **Live voice calls** found what offline cases cannot: the conversation model claimed a booking it never made, and it rewrote callers' answers ("Washington" into "Washington, DC", "the lady one" into "Dr. Emily Chen", a doubt into "scope"). Each became a code-level guard, not a prompt tweak. Booking moved into an edge action, and tool arguments are now checked against the caller's own words. Replaying those turns showed gpt-4.1 makes the same rewrites, so a stronger model was not the fix.
 - 1,324 backend and 125 frontend tests.
