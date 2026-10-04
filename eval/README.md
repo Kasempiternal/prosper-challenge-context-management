@@ -1521,3 +1521,30 @@ Rule 1 (`resolver._ask_type`, `_likeliest`): after one reply with nothing usable
 Rule 2 (`resolver._beside_hinted_default`): a specialty default chosen only by the hint is asked beside what the words reach without the hint, plus the sick visit when they describe a problem ("new patient visit, sick visit, or neurology consultation?"); "new patient visit" or "I want to see a doctor" still offer it. Rule 3 (`grounded`): "I don't know" or a bare "yes" sent as the visit or as `clear service` to an open A-or-B visit question is an empty update.
 Replay with gpt-4o (National, JEV, 48 agent requests in all). Before the fixes, call 1: 0 of 3 (twice `clear service` for "I don't know", once hint General and a New Patient Visit offered). With rules 1-2 and the `clear` half of rule 3, call 1: the suggestion was made and "Yes." led to sprain and strain offers in 1 of 3 runs; one run sent `service_phrase: "I don't know"` (the phrase half of rule 3, added after, has unit tests only: the budget was spent), one sent a stray `provider_phrase: "the doctor"` ("Sorry, which doctor was that?") and suggested only after "Yes." came as an empty update. Call 2, 2 runs: no New Patient Visit without a question; the model dropped the General hint, and the resolver asked between the three headache visits. Nothing was booked in any run (the script stops at the offer).
 Regression sets: 0 wrong commits, no-model outcomes unchanged in every set; both stress gates exit 0.
+
+### Choosing among options by position or label (2026-10-04)
+
+Two replays of one call (flu shot, offers from both Dr. Maria Garcias and Dr. Carlos Garcia, "The last one", then "Yes, but with Dr. Maria Garcia") looped: "which Dr. Maria Garcia?" -> "The first one." -> the same question, since `grounded` swaps the model's "Dr. Maria Garcia in pediatrics" for the caller's words and nothing read "the first one" as a place; and one run sent `reject: ["provider"]` with `pick_offer: 3`, where `merge` let the pick win and read Dr. Carlos Garcia back.
+Fix 1 (`geo.option_at`, used by `resolver._option_at`): while a doctor, visit or clinic question that listed 2-3 options is open, an answer that is only a position ("the first one", "the last", "number two", "I'll take the second one") picks that option, in the order spoken. Any other word, a position past the options, a question that listed none (four doctors asked by first name, "Did your doctor say to fast?") or a one-doctor yes/no leaves it as before. A label ("in pediatrics", "family medicine") already resolved through the clue words and now has tests.
+Fix 2 (`request.merge`): a `reject` sent with `pick_offer` wins and the pick is dropped, since the offers it points to are gone; a doctor named in the same update still wins over the pick, as before.
+Offline: 1489 passed, 1 skipped; every regression set 0 wrong commits, both stress gates exit 0. The one dev-set outcome that changed is `stress_sf` sf-25 ("my baby's checkup" -> "the second one"): asked again before, CORRECT with the JEV now; with no model it picks the second option of the question as spoken (annual wellness visit), which that case counts as wrong because it expects the JEV's question.
+Replay with gpt-4o (2 runs of the 2 calls, 41 requests; a third would have passed the 40-request budget): "which Dr. Maria Garcia?" was reached in 2 of 4 calls and "The first one." answered it both times (Mission Bay pediatrics offered). One call sent `reject` + `pick_offer 3`: it searched again without the doctors offered, which also lost Dr. Maria Garcia, and booked Dr. Wei Chen. One sent `pick_offer 2` and booked Dr. Maria Garcia. A bare reject of the provider ignores a doctor named in the caller's words: not fixed here.
+
+### Full demo scripts, and three guards found by running them (2026-10-04)
+
+Every demo beat and five real-caller calls were run end to end against the real agent (gpt-4o, JEV, text) to write
+the studio's Demo script card from what the agent says. Three faults showed up and got a guard in `grounded()` /
+`lookup`, each with tests:
+- "Yes, please" to a single suggested alternative ("the nearest is Cherry Hill. Want me to look there?", demo beat 4)
+  arrived as the place "New Jersey" and the question came back three times. A bare yes now takes the suggestion.
+- "I don't know" to "Do you have a referral?" arrived as `has_referral: false`, and the visit was refused. Not knowing
+  is not a no: a false status said with "I don't know" (and no "no") is dropped, so the question stays open.
+- "Does anyone at Mission Bay speak Spanish?" (demo beat 8) reached `lookup` as "Mission Bay", so the facts had no
+  answer. A language the caller named goes back into the phrase, as a question about doctors.
+- "Yes, but with Dr. Maria Garcia" sent as a bare `reject: [provider]` turned down every doctor offered, Maria Garcia
+  too, and one replay booked Dr. Wei Chen. A doctor the caller names now goes in as the doctor phrase.
+
+1,495 backend tests. All dev sets 0 wrong commits except `heldout4` h4-26 ("my next one with the psychiatrist, the
+usual"), which flips between asking and committing from run to run. It does the same on the previous commit
+(`a5867c9`, 1 of 3 runs), so it is JEV variance on a case already listed as a known limit, not a regression.
+Both stress gates exit 0.

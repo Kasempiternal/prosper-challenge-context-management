@@ -3,132 +3,140 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Real-caller round</title>
+<title>Final round: 5 calls</title>
 <style>
 :root{--fg:#1a1a1a;--mute:#6b6b6b;--line:#e6e6e6;--bg:#fff;--ok:#1a7f37;--bad:#c62828;--warn:#b26a00;--say:#0b57d0}
 @media (prefers-color-scheme:dark){:root{--fg:#e8e8e8;--mute:#9a9a9a;--line:#2c2c2c;--bg:#121212;--say:#8ab4f8;--ok:#4caf50;--bad:#ef5350;--warn:#ffb74d}}
 *{box-sizing:border-box}
 body{margin:0;font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--fg);background:var(--bg)}
-main{max-width:760px;margin:0 auto;padding:24px 18px 80px}
+main{max-width:820px;margin:0 auto;padding:24px 18px 80px}
 h1{font-size:22px;margin:0 0 4px}
-h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:36px 0 8px;border-bottom:1px solid var(--line);padding-bottom:6px}
 h3{font-size:16px;margin:0}
-p,ol{margin:6px 0}
+p,ol,ul{margin:6px 0}
 .mute{color:var(--mute)}
 .bar{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 18px;font-size:13px;display:flex;gap:14px;justify-content:center;z-index:1}
 .bar b{font-variant-numeric:tabular-nums}
-.plan{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
-.plan td,.plan th{border-top:1px solid var(--line);padding:5px 8px 5px 0;text-align:left;vertical-align:top}
-.plan th{font-size:12px;color:var(--mute);font-weight:600;border-top:0}
-.call{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0}
+.call{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:14px 0}
 .call.pass{border-left:4px solid var(--ok)}.call.fail{border-left:4px solid var(--bad)}.call.extra{border-left:4px solid var(--warn)}
 .head{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
 .n{color:var(--mute);font-variant-numeric:tabular-nums;margin-right:6px}
-.res{display:flex;gap:4px}
+.tag{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--mute);margin-left:6px;font-weight:500}
+.res{display:flex;gap:4px;align-items:center}
 .res button{font:12px system-ui;border:1px solid var(--line);background:none;color:var(--mute);border-radius:5px;padding:3px 8px;cursor:pointer}
 .call.pass .res .p{background:var(--ok);color:#fff;border-color:var(--ok)}
 .call.fail .res .f{background:var(--bad);color:#fff;border-color:var(--bad)}
 .call.extra .res .e{background:var(--warn);color:#fff;border-color:var(--warn)}
-.call table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:14px}
-.call td{padding:5px 0;vertical-align:top;border-top:1px solid var(--line)}
-.call td:first-child{width:52%;padding-right:12px}
-.say{color:var(--say);font-weight:600}
-.x{color:var(--bad);font-size:14px;margin:4px 0 0}
-.x::before{content:"✗ "}
-.note{font-size:13px;color:var(--mute);margin:4px 0 0}
+table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:14px}
+td{padding:6px 0;vertical-align:top;border-top:1px solid var(--line)}
+td.k{width:26px;color:var(--mute);font-variant-numeric:tabular-nums}
+td.s{width:47%;padding-right:14px}
+.say{color:var(--say);font-weight:600;cursor:copy}
+.if{font-size:13px;color:var(--warn);font-weight:600}
+.x{color:var(--bad);font-size:14px;margin:6px 0 0}
+.x::before{content:"Fail if: ";font-weight:600}
+.why{font-size:13px;color:var(--mute);margin:2px 0 6px}
 .switch{background:color-mix(in srgb,var(--say) 10%,transparent);border-radius:6px;padding:8px 12px;font-size:14px;margin:10px 0}
-input.ref{font:12px system-ui;border:1px solid var(--line);background:none;color:var(--fg);border-radius:5px;padding:3px 6px;width:120px}
-code{font-size:13px}
+input.ref{font:12px system-ui;border:1px solid var(--line);background:none;color:var(--fg);border-radius:5px;padding:3px 6px;width:130px}
 </style>
 </head>
 <body>
-<div class="bar"><span>Done <b id="must">0/7</b></span><span style="color:var(--ok)">Pass <b id="cp">0</b></span><span style="color:var(--bad)">Fail <b id="cf">0</b></span><span style="color:var(--warn)">Rough <b id="ce">0</b></span><a href="#" id="reset" class="mute">reset</a></div>
+<div class="bar"><span>Done <b id="must">0/5</b></span><span style="color:var(--ok)">Pass <b id="cp">0</b></span><span style="color:var(--bad)">Fail <b id="cf">0</b></span><span style="color:var(--warn)">Rough <b id="ce">0</b></span><a href="#" id="reset" class="mute">reset</a></div>
 <main>
-<h1>Real-caller round</h1>
-<p><b>7 calls.</b> No script this time. Each card is a <b>person</b>, not lines to read. Become her, talk the way she would, and let the conversation go where it goes. The opening line is only a nudge: say it in your own words.</p>
-
-<table class="plan">
-<tr><th>#</th><th>Caller</th><th>Agent (left sidebar)</th><th>What she wants</th></tr>
-<tr><td>1</td><td>Margaret, 79</td><td>Clinic Scheduler</td><td>Heart check-up with “the lady Dr. Chen”, mornings only</td></tr>
-<tr><td>2</td><td>Rose, 84</td><td>Clinic Scheduler</td><td>Her grandson's rash</td></tr>
-<tr><td>3</td><td>Betty, 76</td><td>Clinic Scheduler</td><td>Flu shots for her and her husband</td></tr>
-<tr><td>4</td><td>Joan, 81</td><td>Clinic Scheduler</td><td>Move an appointment she already has</td></tr>
-<tr><td>5</td><td>Dorothy, 77</td><td>National Scheduler</td><td>Her knee, after a fall</td></tr>
-<tr><td>6</td><td>Evelyn, 83</td><td>National Scheduler</td><td>Questions first, then a cough</td></tr>
-<tr><td>7</td><td>Ruth, 80</td><td>National Scheduler</td><td>Her yearly women's check-up, changes her mind mid-call</td></tr>
-</table>
-
-<h2>How to play her</h2>
+<h1>Final round: 5 calls</h1>
+<p>These calls test what was fixed today, plus the messy things real callers do. Say each <span class="say">blue line</span> as written (click it to copy). The right-hand column is what the agent should do. Its wording can differ a little from call to call. Judge by the <b>Fail if</b> line, not by the exact words.</p>
 <ul>
-<li><b>Talk slowly, trail off, restart.</b> “I need to… oh, what was it. The heart doctor.”</li>
-<li><b>Give things out of order</b> and in the wrong place: your age, your late husband, the bus. Not everything is about the appointment.</li>
-<li><b>Get names a little wrong</b> and correct yourself: “Dr. Chin… Chen, I mean.”</li>
-<li><b>Mishear and ask again:</b> “Tuesday at what, dear?”, “Say that again?”</li>
-<li><b>Don't know things:</b> “Is that a referral? The doctor gave me a paper.” “I think I came once, years ago.”</li>
-<li>Agent: <b>JEV</b> on every call. Check the header reads the right agent before calling. Reload the page once first.</li>
+<li><b>Before the first call:</b> reload the studio page. Open the <b>Test call</b> panel and keep the Disambiguator on <b>JEV</b>.</li>
+<li><b>Pick the agent</b> each card names (click it in the left sidebar; the panel header says <b>TEST CALL · …</b>).</li>
+<li><b>Names and times can differ</b> from the ones written here if an earlier call in the same session already booked that slot. What matters is the behaviour.</li>
+<li><b>If the agent goes somewhere unexpected,</b> answer naturally and keep going. Write a word in the note box, and tell me "check logs" at the end.</li>
 </ul>
 
-<h2>How to score</h2>
-<p><b>Pass</b>: she got what she needed, or a clear, honest reason why not. <b>Rough</b>: it got there but was clumsy (a pointless question, an odd phrase, a repeat). <b>Fail</b>: any red line on the card. Write what happened in the note box; the logs show the rest.</p>
+<section class="call" data-id="1"><div class="head"><h3><span class="n">1</span>Rigoberto, the picky one <span class="tag">National Scheduler</span></h3><div class="res"></div></div>
+<p class="why">Tests: "any other clinic", "another doctor", "anything later", and a "yes" that names a different day.</p>
+<table>
+<tr><td class="k">1</td><td class="s"><span class="say">Hi, I need a dental cleaning.</span></td><td>Asks which city you're in.</td></tr>
+<tr><td class="k">2</td><td class="s"><span class="say">New York.</span></td><td>Offers times at <b>Flushing</b> (Dr. Helen Altman, Dr. Sylvia Smith).</td></tr>
+<tr><td class="k">3</td><td class="s"><span class="say">Is there any other clinic I can book on?</span></td><td>Offers times at <b>Jamaica</b> instead. Does not ask the city again.</td></tr>
+<tr><td class="k">4</td><td class="s"><span class="say">Hmm, do you have another doctor?</span></td><td>Offers <b>other doctors</b> at Jamaica (for example Dr. Lamar Powers, Dr. Rosemary Amoroso).</td></tr>
+<tr><td class="k">5</td><td class="s"><span class="say">None of those times work for me. Anything later?</span></td><td>Offers <b>later times</b> (for example 11:45, 8:45).</td></tr>
+<tr><td class="k">6</td><td class="s"><span class="say">The second one.</span></td><td>Reads the booking back (tomorrow at 8:45) and asks "Shall I book it?".</td></tr>
+<tr><td class="k">7</td><td class="s"><span class="say">Yes, Friday's perfect.</span></td><td><b>Does not book.</b> Offers Friday times instead.</td></tr>
+<tr><td class="k">8</td><td class="s"><span class="say">The first one.</span></td><td>Reads back a Friday appointment.</td></tr>
+<tr><td class="k">9</td><td class="s"><span class="say">Yes.</span></td><td>Booked. Gives a confirmation reference (H, then 4 digits).</td></tr>
+<tr><td class="k">10</td><td class="s"><span class="say">No, that's all. Thank you.</span></td><td>Says goodbye. The call ends.</td></tr>
+</table>
+<p class="x">it asks "Which city are you in?" again at step 3; it offers the same clinic, doctors or times again; it books at step 7 (a day you didn't agree to).</p></section>
 
-<h2>Clinic Scheduler (San Francisco)</h2>
-<div class="switch">Click <b>Clinic Scheduler</b> in the left sidebar. Header: <b>TEST CALL · CLINIC SCHEDULER</b>.</div>
+<section class="call" data-id="2"><div class="head"><h3><span class="n">2</span>Dani, sprained ankle, no medical words <span class="tag">National Scheduler</span></h3><div class="res"></div></div>
+<p class="why">Tests: "I don't know" to a two-option question (it should suggest, not hand over), and a question in the middle of an offer.</p>
+<table>
+<tr><td class="k">1</td><td class="s"><span class="say">Hello, I sprained my ankle yesterday playing football with my son, and I want to see a doctor.</span></td><td>Asks which city you're in, or which visit it is.</td></tr>
+<tr><td class="k"></td><td class="s"><span class="if">If it asks which city:</span><br><span class="say">San Francisco.</span></td><td>Offers sprain and strain evaluation times, or asks which visit it is.</td></tr>
+<tr><td class="k"></td><td class="s"><span class="if">If it asks "a foot and ankle consultation or a sprain and strain evaluation?":</span><br><span class="say">I don't know.</span></td><td>Suggests one: <i>"It sounds like a …, since you said sprained ankle. Shall I go with that?"</i></td></tr>
+<tr><td class="k"></td><td class="s"><span class="if">If it suggests one:</span><br><span class="say">Yes.</span></td><td>Offers that visit's times, or asks about a referral.</td></tr>
+<tr><td class="k"></td><td class="s"><span class="if">If it asks whether you have a referral:</span><br><span class="say">Yes, I have one from my GP.</span></td><td>Offers times.</td></tr>
+<tr><td class="k">2</td><td class="s"><span class="say">How long does the visit take?</span></td><td>Answers from the catalog (30 or 40 minutes) and keeps the times open.</td></tr>
+<tr><td class="k">3</td><td class="s"><span class="say">Okay, the first one.</span></td><td>Reads the booking back.</td></tr>
+<tr><td class="k">4</td><td class="s"><span class="say">Yes, please.</span></td><td>Booked, with a reference.</td></tr>
+<tr><td class="k">5</td><td class="s"><span class="say">No, thanks, bye.</span></td><td>Goodbye.</td></tr>
+</table>
+<p class="x">it transfers you after "I don't know"; it takes "I don't know" as "no referral" and refuses; it asks the same two-option question a third time.</p></section>
 
-<section class="call" data-id="1"><div class="head"><h3><span class="n">1</span>Margaret, 79: “the lady Dr. Chen”</h3><div class="res"></div></div>
-<p><b>Who she is.</b> Widowed, takes the 38 bus, so <b>mornings only</b>. Has seen the heart doctor before and has a letter from her GP (that's her referral, but she isn't sure what it's called). Can't quite remember the doctor's name, only that she's a woman and “very kind”.</p>
-<p class="note">Nudge: “Hello, yes, I need to see the heart doctor again, the lady one, Dr. Chin… Chen. It has to be in the morning, dear, because of my bus.”</p>
-<p><b>Somewhere in the call:</b> ask whether the clinic has parking, and ask it to repeat the time.</p>
-<p class="x">Books a doctor she didn't confirm by name (it must ask “Do you mean Dr. Emily Chen?”). Invents a parking answer (the catalog has no parking information). Offers afternoons after she said mornings. Books before reading it back and hearing her yes.</p></section>
+<section class="call" data-id="3"><div class="head"><h3><span class="n">3</span>Priya, a headache, then her mother <span class="tag">Clinic Scheduler</span></h3><div class="res"></div></div>
+<p class="why">Tests: a symptom is asked about before anything is offered, an honest "we don't offer that", and a second booking for someone else.</p>
+<table>
+<tr><td class="k">1</td><td class="s"><span class="say">Hi, um, I've had a headache for three days and I'd like to see someone.</span></td><td>Asks which visit (a sick visit, a headache follow-up, a neurology consultation), or offers sick visit times.</td></tr>
+<tr><td class="k">2</td><td class="s"><span class="if">If it asked which visit:</span><br><span class="say">A sick visit.</span></td><td>Offers sick visit times.</td></tr>
+<tr><td class="k">3</td><td class="s"><span class="say">The first one.</span></td><td>Reads the booking back.</td></tr>
+<tr><td class="k">4</td><td class="s"><span class="say">Yes.</span></td><td>Booked, with a reference.</td></tr>
+<tr><td class="k">5</td><td class="s"><span class="say">Can you also book an eye exam for my mother? She's never been to your clinics.</span></td><td><i>"Sorry, we don't offer eye care at our clinics."</i> That's true for this catalog, which has no eye doctor.</td></tr>
+<tr><td class="k">6</td><td class="s"><span class="say">Oh. Then a flu shot for her.</span></td><td>Offers flu shot times.</td></tr>
+<tr><td class="k">7</td><td class="s"><span class="say">The first one.</span></td><td>Reads the second booking back.</td></tr>
+<tr><td class="k">8</td><td class="s"><span class="say">Yes.</span></td><td>Booked, with a <b>second</b> reference. Your own booking still stands.</td></tr>
+<tr><td class="k">9</td><td class="s"><span class="say">No, that's all.</span></td><td>Goodbye.</td></tr>
+</table>
+<p class="x">it offers a new patient visit for the headache without asking; it offers an eye exam; your mother's booking replaces yours; it transfers you.</p></section>
 
-<section class="call" data-id="2"><div class="head"><h3><span class="n">2</span>Rose, 84: her grandson's rash</h3><div class="res"></div></div>
-<p><b>Who she is.</b> Looking after <b>Tommy, 6</b>, while his mother works. He's had a red, itchy rash on his arms for three days. She doesn't know if he has been to this clinic (“his mother takes him, I think he's been”). No referral that she knows of.</p>
-<p class="note">Nudge: “I'm calling about my grandson, Tommy, he's six, he's got this rash all up his arms and his mother's at work, so…”</p>
-<p class="x">Books an adult visit for Tommy without asking. Books before reading it back. Gets confused about who the patient is (Rose vs Tommy) in a way that changes the visit.</p>
-<p class="note">Fine: asking “pediatric sick visit or dermatology consultation?”, or asking about a referral for the skin doctor.</p></section>
+<section class="call" data-id="4"><div class="head"><h3><span class="n">4</span>Tom, needs a shot and is in a hurry <span class="tag">Clinic Scheduler</span></h3><div class="res"></div></div>
+<p class="why">Tests: a vague "shot", impatience, "what did you say?", a question it can't answer, and a "yes" that names a different doctor.</p>
+<table>
+<tr><td class="k">1</td><td class="s"><span class="say">I need a shot.</span></td><td><i>"What kind of visit is it: a vaccination, a flu shot, or a COVID-19 vaccine, or something else?"</i></td></tr>
+<tr><td class="k">2</td><td class="s"><span class="say">Ugh, the flu one. This is taking forever.</span></td><td>Offers flu shot times: Dr. Maria Garcia (today, tomorrow) and Dr. Carlos Garcia (Friday at 8, North Beach).</td></tr>
+<tr><td class="k">3</td><td class="s"><span class="say">What did you say? Can you repeat that?</span></td><td>Repeats the same times.</td></tr>
+<tr><td class="k">4</td><td class="s"><span class="say">Is there parking at that clinic?</span></td><td><i>"I don't have that information"</i>, usually with the clinic's phone number, then back to the times. It must not invent a yes.</td></tr>
+<tr><td class="k">5</td><td class="s"><span class="say">Fine. The last one.</span></td><td>Reads back: flu shot with <b>Dr. Carlos Garcia</b>, Friday at 8 at North Beach.</td></tr>
+<tr><td class="k">6</td><td class="s"><span class="say">Yes, but with Dr. Maria Garcia.</span></td><td><b>Does not book Carlos.</b> Asks which one, because two doctors share the name (<i>"in pediatrics or in family medicine?"</i>), or reads Dr. Maria Garcia back.</td></tr>
+<tr><td class="k"></td><td class="s"><span class="if">If it reads Dr. Maria Garcia back:</span><br><span class="say">Yes.</span></td><td>Booked with her, with a reference. Skip to the last line.</td></tr>
+<tr><td class="k"></td><td class="s"><span class="if">If it asks which Maria Garcia:</span><br><span class="say">The family medicine one.</span></td><td>Offers her times at Richmond. It must not ask the same question again.</td></tr>
+<tr><td class="k"></td><td class="s"><span class="if">If it offered her times:</span><br><span class="say">The first one.</span></td><td>Reads back a flu shot with Dr. Maria Garcia.</td></tr>
+<tr><td class="k"></td><td class="s"><span class="if">If it read her back:</span><br><span class="say">Yes.</span></td><td>Booked, with a reference.</td></tr>
+<tr><td class="k">7</td><td class="s"><span class="say">No, thanks.</span></td><td>Goodbye.</td></tr>
+</table>
+<p class="x">it books Carlos Garcia after you named Maria; it asks "which Maria Garcia" again after you answered; it says the clinic has parking.</p></section>
 
-<section class="call" data-id="3"><div class="head"><h3><span class="n">3</span>Betty, 76: flu shots for two</h3><div class="res"></div></div>
-<p><b>Who she is.</b> Wants a flu shot. She has been to the clinic before. Halfway through, remembers her husband <b>Frank</b> needs one too, and <b>he has never been</b> to this clinic. “He won't call himself, you know how men are.”</p>
-<p class="note">Nudge: “Hi love, I'd like to get my flu shot before it gets cold.” Book hers, then: “Oh, and Frank! My husband. Can you do him too?”</p>
-<p class="x">Books Frank as a returning patient (he's new). Books both in one read-back without a yes for each. Loses Betty's booking when Frank's starts.</p></section>
+<section class="call" data-id="5"><div class="head"><h3><span class="n">5</span>Linda, stuck and losing patience <span class="tag">National Scheduler</span></h3><div class="res"></div></div>
+<p class="why">Tests: "hello?", booking for a husband, a caller who won't give a city (no loops), and asking for a person.</p>
+<table>
+<tr><td class="k">1</td><td class="s"><span class="say">Hello? Is anybody there?</span></td><td>Answers that it's here, and asks what you'd like to book.</td></tr>
+<tr><td class="k">2</td><td class="s"><span class="say">Yes, hi. My husband needs to see someone about his back, he can't call himself.</span></td><td>Asks which city, or what the visit is for.</td></tr>
+<tr><td class="k">3</td><td class="s"><span class="say">Your city.</span></td><td>Asks again, for example <i>"Sorry, which location was that?"</i></td></tr>
+<tr><td class="k">4</td><td class="s"><span class="say">I already told you, your city!</span></td><td>Asks for a nearby city or a ZIP code, or hands you to staff. <b>Not the same question a third time.</b></td></tr>
+<tr><td class="k">5</td><td class="s"><span class="say">Ugh. Can I just talk to a person?</span></td><td>Transfers you to the clinic staff right away. The call ends.</td></tr>
+</table>
+<p class="x">it asks the same question three times; it refuses to transfer; it makes up a city.</p></section>
 
-<section class="call" data-id="4"><div class="head"><h3><span class="n">4</span>Joan, 81: move an appointment</h3><div class="res"></div></div>
-<p><b>Who she is.</b> Already has an appointment <b>Thursday with the skin doctor</b>. Her daughter can't drive her that day. She doesn't have a confirmation number (“I have a card somewhere…”).</p>
-<p class="note">Nudge: “Hello, I have an appointment on Thursday with the skin doctor and my daughter can't take me, can I change it?”</p>
-<p class="x">Books a brand-new appointment as if it were the change (her Thursday one would still stand). Pretends to have moved it. A polite transfer to staff is the expected answer today.</p></section>
-
-<h2>National Scheduler</h2>
-<div class="switch">Click <b>National Scheduler</b> in the left sidebar. Header: <b>TEST CALL · NATIONAL SCHEDULER</b>.</div>
-
-<section class="call" data-id="5"><div class="head"><h3><span class="n">5</span>Dorothy, 77: her knee</h3><div class="res"></div></div>
-<p><b>Who she is.</b> Lives in <b>Overland Park</b> (“that's by Kansas City”). Fell in the garden two weeks ago, the knee still swells. Thinks she came “once, years ago”. Her regular doctor said “get it looked at”, and she doesn't know if that counts as a referral.</p>
-<p class="note">Nudge: “I took a tumble in the garden, oh, two weeks ago now, and my knee's still swollen, my doctor said I ought to get it looked at.”</p>
-<p class="x">Offers a clinic outside the Kansas City area without saying so. Treats “my doctor said get it looked at” as a referral for a visit that requires one, without asking. Books before her yes.</p></section>
-
-<section class="call" data-id="6"><div class="head"><h3><span class="n">6</span>Evelyn, 83: questions first</h3><div class="res"></div></div>
-<p><b>Who she is.</b> Careful. Asks before committing: is there a clinic in <b>Independence</b>, what time does it open, and does anyone there speak Spanish (for her neighbor Lupe). Then books for herself: a <b>cough that won't go away</b>, ten days now. Returning patient.</p>
-<p class="note">Nudge: “Before I book anything, dear, do you have a clinic in Independence? What time do they open?”</p>
-<p class="note">True answers: Independence Community Clinic, 2160 3rd St, Mon–Fri 8:00–17:00. One doctor there speaks Spanish: Dr. Sandra Jernigan (Family Medicine).</p>
-<p class="x">Transfers her to staff for a question. Answers with anything not in the line above (other hours, other doctors). Forgets her cough after the questions.</p></section>
-
-<section class="call" data-id="7"><div class="head"><h3><span class="n">7</span>Ruth, 80: changes her mind</h3><div class="res"></div></div>
-<p><b>Who she is.</b> In <b>Philadelphia</b>. Wants “the woman's check-up, the yearly one” (she won't say “well-woman exam”). Returning patient. When she hears the times, asks <b>what street the clinic is on</b>, then decides <b>afternoons are better</b> after all.</p>
-<p class="note">Nudge: “I'm due for my yearly check-up, the woman's one, you know.” After the first offer: “Which one is that, what street?” then “Oh, actually, could it be in the afternoon?”</p>
-<p class="x">Gives a street that the tool didn't return. Ignores the switch to afternoons. Drops the visit type when she changes the time. Books before her yes.</p></section>
-
-<h2>Reading the logs together</h2>
-<p class="mute">Do all seven, then tell me “done”. I'll read every turn: what she said, what the model sent, what the scheduler decided, and what was spoken.</p>
+<p class="mute" style="margin-top:28px">Two known rough edges, left on purpose, so don't count them as fails. A made-up doctor name ("Dr. Kalem") is matched to sound-alike doctors in other cities, because speech recognition mangles names. A visit refused for lack of a referral doesn't suggest a no-referral alternative (for example "my knee" with no referral). Both are written up in <code>solution.md</code>.</p>
 </main>
 <script>
-const K='prosper-live-calls-real',s=JSON.parse(localStorage.getItem(K)||'{}');
+const K='prosper-live-calls-final',s=JSON.parse(localStorage.getItem(K)||'{}');
 const opts=[['p','Pass','pass'],['e','Rough','extra'],['f','Fail','fail']];
 function paint(){
   let p=0,f=0,e=0,m=0;
   document.querySelectorAll('.call').forEach(c=>{
     const v=(s[c.dataset.id]||{}).r;c.className='call'+(v?' '+v:'');
-    if(v==='pass')p++;if(v==='fail')f++;if(v==='extra')e++;
-    if(+c.dataset.id<=7&&v)m++;
+    if(v==='pass')p++;if(v==='fail')f++;if(v==='extra')e++;if(v)m++;
   });
-  must.textContent=m+'/7';cp.textContent=p;cf.textContent=f;ce.textContent=e;
+  must.textContent=m+'/5';cp.textContent=p;cf.textContent=f;ce.textContent=e;
   localStorage.setItem(K,JSON.stringify(s));
 }
 document.querySelectorAll('.call').forEach(c=>{
@@ -138,6 +146,7 @@ document.querySelectorAll('.call').forEach(c=>{
   opts.forEach(([k,label,v])=>{const b=document.createElement('button');b.className=k;b.textContent=label;
     b.onclick=()=>{s[id].r=s[id].r===v?'':v;paint()};box.append(b)});
 });
+document.querySelectorAll('.say').forEach(el=>el.onclick=()=>navigator.clipboard&&navigator.clipboard.writeText(el.textContent));
 reset.onclick=e=>{e.preventDefault();if(confirm('Clear all results?')){localStorage.removeItem(K);location.reload()}};
 paint();
 </script>
