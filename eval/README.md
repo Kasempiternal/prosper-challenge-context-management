@@ -1323,3 +1323,41 @@ Six unscripted calls, the tester playing elderly callers from character cards (`
 | A grandson's rash with the age lost to speech recognition went to dermatology, refused for lack of a referral, with nothing else offered | Not changed. Alternatives stay within the specialty (round 5 review), and dermatology has none without a referral. Listed as a known limit. |
 
 The dev re-run after these fixes surfaced one more case through JEV variance: nat4-sym-06 ("my 2-year-old only says a few words") got a first answer of 0.79, just under the 0.8 act threshold, so the check settled on New Patient Visit and an adult visit was offered for a toddler. The round 3 rule that re-chooses within a specialty when a choice lands on its default ran only on the act path; it now also runs after the check. Dev and stress sets after all of it, JEV: 0 wrong commits on every dev set, both stress gates PASS.
+
+
+## Unscripted text calls, pilot (2026-10-04)
+
+`eval/sim_calls.py` runs the real agent (gpt-4o, the shipped node prompts and tools, the resolver, the chosen
+disambiguator) against a model that plays the caller, in text only (no speech recognition, no voice, so a call
+is LLM tokens only, about $0.055). Code picks the target from the catalog first (a bookable row the patient is
+allowed to book, plus a few the agent must refuse); gpt-4o-mini then writes a person who half-remembers it
+(10 archetypes: rambling elder, hard of hearing, limited English, distracted parent, forgetful, impatient...).
+30% of calls get crude speech-recognition noise (names lose a vowel, no punctuation). Frozen targets and
+personas: `eval/sim_calls/pilot_targets.jsonl`; results and transcripts: `pilot_jev.*`, `pilot_none.*`.
+`pilot0_*` is the first run, kept: its personas literally said "a vague complaint" and "a shot", so staff
+handoff was often the right answer; the persona prompt and the scoring were fixed (same targets, same seed).
+
+20 calls (10 SF, 10 national, 2 the agent must refuse), same calls in both modes:
+
+| Mode | Right | Wrong | Safe (no booking) | Stuck |
+|---|---|---|---|---|
+| JEV | 7 | 4 | 8 | 1 |
+| Off (rules only) | 3 | 4 | 11 | 2 |
+
+JEV books the target in more than twice as many calls (7 against 3) at the same number of wrong bookings.
+Reading all four JEV "wrong" calls: none is a clear agent error. `national-07` (a back problem, target "new
+patient consultation"), `national-10` (spots on the face, target "acne consultation") and `sf-13` (the persona
+wrote "my kids" for an adult "annual physical") are labels the caller's words cannot determine: the agent's
+choice was reasonable. `national-06` is a caller who did not know the city and said yes to "Winter Park,
+Florida". So the automatic score overstates wrong bookings; a person has to read the wrong ones.
+
+Faults in the agent this found (not fixed; pilot only):
+- `sf-15`: "I need a shot" at Mission Bay gets "What's the visit for?" twenty times in both modes. The agent never
+  changes its question or hands over. `sf-05` and `sf-15` differ only in wording.
+- A forced-choice question the caller cannot answer ("vaccination or flu shot?") repeats until a handoff.
+- Doctor described without a name ("the lady doctor", "the tall friendly guy") often ends in "which doctor was
+  that?" and a request to spell the last name.
+
+Limits of the pilot: 20 calls is a smoke test, not a rate; the caller model is more cooperative than people;
+targets whose lay description fits several visit types should be left out of the next set. Spend: about $3.4
+(gpt-4o agent for 60 calls, gpt-4o-mini callers and personas, JEV fractions of a cent).

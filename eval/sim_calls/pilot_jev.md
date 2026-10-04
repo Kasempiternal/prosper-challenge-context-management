@@ -1,0 +1,442 @@
+# pilot_jev
+
+
+## national-06: WRONG (visit 'knee injury evaluation' != 'follow-up visit'; place 'Winter Park' != 'Santa Clara')
+
+Target: follow-up visit with Dr. Diann Compton at Santa Clara; returning, no referral; kind normal. Caller: Linda, a forgetful person who cannot remember the doctor's name and describes them instead. Noisy speech: True.
+
+- **agent**: Hello, how can I assist you with scheduling an appointment today?
+- **caller**: Hi, um, I need to see the doctor about my knee. It’s been acting up, and I just want to make sure it’s nothing serious.   (agent heard: hi um i need to see the doctor about my knee it’s been acting up and i just want to make sure it’s nothing serious)
+- **agent**: One moment.
+- **agent**: Which city are you in?
+- **caller**: I’m in the area near that big park, you know, the one with the playground.   (agent heard: i’m in the area near that big park you know the one with the playground)
+- **agent**: Sorry, which location was that?
+- **caller**: It's around Highland Ave, somewhere near the park.   (agent heard: it's around highland ave somewhere near the park)
+- **agent**: One moment.
+- **agent**: Did you mean Winter Park, Florida?
+- **caller**: Uh, yes, I guess that's it. Winter Park works for me.   (agent heard: uh yes i guess that's it wonter purk works for me)
+- **agent**: Is that an orthopedic consultation or a knee injury evaluation?
+- **caller**: Um, I think it’s just a check-up for my knee, not exactly sure about the terms.   (agent heard: um i think it’s just a check-up for my knee not exactly sure about the terms)
+- **agent**: One moment.
+- **agent**: Is that an orthopedic consultation or a knee injury evaluation?
+- **caller**: Oh, um, I’m not sure what the difference is, but I just need to see the doctor about my knee.   (agent heard: oh um i’m not sure what the difference is but i just need to see the doctor about my knee)
+- **agent**: One moment.
+- **agent**: Is that an orthopedic consultation or a knee injury evaluation?
+- **caller**: I, um, I just want to make sure it’s nothing serious with my knee, so maybe a knee injury evaluation?   (agent heard: i um i just want to make sure it’s nothing serious with my knee so maybe a knee injury evaluation)
+- **agent**: For a knee injury evaluation, Dr. Diana Ferguson has today at 11 or Friday at 8 at Winter Park and Dr. Sandy Adams has tomorrow at 7:30 at Downtown. Which works best?
+- **caller**: Oh, um, I wanted to see the lady doctor who works near the park. I think that's Dr. Ferguson. Could I have a time next week instead?   (agent heard: ah um i wanted to see the lady doctor who works near the purk i think that's dr fergason could i have a time next week instead)
+- **agent**: For a knee injury evaluation, Dr. Diana Ferguson has Tuesday at 8:30, Wednesday the 14th at 8:30, or Friday the 16th at 8 at Winter Park. Which works best?
+- **caller**: Um, could I do Tuesday at 8:30? That works for me.   (agent heard: um could i do tuesday at 8:30 that works for me)
+- **agent**: Okay, a knee injury evaluation with Dr. Diana Ferguson, Tuesday at 8:30 at Winter Park. Shall I book it?
+- **caller**: Yes, please book that for me.   (agent heard: yes please book that for me)
+- **agent**: You're all booked. Your confirmation is H, 2, 6, 7, 7. Is there anything else I can help with?
+- **caller**: No, that's all I needed. Thank you! Goodbye!   (agent heard: no that's all i needed thank you goodbye)
+- **agent**: Thank you for calling, take care, and goodbye!
+
+## national-07: WRONG (visit 'back pain evaluation' != 'new patient consultation')
+
+Target: new patient consultation with Dr. Sandra Halverson at Hollywood; new, no referral; kind normal. Caller: Jessica, a chatty person who goes off topic and has to be brought back. Noisy speech: True.
+
+- **agent**: Hello, how can I assist you in booking an appointment today?
+- **caller**: Hi there! I’d like to book an appointment to get my back checked out. It’s been bothering me a bit, and I think it’s time to see someone about it!   (agent heard: hi there i’d like to book in appointment to get my back checked out it’s been bothering me a bit and i think it’s time to see someone about it)
+- **agent**: One moment.
+- **agent**: Which city are you in?
+- **caller**: I’m in Los Angeles, but I'm looking for a clinic in Hollywood, I think.   (agent heard: i’m in los angules but i'm looking for a clinic in hollywood i think)
+- **agent**: One moment.
+- **agent**: For a back pain evaluation, Dr. Young Ko has today at 11 or Monday at 9:30 at Hollywood and Dr. Christopher Grantham has tomorrow at 8 at Hollywood. Which works best?
+- **caller**: I think I’d prefer to see Dr. Young Ko on Monday at 9:30! That sounds perfect for me.   (agent heard: i think i’d prefer to see dr yaung ki on monday at 9:30 that sounds perfect for me)
+- **agent**: Okay, a back pain evaluation with Dr. Young Ko, Monday at 9:30 at Hollywood. Shall I book it?
+- **caller**: Yes, please! That works great for me.   (agent heard: yes please that works great for me)
+- **agent**: You're all booked. Your confirmation is H, 8, 9, 6, 2. Is there anything else I can help with?
+- **caller**: Nope, that’s all I needed! Thanks so much for your help! Goodbye!   (agent heard: nope that’s all i needed thanks so much for your help goodbye)
+- **agent**: Thank you for calling, and have a great day! Goodbye!
+
+## national-10: WRONG (visit 'dermatology consultation' != 'acne consultation')
+
+Target: acne consultation with Dr. Michelle Limon at Alameda; new, referral; kind normal. Caller: Eleanor Smith, an 80-year-old who rambles and tells small stories before getting to the point. Noisy speech: False.
+
+- **agent**: Hello! How can I help you with booking today?
+- **caller**: Hello there! I need to see Dr. Michelle Limon for some spots that have been popping up on my face. It's really been bothering me, you know?
+- **agent**: One moment.
+- **agent**: Do you have a referral for a dermatology consultation?
+- **caller**: Yes, I have a referral from my neighbor who said Dr. Limon is very nice and works with a lot of older folks.
+- **agent**: For a dermatology consultation, Dr. Michelle Limon has tomorrow at 8, Friday at 8, or Tuesday at 8:30 at Alameda. Which works best?
+- **caller**: Oh, I think Tuesday at 8:30 would work best for me. I like to keep my mornings clear for gardening!
+- **agent**: Okay, a dermatology consultation with Dr. Michelle Limon, Tuesday at 8:30 at Alameda. Shall I book it?
+- **caller**: Yes, please book it! That sounds perfect.
+- **agent**: You're all booked. Your confirmation is H, 2, 5, 4, 9. Is there anything else I can help with?
+- **caller**: No, that's all I needed. Thank you so much! Goodbye!
+- **agent**: You're welcome, and goodbye!
+
+## sf-13: WRONG (visit 'well-child visit' != 'annual physical')
+
+Target: annual physical with Dr. David Johnson at Downtown; returning, no referral; kind normal. Caller: Emily, a busy parent, distracted by kids in the background, answers in fragments. Noisy speech: True.
+
+- **agent**: Hello! How can I help you with your appointment needs today?
+- **caller**: Hi! I need to get my kids in for their check-up, you know, the regular visit. It's been a year, I think?   (agent heard: hi i need to get my kids in for their check-up you know the regular visit it's been a year i think)
+- **agent**: One moment.
+- **agent**: For a well-child visit, Dr. Priya Williams has today at 11 at Downtown, Dr. Michael Chen has tomorrow at 8 at Downtown, and Dr. Maria Garcia has Friday at 8 at Mission Bay. Which works best?
+- **caller**: Um, I want the doctor my neighbor recommended, he's the tall, friendly guy downtown. Is that Dr. Chen?   (agent heard: um i want the doctor my neighbor recommended he's the tall friendly guy downtewn is that dr chan)
+- **agent**: For a well-child visit, Dr. Michael Chen has today at 11:30, tomorrow at 8, or Tuesday at 8:30 at Downtown. Which works best?
+- **caller**: Okay, um, I think tomorrow at 8 works best for us.   (agent heard: okay um i think tomorrow at 8 works best for us)
+- **agent**: Okay, a well-child visit with Dr. Michael Chen, tomorrow at 8 at Downtown. Shall I book it?
+- **caller**: Yes, please! That sounds good.   (agent heard: yes please that sounds good)
+- **agent**: You're all booked. Your confirmation is H, 2, 9, 9, 1. Is there anything else I can help with?
+- **caller**: No, that's it. Thank you! Goodbye!   (agent heard: no that's it thank you goodbye)
+- **agent**: Thank you for calling and have a great day, goodbye!
+
+## national-01: RIGHT (refused or handed over, as it had to)
+
+Target: joint injection with Dr. Karan Kalra at Hialeah; returning, no referral; kind no_referral. Caller: Mabel Johnson, a hard-of-hearing elder who often says 'what?' and needs things repeated. Noisy speech: True.
+
+- **agent**: Hello! How can I assist you in booking an appointment today?
+- **caller**: Hi, um, I need to see Dr. Karan. You know, the one my neighbor talked about? My knee's been hurting.   (agent heard: hi um i need to see dr karan you know the one my neighbor talked about my knee's been hurting)
+- **agent**: One moment.
+- **agent**: Is that Denver, Houston, or Miami?
+- **caller**: No, no, I need to go to the place on Main Street, the big clinic.   (agent heard: no no i need to go to the place on miin street the big clinic)
+- **agent**: One moment.
+- **agent**: Is that Denver or Miami?
+- **caller**: I’m not sure about Denver, but I need the place in Miami on Main Street.   (agent heard: i’m not sure about denver but i need the place in miomi on main street)
+- **agent**: Sorry, I still need to know which one: Denver or Miami? Or tell me your ZIP code.
+- **caller**: Oh, it's Miami, yes. I’ve been living here for over 30 years.   (agent heard: eh it's miami yes i’ve been living here for over 30 years)
+- **agent**: One moment.
+- **agent**: I don't see any openings for a knee injury evaluation in the next three weeks with those preferences. Want me to try other days?
+- **caller**: No, that’s not what I wanted. I need to see Dr. Karan for my knee, you know, soon. Can you try again?   (agent heard: no that’s not what i wanted i need to see dr karan for my knee you know soon can you try again)
+- **agent**: I don't see any openings for a knee injury evaluation in the next three weeks with those preferences. Want me to try other days?
+- **caller**: Oh dear, I just want to see Dr. Karan for my knee. If there’s no openings, maybe you can transfer me?   (agent heard: uh dear i just want to see dr karan for my knee if there’s no openings maybe you can transfer me)
+- **agent**: I am passing you to a member of the clinic staff who can help. Goodbye.
+
+## national-04: RIGHT (booked the target (doctor not named by the caller: Dr. Heather Cavallo))
+
+Target: nutrition counseling with Dr. Folake Olawale at Longwood; returning, no referral; kind normal. Caller: Emily Carter, an anxious person who over-explains symptoms and apologises a lot. Noisy speech: True.
+
+- **agent**: Hello! What can I help you book today?
+- **caller**: Hi! I was hoping to talk to someone about my eating habits, you know, just to make sure I'm on the right track?   (agent heard: hi i was hoping to talk to someone about my eating habits you know just to make sure i'm on the right track)
+- **agent**: One moment.
+- **agent**: Which city are you in?
+- **caller**: I'm in Boston.   (agent heard: i'm in boston)
+- **agent**: One moment.
+- **agent**: Do you have a referral for an eating disorder evaluation?
+- **caller**: Oh, I don’t have a referral or anything. I’m a returning patient, though!   (agent heard: uh i don’t have a referral or anything i’m a returning patient though)
+- **agent**: An eating disorder evaluation needs a referral first. Once you have one, we can book it.
+- **caller**: Oh, I see. I didn't mean to cause any confusion. I was just hoping to get some guidance on my eating habits. Is there a different type of appointment I could schedule instead?   (agent heard: oh i see i didn't mean to cause any confusion i was just hoping to get some guidance on my eating habits is there a different type of appointment i could schedule instead)
+- **agent**: One moment.
+- **agent**: For a new patient visit, Dr. George Kamali has today at 11 at Back Bay, Dr. Usha Pandey has tomorrow at 7 at Newton, and Dr. Orville Fowler has Friday at 7 at South End. Which works best?
+- **caller**: Um, could you tell me if Dr. Pandey is the one my neighbor mentioned? I think she might be the one who helped with something similar.   (agent heard: um could you tell me if dr pandey is the one my neighbor mentioned i think she might be the one who helped with something similar)
+- **agent**: Dr. Usha Pandey is a pediatrics specialist at Newton. She speaks English, Hindi, and Mandarin.
+- **caller**: Oh, that’s not what I wanted. I’m looking for someone who can help with nutrition and eating habits, not pediatrics. Is there someone else available who can help with that?   (agent heard: ah that’s not what i wanted i’m looking for someone who can help with nutrition and eating habits not pediatrics is there someone else available who can help with that)
+- **agent**: For a new patient visit, Dr. George Kamali has today at 11 at Back Bay, Dr. Usha Pandey has tomorrow at 7 at Newton, and Dr. Orville Fowler has Friday at 7 at South End. Which works best?
+- **caller**: Um, I think I need someone who can specifically talk about eating habits, not a pediatrician. I’m sorry, but none of those options seem like the right fit for me.   (agent heard: um i think i need someone who can specifically talk about eating habits not a pediatrician i’m sorry but none of those options seem like the right fit for me)
+- **agent**: What's the visit for?
+- **caller**: I just want to discuss my eating habits and get some guidance on nutrition, if that's possible.   (agent heard: i just want to discuss my eating habits and get some guidance on nutrition if that's possible)
+- **agent**: One moment.
+- **agent**: For a nutrition counseling, Dr. Heather Cavallo has today at 11 at Longwood, Dr. Katrina Etienne has tomorrow at 7 at South End, and Dr. Orville Fowler has Friday at 7 at South End. Which works best?
+- **caller**: Oh, Dr. Cavallo sounds like a great option! I can do today at 11 at Longwood.   (agent heard: uh dr cavillo sounds like a great option i can du today at 11 at longwoud)
+- **agent**: Okay, a nutrition counseling with Dr. Heather Cavallo, today at 11 at Longwood. Shall I book it?
+- **caller**: Yes, please! That sounds perfect.   (agent heard: yes please that sounds perfect)
+- **agent**: You're all booked. Your confirmation is H, 0, 6, 8, 4. Is there anything else I can help with?
+- **caller**: No, that’s all. Thank you so much for your help! Goodbye!   (agent heard: no that’s all thank you so much for your help goodbye)
+- **agent**: Thank you for calling, and have a great day. Goodbye!
+
+## national-11: SAFE (no booking, handed to staff)
+
+Target: STI testing with Dr. Farhad Ansari at Central West End; returning, no referral; kind normal. Caller: Evelyn, a hard-of-hearing elder who often says 'what?' and needs things repeated. Noisy speech: False.
+
+- **agent**: Hello, thank you for calling. How may I assist you with booking today?
+- **caller**: Hello, um, I need to come in for that test, you know, the one about private stuff. It's important, you see.
+- **agent**: One moment.
+- **agent**: What's the visit for?
+- **caller**: It's for that test, the one my neighbor recommended. I want to see that nice man at the clinic on Broadway in the Central West End.
+- **agent**: One moment.
+- **agent**: I can't book a blood draw with that doctor. I can book Dr. Carina Reddy at Central West End or Dr. Shannon Love at Central West End. Would either of those work?
+- **caller**: No, that is not what I wanted. I want to see that friendly man my neighbor told me about.
+- **agent**: Is that a blood draw or a lipid panel?
+- **caller**: I don't remember the exact names. It's, um, for private stuff, like my neighbor said.
+- **agent**: One moment.
+- **agent**: Is that a blood draw or a lipid panel?
+- **caller**: I’m not sure, I just know it’s important. I want to see that nice man at the clinic.
+- **agent**: I can't book a blood draw with that doctor. I can book Dr. Carina Reddy at Central West End or Dr. Shannon Love at Central West End. Would either of those work?
+- **caller**: No, that is not what I wanted. I need to see that friendly man my neighbor recommended.
+- **agent**: I'll pass you to a clinic staff member who can help you. Goodbye.
+
+## national-12: SAFE (no booking, handed to staff)
+
+Target: urgent care visit with Dr. Mark Chou at Inglewood; returning, referral; kind normal. Caller: Carlos Martinez, a Spanish speaker with limited English: short sentences, a few wrong words. Noisy speech: True.
+
+- **agent**: Hello! How can I assist you with booking an appointment today?
+- **caller**: Hello. I need see doctor for chest pain. It's bad.   (agent heard: hello i need see doctor for chest pain it's bad)
+- **agent**: One moment.
+- **agent**: Which city are you in?
+- **caller**: Inglewood.   (agent heard: inglewood)
+- **agent**: One moment.
+- **agent**: Do you have a referral for a cardiology consultation?
+- **caller**: Yes, I have referral from other doctor.   (agent heard: yes i have referral from other doctor)
+- **agent**: For a cardiology consultation, Dr. Doyle Ruth has today at 11:20 at Inglewood and Dr. Nathan Takagi has Friday at 8 or Monday at 8 at Inglewood. Which works best?
+- **caller**: No, that is not what I want. I want Dr. Mark Chou, he is nice.   (agent heard: no that is not what i want i want dr mark choi ho is nice)
+- **agent**: I can't book a cardiology consultation with that doctor. I can book Dr. Nathan Takagi at Inglewood or Dr. Doyle Ruth at Inglewood. Would either of those work?
+- **caller**: No, I want Dr. Mark Chou. Please help me see him.   (agent heard: no i want dr mark choi please help me see him)
+- **agent**: I am passing you to a member of the clinic staff who can help with this request. Goodbye.
+
+## national-14: SAFE (no booking, handed to staff)
+
+Target: IUD insertion with Dr. Nellie Palmore at Soulard; returning, no referral; kind normal. Caller: Emily Johnson, an anxious person who over-explains symptoms and apologises a lot. Noisy speech: True.
+
+- **agent**: Hello! How can I assist you with booking an appointment today?
+- **caller**: Hi, I’m sorry to bother you, but I really need to schedule an appointment for something kind of personal. It’s for, um, something to do with my lady parts. I just want to make sure everything is okay.   (agent heard: hi i’m sorry to bother you but i really need to schedule an appointment for something kind of personal it’s for um something to do with my lady parts i just want to make sure everything is okay)
+- **agent**: One moment.
+- **agent**: Which city are you in?
+- **caller**: I'm in, um, St. Louis. I remember the clinic is near that big park, Soulard, right?   (agent heard: i'm in um st louis i remember the clinic is near that big park soulard right)
+- **agent**: One moment.
+- **agent**: Is that an OB/GYN new patient visit or an annual well-woman exam?
+- **caller**: Um, I think it's more like an OB/GYN visit, but I'm a returning patient, so I don’t think I need to be classified as a new patient.   (agent heard: um i think it's more like an ob/gyn visit but i'm a returning patient so i don’t think i need to be classified as a new patient)
+- **agent**: For an OB/GYN new patient visit, Dr. Marcella Bumgarner has today at 11:20 or tomorrow at 8 at Clayton and Dr. Nicole Owusu has Friday at 9 at Downtown. Which works best?
+- **caller**: Oh, um, I don’t think that's quite what I wanted. I was hoping to see a female doctor, and I’m not sure about traveling to Clayton or Downtown. I really just want to schedule something at the clinic near Soulard.   (agent heard: oh um i don’t think that's quite what i wanted i was hoping to see a female doctor and i’m not sure about traveling to clayton or downtown i really just want to schedule something at the clinic near soilard)
+- **agent**: We can't do an OB/GYN new patient visit at Soulard. I can book Dr. Nicole Owusu at Downtown or Dr. Marcella Bumgarner at Central West End. Would either of those work?
+- **caller**: I appreciate it, but that’s still not what I wanted. I really want a female doctor at the clinic near Soulard, if that's possible. I’m feeling pretty anxious about this.   (agent heard: i appreciate it but that’s still not what i wanted i really want a female doctor at the clinic near soulard if that's possible i’m feeling pretty anxious about this)
+- **agent**: I'll transfer you to a clinic staff member who can help with your request. Goodbye.
+
+## national-16: SAFE (no booking, handed to staff)
+
+Target: follow-up visit with Dr. Karin Betts at NoDa; returning, no referral; kind normal. Caller: Mary Johnson, a forgetful person who cannot remember the doctor's name and describes them instead. Noisy speech: True.
+
+- **agent**: Hello, how can I help you today?
+- **caller**: Hi there! I need to see the doctor about my knee. It's been bothering me since the last time I came in.   (agent heard: hi there i need to see the doctor about my knee it's been bothering me since the last time i came in)
+- **agent**: One moment.
+- **agent**: Which city are you in?
+- **caller**: I'm in Charlotte.   (agent heard: i'm in charlotte)
+- **agent**: One moment.
+- **agent**: Is that an orthopedic consultation or a knee injury evaluation?
+- **caller**: Um, I think it's more of a consultation. Just need to see the doctor about my knee.   (agent heard: um i think it's more of a consultation just need to see the doctor about my knee)
+- **agent**: One moment.
+- **agent**: Do you have a referral for an orthopedic consultation?
+- **caller**: I’m not sure about a referral. I just want to see the female doctor at that clinic near the coffee shop.   (agent heard: i’m not sure about a referral i just want to see the female doctor at that clinic near the coffee shop)
+- **agent**: Which city are you in?
+- **caller**: I'm in Charlotte.   (agent heard: i'm in charlotte)
+- **agent**: I can't book an orthopedic consultation with that doctor. I can book Dr. Suresh Dubey at Uptown or Dr. Ernest Horner at South End. Would either of those work?
+- **caller**: Oh, no, that's not what I wanted. I need to see that nice female doctor at the place near Elm Street in NoDa.   (agent heard: ih no that's not what i wanted i need to see that nice female doctor at the place near elm street in noda)
+- **agent**: I can't book an orthopedic consultation with that doctor. I can book Dr. Suresh Dubey at NoDa or Dr. Randall Quiroz at NoDa. Would either of those work?
+- **caller**: No, that's not what I wanted either. I really need to see that female doctor, you know?   (agent heard: no that's not what i wanted either i really need to see that female doctor you know)
+- **agent**: I'll pass you to a member of the clinic staff who can help you further. Goodbye!
+
+## sf-00: SAFE (no booking, caller left)
+
+Target: telehealth follow-up with Dr. Michael Sato at Richmond; returning, referral; kind normal. Caller: Harold Thompson, an 80-year-old who rambles and tells small stories before getting to the point. Noisy speech: True.
+
+- **agent**: Hello! How can I assist you with booking an appointment today?
+- **caller**: Oh, hello there! You see, I’ve been dealing with this awful cough, much like an old friend that just won’t leave. I think I need to have someone take a look at it.   (agent heard: oh hello there you see i’ve been dealing with this awful cough much like an old friend that just won’t leave i think i need to have someone take a look at it)
+- **agent**: One moment.
+- **agent**: For a sick visit, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Mission Bay, or Friday at 8 at Mission Bay. Which works best?
+- **caller**: Oh dear, that’s not quite the doctor I was hoping to see. I was told about a fellow down on Bryant Street, you know, the one my neighbor raved about. Do you have any openings with him?   (agent heard: oh dear that’s not quite the doctor i was hoping to see i was told about a fellow down on bryant street you know the one my neighbor raved about do you have any openings with him)
+- **agent**: Sorry, which doctor was that?
+- **caller**: Oh, I can’t quite remember his name, but I know he works at that clinic on Bryant Street. He’s supposed to be a gentle fellow who really listens.   (agent heard: oh i can’t quite remember his name but i know he works at that clinic on bryant street he’s supposed to be a gentle fellow who really listens)
+- **agent**: Could you spell the doctor's last name for me?
+- **caller**: Oh, I’m afraid I don’t recall the last name at all. I just know he’s at that lovely place on Bryant Street, which has those big trees lining it.   (agent heard: oh i’m afraid i don’t recall the last name at all i just know he’s at that lovely place on bryant street which has those big trees lining it)
+- **agent**: Is that North Gate at 944 Bryant or Richmond at 4671 Bryant?
+- **caller**: Ah, yes! I believe it's Richmond at 4671 Bryant. That's the one!   (agent heard: ah yes i believe it's rechmond at 4671 bryant that's the one)
+- **agent**: For a sick visit, Dr. Maria Garcia has today at 11, tomorrow at 8, or Friday at 8 at Richmond. Which works best?
+- **caller**: Oh, I see we’re back to Dr. Garcia. I appreciate it, but that’s not the doctor I was hoping to visit. I really want to see the one my neighbor recommended.   (agent heard: oh i see we’re back to dr garcia i appreciate it but that’s not the doctor i was hoping to visit i really want to see the one my neighbor recommended)
+- **agent**: For a sick visit, Dr. Maria Garcia has today at 11, tomorrow at 8, or Friday at 8 at Richmond. Which works best?
+- **caller**: I understand, but I’m really looking for that other doctor at Richmond, the one with the kind demeanor. I’d prefer to wait for an appointment with him.   (agent heard: i understand but i’m really looking for that other doctor at richmond the one with the kind demeanor i’d prefer to wait for an appointment with him)
+- **agent**: For a sick visit, Dr. Maria Garcia has today at 11, tomorrow at 8, or Friday at 8 at Richmond. Which works best?
+- **caller**: Well, it seems we’re going in circles here. I think I’ll have to give up on this for now. Thank you for your help!   (agent heard: well it seems we’re going in circles here i think i’ll have to give up on this for now thank you for your help)
+- **agent**: You're welcome. If you need further assistance, please feel free to reach out. Have a good day!
+
+## sf-02: RIGHT (booked the target)
+
+Target: sick visit with Dr. Michael Sato at Sunset; returning, no referral; kind normal. Caller: Carlos Mendoza, a Spanish speaker with limited English: short sentences, a few wrong words. Noisy speech: True.
+
+- **agent**: Hello! How can I assist you in booking an appointment today?
+- **caller**: Hello! I need a visit. I feel un buen poco mal. My head hurts a lot.   (agent heard: hello i need a visit i feel un buen poco mal my head hurts a lot)
+- **agent**: One moment.
+- **agent**: For a sick visit, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Mission Bay, or Friday at 8 at Mission Bay. Which works best?
+- **caller**: No, that is not what I wanted. I want Dr. Michael Sato at the clinic in Sunset on Geary Blvd.   (agent heard: no that is not what i wanted i want dr michael sato at the clinic in sunset on geary blvd)
+- **agent**: Have you been seen at one of our clinics before?
+- **caller**: Yes, I am a returning patient.   (agent heard: yes i am a returning patient)
+- **agent**: For a sick visit, Dr. Michael Sato has tomorrow at 8:40, Friday at 8, or Monday at 8 at Sunset. Which works best?
+- **caller**: I can come tomorrow at 8:40. Yes, that works.   (agent heard: i can come tomorrow at 8:40 yes that works)
+- **agent**: Okay, a sick visit with Dr. Michael Sato, tomorrow at 8:40 at Sunset. Shall I book it?
+- **caller**: Yes, please book it.   (agent heard: yes please book it)
+- **agent**: You're all booked. Your confirmation is H, 4, 6, 2, 4. Is there anything else I can help with?
+- **caller**: No, that is all. Thank you! Goodbye!   (agent heard: no that is all thank you goodbye)
+- **agent**: Thank you for calling. Goodbye and take care!
+
+## sf-03: RIGHT (offered an allowed alternative: well-child visit with Dr. Maria Garcia)
+
+Target: new patient visit with Dr. Patricia Hernandez at Mission Bay; new, no referral; kind no_new. Caller: Emma Johnson, a busy parent, distracted by kids in the background, answers in fragments. Noisy speech: False.
+
+- **agent**: Hello! How can I help you with your appointment booking today?
+- **caller**: Hi! I need to get my son checked out, just a basic visit to make sure he's good.
+- **agent**: One moment.
+- **agent**: For a well-child visit, Dr. Priya Williams has today at 11 at Downtown, Dr. Michael Chen has tomorrow at 8 at Downtown, and Dr. Maria Garcia has Friday at 8 at Mission Bay. Which works best?
+- **caller**: Um, I need the one in Mission Bay. When's the next available time after 8?
+- **agent**: For a well-child visit, Dr. Maria Garcia has tomorrow at 8:30, Friday at 8, or Wednesday the 14th at 8 at Mission Bay. Which works best?
+- **caller**: Um, I guess tomorrow at 8:30 works.
+- **agent**: Okay, a well-child visit with Dr. Maria Garcia, tomorrow at 8:30 at Mission Bay. Shall I book it?
+- **caller**: Yes, please book it!
+- **agent**: You're all booked. Your confirmation is H, 1, 1, 6, 6. Is there anything else I can help with?
+- **caller**: No, that's all. Thanks! Goodbye!
+- **agent**: Thank you for calling, and have a great day! Goodbye!
+
+## sf-05: SAFE (no booking, handed to staff)
+
+Target: vaccination with Dr. Elizabeth Nguyen at North Beach; returning, no referral; kind normal. Caller: Jordan, a terse young adult who answers in as few words as possible. Noisy speech: True.
+
+- **agent**: Hello! What can I help you book today?
+- **caller**: I need to schedule a shot with the female doctor at the North Beach clinic for next week.   (agent heard: i need to schedule a shot with the female doctor at the north boach clinic for next week)
+- **agent**: One moment.
+- **agent**: Sorry, which doctor was that?
+- **caller**: The female doctor my neighbor recommended.   (agent heard: the female doctor my neighbor recommended)
+- **agent**: Could you spell the doctor's last name for me?
+- **caller**: I don't remember the last name. Can you just check for the female doctor who works with families?   (agent heard: i don't remember the last name can you just check for the female doctor who works with families)
+- **agent**: I'm passing you to a member of our clinic staff who can help. Goodbye!
+
+## sf-08: SAFE (no booking, handed to staff)
+
+Target: medication review with Dr. Andre Patel at North Gate; returning, no referral; kind normal. Caller: Jessica Reynolds, a person who changes their mind about the day or time halfway through. Noisy speech: False.
+
+- **agent**: Hello! How can I assist you with booking an appointment today?
+- **caller**: Hi! I need to schedule an appointment to talk about my meds. I think it was with Dr. Patel.
+- **agent**: One moment.
+- **agent**: Have you been seen at one of our clinics before?
+- **caller**: Yeah, I have been to your clinic before.
+- **agent**: Which Dr. Patel is it? Do you know the first name?
+- **caller**: I think it's just Dr. Patel. My neighbor saw him and said he was really nice.
+- **agent**: Which Dr. Patel is it? Do you know the first name?
+- **caller**: I don't know his first name, but I know he’s in his forties, I think.
+- **agent**: Which Dr. Patel is it? Do you know the first name?
+- **caller**: I'm sorry, I really don't know his first name. I just want to see him if that's okay.
+- **agent**: For a medication review, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Mission Bay, or Friday at 8 at Richmond. Which works best?
+- **caller**: Oh, that’s not what I wanted. I was hoping to see Dr. Patel.
+- **agent**: Which Dr. Patel is it? Do you know the first name?
+- **caller**: I really don’t know his first name. Can I just schedule with him?
+- **agent**: For a medication review, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Mission Bay, or Friday at 8 at Richmond. Which works best?
+- **caller**: That’s not what I wanted, I'm looking for Dr. Patel.
+- **agent**: Which Dr. Patel is it? Do you know the first name?
+- **caller**: I wish I could help with that, but I just don’t know his first name. Can I still talk to him?
+- **agent**: I'll connect you with our clinic staff who can assist you further. Goodbye!
+
+## sf-09: SAFE (no booking, handed to staff)
+
+Target: urgent care visit with Dr. Wei Chen at Mission Bay; returning, no referral; kind normal. Caller: Jessica, an impatient person who gets short with questions. Noisy speech: False.
+
+- **agent**: Hello, this is the multi-specialty clinic. What can I help you book today?
+- **caller**: I need to see a doctor for a cough that's been bothering me.
+- **agent**: One moment.
+- **agent**: For a sick visit, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Mission Bay, or Friday at 8 at Mission Bay. Which works best?
+- **caller**: That's not what I want. I need to see Dr. Chen at the place on Main Street.
+- **agent**: Do you mean Dr. Wei Chen or Dr. Lucas Chen?
+- **caller**: Dr. Chen, the older one. I just need to be seen for my cough today.
+- **agent**: One moment.
+- **agent**: Do you mean Dr. Wei Chen or Dr. Lucas Chen?
+- **caller**: I mean Dr. Chen, the one my neighbor saw. Can you get me an appointment today?
+- **agent**: One moment.
+- **agent**: Do you mean Dr. Wei Chen or Dr. Lucas Chen?
+- **caller**: I said Dr. Chen. I just need to see him today for my cough.
+- **agent**: One moment.
+- **agent**: Do you mean Dr. Wei Chen or Dr. Lucas Chen?
+- **caller**: I don’t have time for this. Just check if Dr. Chen is available today for my cough.
+- **agent**: I'll pass you to a member of the clinic staff who can help. Goodbye.
+
+## sf-15: STUCK (no booking after the turn limit)
+
+Target: vaccination with Dr. Lucas Chen at Mission Bay; new, no referral; kind normal. Caller: Alex, a terse young adult who answers in as few words as possible. Noisy speech: False.
+
+- **agent**: Hi there! How can I assist you in booking an appointment today?
+- **caller**: I need to schedule a shot at the clinic in Mission Bay.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+- **caller**: It's for a shot.
+- **agent**: What's the visit for?
+
+## sf-17: RIGHT (booked the target (doctor not named by the caller: Dr. Maria Garcia))
+
+Target: sick visit with Dr. Carlos Garcia at North Beach; new, no referral; kind normal. Caller: Linda, a chatty person who goes off topic and has to be brought back. Noisy speech: True.
+
+- **agent**: Hello, thank you for calling our clinic group. What can I help you book today?
+- **caller**: Hi there! I’m looking to see a doctor because I’ve been feeling a bit under the weather lately. I think it might just be something minor, but I’d like to get it checked out.   (agent heard: hi there i’m looking to see a doctor because i’ve been feeling a bit under the weather lately i think it might just be something minor but i’d like to get it checked out)
+- **agent**: One moment.
+- **agent**: For a sick visit, Dr. Maria Garcia has today at 11 at Richmond, tomorrow at 8 at Mission Bay, or Friday at 8 at Mission Bay. Which works best?
+- **caller**: Oh, I was hoping to see Dr. Garcia in the North Beach area, you know, over on Mission St? Is that an option?   (agent heard: oh i was hoping to see dr garcii in the north beich area you know over on mission st is that an option)
+- **agent**: Do you mean Dr. Maria Garcia or Dr. Carlos Garcia?
+- **caller**: Oh, I think it’s Dr. Maria Garcia that my neighbor mentioned. She’s the one who’s good with kids, right?   (agent heard: oh i think it’s dr maria garcia that my neighbor mentioned she’s the one who’s good with kids right)
+- **agent**: For a sick visit, Dr. Maria Garcia has Tuesday at 8:20, Thursday the 15th at 8:20, or Tuesday the 27th at 8 at North Beach. Which works best?
+- **caller**: Oh, let’s go with Tuesday the 27th at 8 at North Beach! That sounds perfect.   (agent heard: oh let’s go with tuesday the 27th at 8 at nurth beach that sounds perfect)
+- **agent**: Okay, a sick visit with Dr. Maria Garcia, Tuesday the 27th at 8 at North Beach. Shall I book it?
+- **caller**: Yes, please book that!   (agent heard: yes please book that)
+- **agent**: You're all booked. Your confirmation is H, 0, 4, 3, 1. Is there anything else I can help with?
+- **caller**: No, that’s all I needed. Thank you so much! Goodbye!   (agent heard: no that’s all i needed thank you so much goodbye)
+- **agent**: Thank you for calling, and have a wonderful day! Goodbye!
+
+## sf-18: RIGHT (booked the target)
+
+Target: annual physical with Dr. Michael Chen at North Beach; returning, no referral; kind normal. Caller: Lisa Johnson, a person who changes their mind about the day or time halfway through. Noisy speech: True.
+
+- **agent**: Hello! How can I assist you with your appointment needs today?
+- **caller**: Hi there! I need to schedule my annual check-up with Dr. Michael Chen.   (agent heard: hi there i need to schedule my annual check-up with dr michael chun)
+- **agent**: Is that an annual physical or an annual wellness visit?
+- **caller**: Um, I think it’s an annual physical? It’s just the regular check-up I do every year.   (agent heard: um i think it’s an annual physical it’s just the regular check-up i do every year)
+- **agent**: For an annual physical, Dr. Michael Chen has today at 11:30 at Downtown, tomorrow at 10 at Downtown, or Friday at 8 at North Beach. Which works best?
+- **caller**: Uh, I was actually hoping for something next week or the week after. Do you have any openings then?   (agent heard: uh i was actually hoping for something next week or the week after do you have any openings then)
+- **agent**: For an annual physical, Dr. Michael Chen has Monday at 8 at Mission District, Tuesday at 8:30 at Downtown, or Wednesday the 14th at 8:30 at Mission District. Which works best?
+- **caller**: I think I’d prefer the Wednesday the 14th at 8:30 at Mission District. Is that available?   (agent heard: i think i’d prefer the wednesday the 14th at 8:30 at misseon district is that available)
+- **agent**: Okay, an annual physical with Dr. Michael Chen, Wednesday the 14th at 8:30 at Mission District. Shall I book it?
+- **caller**: Yes, please! That sounds perfect.   (agent heard: yes please that sounds perfect)
+- **agent**: You're all booked. Your confirmation is H, 6, 7, 6, 3. Is there anything else I can help with?
+- **caller**: No, that’s all I needed. Thank you!   (agent heard: no that’s all i needed thank you)
+- **agent**: Thank you for calling. Goodbye!
+
+## sf-19: RIGHT (booked the target)
+
+Target: mammogram with Dr. Hannah Nguyen at Midtown; returning, no referral; kind normal. Caller: Linda Adams, an impatient person who gets short with questions. Noisy speech: False.
+
+- **agent**: Hello! How can I assist you with scheduling today?
+- **caller**: I need to schedule a breast check at the Market Street location, with that lady doctor my neighbor recommended. Make it soon, please.
+- **agent**: One moment.
+- **agent**: Sorry, which doctor was that?
+- **caller**: I don't remember her name, but she's a lady doctor at the Market Street location. Can you help me get an appointment with her?
+- **agent**: For a mammogram, Dr. Hannah Nguyen has today at 11, Monday at 8:30, or Thursday the 15th at 8:30 at Midtown. Which works best?
+- **caller**: I need to see her today at 11. Can you book that?
+- **agent**: Okay, a mammogram with Dr. Hannah Nguyen, today at 11 at Midtown. Shall I book it?
+- **caller**: Yes, please book that.
+- **agent**: You're all booked. Your confirmation is H, 7, 1, 0, 3. Is there anything else I can help with?
+- **caller**: No, that's all. Thank you. Goodbye.
+- **agent**: Thank you for calling, have a great day. Goodbye!
