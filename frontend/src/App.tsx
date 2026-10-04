@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Toaster } from 'sonner'
 import { CallProvider } from './components/call/CallProvider'
 import { Canvas } from './components/canvas/Canvas'
+import { DemoScript } from './components/demo/DemoScript'
 import { RightPanel } from './components/inspector/RightPanel'
 import { KeysSheet } from './components/keys/KeysSheet'
 import { Sidebar } from './components/sidebar/Sidebar'
@@ -86,6 +87,7 @@ function Workspace() {
       <TopBar helpOpen={helpOpen} setHelpOpen={setHelpOpen} />
       <div className="relative min-h-0 flex-1">
         <Canvas />
+        <DemoScript />
         <RightPanel />
       </div>
     </main>

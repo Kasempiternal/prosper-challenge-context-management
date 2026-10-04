@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { Activity, Check, Keyboard, LayoutGrid, Loader2, Phone, Redo2, Save, Settings2, Undo2 } from 'lucide-react'
+import { Activity, Check, Keyboard, LayoutGrid, Loader2, Phone, Redo2, Save, ScrollText, Settings2, Undo2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAutoLayout } from '../../hooks/useAutoLayout'
 import { SHORTCUTS } from '../../hooks/useShortcuts'
@@ -8,6 +8,7 @@ import { callBlockedHint } from '../../lib/issues'
 import { fade, spring } from '../../lib/motion'
 import { isCallActive, useCall } from '../../store/call'
 import { cn } from '../../lib/cn'
+import { useDemo } from '../../store/demo'
 import { useDevView } from '../../store/devView'
 import { useEditor } from '../../store/editor'
 import { KeysButton } from '../keys/KeysSheet'
@@ -97,6 +98,7 @@ export function TopBar({ helpOpen, setHelpOpen }: { helpOpen: boolean; setHelpOp
         <ThemeMenu />
         <div className="ml-1 flex items-center gap-1.5">
           <KeysButton />
+          <DemoToggle />
           <DevViewToggle />
         </div>
       </div>
@@ -123,6 +125,25 @@ export function TopBar({ helpOpen, setHelpOpen }: { helpOpen: boolean; setHelpOp
         {callStatus === 'live' ? 'On call' : 'Test call'}
       </Button>
     </header>
+  )
+}
+
+function DemoToggle() {
+  const on = useDemo((s) => s.open)
+  return (
+    <button
+      type="button"
+      onClick={useDemo.getState().toggleOpen}
+      aria-pressed={on}
+      title="Demo script: the lines to say for each demo beat"
+      className={cn(
+        'flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors duration-200 ease-out-soft',
+        on ? 'border-accent/40 bg-accent-soft text-accent' : 'border-border text-ink-soft hover:border-border-strong hover:text-ink',
+      )}
+    >
+      <ScrollText className="size-3.5" aria-hidden />
+      Demo script
+    </button>
   )
 }
 
